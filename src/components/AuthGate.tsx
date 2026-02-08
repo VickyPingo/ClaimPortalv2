@@ -1,0 +1,179 @@
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import Login from './Login';
+import BrokerDashboard from './BrokerDashboard';
+import ClientPortal from './ClientPortal';
+import StructuralDamageForm from './StructuralDamageForm';
+import AllRiskForm from './AllRiskForm';
+import BurstGeyserForm from './BurstGeyserForm';
+import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
+import ClaimDetail from './ClaimDetail';
+import ProtectedRoute from './ProtectedRoute';
+import { Briefcase } from 'lucide-react';
+
+export default function AuthGate() {
+  const { user, userType, loading, brokerageId } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const [showStructuralDamageForm, setShowStructuralDamageForm] = useState(false);
+  const [showAllRiskForm, setShowAllRiskForm] = useState(false);
+  const [showGeyserForm, setShowGeyserForm] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState<any>(null);
+  const [loadingClaim, setLoadingClaim] = useState(false);
+
+  const fetchClaimDetails = async (claimId: string) => {
+    setLoadingClaim(true);
+    try {
+      const { data, error } = await supabase
+        .from('claims')
+        .select('*')
+        .eq('id', claimId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data) {
+        setSelectedClaim(data);
+      }
+    } catch (error) {
+      console.error('Error fetching claim:', error);
+      alert('Failed to load claim details');
+    } finally {
+      setLoadingClaim(false);
+    }
+  };
+
+  if (loading || loadingClaim) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (user && userType === 'broker') {
+    if (showAdminDashboard) {
+      return (
+        <ProtectedRoute allowedRoles={['broker']}>
+          <BrokerAdminDashboard />
+        </ProtectedRoute>
+      );
+    }
+
+    if (selectedClaim) {
+      return (
+        <ProtectedRoute allowedRoles={['broker']}>
+          <ClaimDetail
+            claim={selectedClaim}
+            onBack={() => setSelectedClaim(null)}
+          />
+        </ProtectedRoute>
+      );
+    }
+
+    if (showStructuralDamageForm) {
+      return (
+        <ProtectedRoute allowedRoles={['broker']}>
+          <StructuralDamageForm
+            clientId={user.id}
+            brokerageId={brokerageId || '00000000-0000-0000-0000-000000000001'}
+            onBack={() => setShowStructuralDamageForm(false)}
+          />
+        </ProtectedRoute>
+      );
+    }
+
+    if (showAllRiskForm) {
+      return (
+        <ProtectedRoute allowedRoles={['broker']}>
+          <AllRiskForm
+            clientId={user.id}
+            brokerageId={brokerageId || '00000000-0000-0000-0000-000000000001'}
+            onBack={() => setShowAllRiskForm(false)}
+          />
+        </ProtectedRoute>
+      );
+    }
+
+    if (showGeyserForm) {
+      return (
+        <ProtectedRoute allowedRoles={['broker']}>
+          <BurstGeyserForm
+            clientId={user.id}
+            brokerageId={brokerageId || '00000000-0000-0000-0000-000000000001'}
+            onBack={() => setShowGeyserForm(false)}
+          />
+        </ProtectedRoute>
+      );
+    }
+
+    return (
+      <ProtectedRoute allowedRoles={['broker']}>
+        <BrokerDashboard
+          onSelectClaimType={(type) => {
+            if (type === 'structural_damage') {
+              setShowStructuralDamageForm(true);
+            } else if (type === 'all_risk') {
+              setShowAllRiskForm(true);
+            } else if (type === 'burst_geyser') {
+              setShowGeyserForm(true);
+            }
+          }}
+          onShowClaim={(claimId) => fetchClaimDetails(claimId)}
+          onShowAdminDashboard={() => setShowAdminDashboard(true)}
+        />
+      </ProtectedRoute>
+    );
+  }
+
+  if (user && userType === 'client') {
+    return (
+      <ProtectedRoute allowedRoles={['client']}>
+        <ClientPortal />
+      </ProtectedRoute>
+    );
+  }
+
+  if (showLogin) {
+    return <Login onBackToRole={() => setShowLogin(false)} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
+        <div className="text-center mb-12">
+          <div className="flex items-center justify-center mb-6">
+            <div className="w-20 h-20 bg-blue-700 rounded-full flex items-center justify-center shadow-lg">
+              <Briefcase className="w-10 h-10 text-white" />
+            </div>
+          </div>
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">Claims Portal</h1>
+          <p className="text-xl text-gray-600 mb-8">Professional insurance claims management system</p>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Welcome</h2>
+          <p className="text-gray-600 mb-8">
+            Sign in to access your dashboard and manage insurance claims
+          </p>
+
+          <button
+            onClick={() => setShowLogin(true)}
+            className="w-full max-w-sm mx-auto bg-blue-700 text-white py-4 px-8 rounded-xl font-semibold text-lg hover:bg-blue-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            Sign In
+          </button>
+
+          <div className="mt-8 pt-8 border-t border-gray-200">
+            <p className="text-sm text-gray-500">
+              Secure access for brokers and clients
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
