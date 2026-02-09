@@ -689,6 +689,38 @@ export default function AllRiskForm({
                     </select>
                   </div>
 
+                  {incidentType === 'stolen' && ['Mobile Phone', 'Tablet'].includes(newItem.category as string) && (
+                    <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                      <div className="flex items-start mb-3">
+                        <Smartphone className="w-5 h-5 text-blue-700 mr-2 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-semibold text-blue-900 text-sm mb-2">Blacklisting Helper</h4>
+                          <p className="text-sm text-blue-800 mb-3">
+                            Note: To open a Police Case for a stolen phone, you first need to blacklist the device with your network provider to get an ITC Reference Number.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-white rounded p-2">
+                          <p className="font-semibold text-gray-900">Vodacom</p>
+                          <p className="text-gray-700">Dial 082 111</p>
+                        </div>
+                        <div className="bg-white rounded p-2">
+                          <p className="font-semibold text-gray-900">MTN</p>
+                          <p className="text-gray-700">Dial 135 or 083 135</p>
+                        </div>
+                        <div className="bg-white rounded p-2">
+                          <p className="font-semibold text-gray-900">Cell C</p>
+                          <p className="text-gray-700">Dial 140 or 084 140</p>
+                        </div>
+                        <div className="bg-white rounded p-2">
+                          <p className="font-semibold text-gray-900">Telkom</p>
+                          <p className="text-gray-700">Dial 081 180</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Item Description *
