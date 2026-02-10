@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { useBrokerage } from './BrokerageContext';
 
 export interface BrokerProfile {
   id: string;
@@ -30,13 +31,14 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'>) => Promise<void>;
   brokerSignIn: (email: string, password: string) => Promise<void>;
-  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId: string) => Promise<void>;
+  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<void>;
   clientSignIn: (email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { brokerage } = useBrokerage();
   const [user, setUser] = useState<User | null>(null);
   const [userType, setUserType] = useState<'broker' | 'client' | null>(null);
   const [brokerageId, setBrokerageId] = useState<string | null>(null);
@@ -144,6 +146,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'>) => {
+    if (!brokerage?.id) {
+      throw new Error('Brokerage not loaded. Please refresh the page.');
+    }
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -152,13 +158,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    const defaultBrokerageId = '00000000-0000-0000-0000-000000000001';
+    const currentBrokerageId = brokerage.id;
 
     const { error: brokerUserError } = await supabase
       .from('broker_users')
       .insert({
         id: authData.user.id,
-        brokerage_id: defaultBrokerageId,
+        brokerage_id: currentBrokerageId,
         name: profile.full_name,
         phone: profile.cell_number,
         role: 'staff',
@@ -170,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from('broker_profiles')
       .insert({
         id: authData.user.id,
-        brokerage_id: defaultBrokerageId,
+        brokerage_id: currentBrokerageId,
         full_name: profile.full_name,
         id_number: profile.id_number,
         cell_number: profile.cell_number,
@@ -192,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
-  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId: string) => {
+  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -201,11 +207,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
+    const currentBrokerageId = brokerageId || brokerage?.id;
+
+    if (!currentBrokerageId) {
+      throw new Error('Brokerage not loaded. Please refresh the page.');
+    }
+
     const { error: profileError } = await supabase
       .from('client_profiles')
       .insert({
         id: authData.user.id,
-        brokerage_id: brokerageId,
+        brokerage_id: currentBrokerageId,
         full_name: profile.full_name,
         email: profile.email,
         cell_number: profile.cell_number,

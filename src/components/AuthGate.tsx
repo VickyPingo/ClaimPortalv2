@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
 import Login from './Login';
 import BrokerDashboard from './BrokerDashboard';
@@ -10,10 +11,11 @@ import BurstGeyserForm from './BurstGeyserForm';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import ClaimDetail from './ClaimDetail';
 import ProtectedRoute from './ProtectedRoute';
-import { Briefcase } from 'lucide-react';
+import { Briefcase, AlertCircle } from 'lucide-react';
 
 export default function AuthGate() {
   const { user, userType, loading, brokerageId } = useAuth();
+  const { brokerage, loading: brokerageLoading, error: brokerageError } = useBrokerage();
   const [showLogin, setShowLogin] = useState(false);
   const [showStructuralDamageForm, setShowStructuralDamageForm] = useState(false);
   const [showAllRiskForm, setShowAllRiskForm] = useState(false);
@@ -43,12 +45,32 @@ export default function AuthGate() {
     }
   };
 
-  if (loading || loadingClaim) {
+  if (brokerageLoading || loading || loadingClaim) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (brokerageError || !brokerage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Configuration Error</h2>
+          <p className="text-gray-600 mb-6">
+            {brokerageError || 'Unable to load brokerage configuration for this domain.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -146,12 +168,23 @@ export default function AuthGate() {
       <div className="max-w-2xl w-full">
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-6">
-            <div className="w-20 h-20 bg-blue-700 rounded-full flex items-center justify-center shadow-lg">
-              <Briefcase className="w-10 h-10 text-white" />
-            </div>
+            {brokerage.logo_url ? (
+              <img
+                src={brokerage.logo_url}
+                alt={brokerage.name}
+                className="h-20 object-contain"
+              />
+            ) : (
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
+                style={{ backgroundColor: brokerage.brand_color }}
+              >
+                <Briefcase className="w-10 h-10 text-white" />
+              </div>
+            )}
           </div>
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">Claims Portal</h1>
-          <p className="text-xl text-gray-600 mb-8">Professional insurance claims management system</p>
+          <h1 className="text-5xl font-bold text-gray-900 mb-4">{brokerage.name}</h1>
+          <p className="text-xl text-gray-600 mb-8">Claims Portal</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
@@ -162,7 +195,11 @@ export default function AuthGate() {
 
           <button
             onClick={() => setShowLogin(true)}
-            className="w-full max-w-sm mx-auto bg-blue-700 text-white py-4 px-8 rounded-xl font-semibold text-lg hover:bg-blue-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            className="w-full max-w-sm mx-auto text-white py-4 px-8 rounded-xl font-semibold text-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+            style={{
+              backgroundColor: brokerage.brand_color,
+              ":hover": { filter: 'brightness(0.9)' }
+            }}
           >
             Sign In
           </button>

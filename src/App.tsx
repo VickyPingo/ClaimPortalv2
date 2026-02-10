@@ -1,4 +1,5 @@
 import { AuthProvider } from './contexts/AuthContext';
+import { BrokerageProvider } from './contexts/BrokerageContext';
 import AuthGate from './components/AuthGate';
 
 function AppContent() {
@@ -7,9 +8,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrokerageProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrokerageProvider>
   );
 }
 
