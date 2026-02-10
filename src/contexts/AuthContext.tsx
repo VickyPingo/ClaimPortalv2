@@ -153,13 +153,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    console.log('🚪 Signing out and clearing all cached data...');
+
+    // Clear all localStorage
+    localStorage.clear();
+
+    // Sign out from Supabase
     await supabase.auth.signOut();
+
+    // Clear all state
     setUser(null);
     setUserType(null);
     setUserRole(null);
     setBrokerageId(null);
     setBrokerProfile(null);
     setClientProfile(null);
+
+    console.log('✓ Signed out successfully');
   };
 
   const isSuperAdmin = (): boolean => {
@@ -169,6 +179,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log('🔐 Starting sign in process...');
 
+    // Clear any cached data before signing in
+    localStorage.clear();
+    console.log('🧹 Cleared cached data');
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -177,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     if (!data.user) throw new Error('Sign in failed - no user data');
 
-    console.log('✓ Authentication successful, fetching profile...');
+    console.log('✓ Authentication successful, fetching fresh profile from database...');
 
     // Explicitly fetch and set user profile before returning
     setUser(data.user);
@@ -233,6 +247,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const brokerSignIn = async (email: string, password: string) => {
     console.log('🔐 Starting broker sign in process...');
 
+    // Clear any cached data before signing in
+    localStorage.clear();
+    console.log('🧹 Cleared cached data');
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -241,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     if (!data.user) throw new Error('Sign in failed - no user data');
 
-    console.log('✓ Broker authentication successful, fetching profile...');
+    console.log('✓ Broker authentication successful, fetching fresh profile from database...');
 
     // Explicitly fetch and set user profile before returning
     setUser(data.user);
@@ -284,6 +302,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clientSignIn = async (email: string, password: string) => {
     console.log('🔐 Starting client sign in process...');
 
+    // Clear any cached data before signing in
+    localStorage.clear();
+    console.log('🧹 Cleared cached data');
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -292,7 +314,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
     if (!data.user) throw new Error('Sign in failed - no user data');
 
-    console.log('✓ Client authentication successful, fetching profile...');
+    console.log('✓ Client authentication successful, fetching fresh profile from database...');
 
     // Explicitly fetch and set user profile before returning
     setUser(data.user);

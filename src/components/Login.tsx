@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
 
 export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
-  const { signIn } = useAuth();
+  const { signIn, userRole, userType, loading: authLoading } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,6 +22,16 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
     }
   }, []);
 
+  // Wait for profile to load after login before navigation happens
+  useEffect(() => {
+    if (!authLoading && userType && userRole !== null) {
+      console.log('✅ Profile loaded after login, navigation will occur');
+      console.log('   User Type:', userType);
+      console.log('   User Role:', userRole);
+      console.log('   Dashboard:', userRole === 'super_admin' ? '/admin/brokerages' : '/claims');
+    }
+  }, [authLoading, userType, userRole]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -29,6 +39,8 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
 
     try {
       await signIn(email, password);
+      // signIn now waits for profile to load before returning
+      console.log('✓ Login successful, profile loaded');
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
