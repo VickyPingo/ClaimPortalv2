@@ -4,7 +4,7 @@ import AdminDashboard from './AdminDashboard';
 import ClientsDirectory from './ClientsDirectory';
 import ClientFolder from './ClientFolder';
 import ClaimMasterView from './ClaimMasterView';
-import BrokerSettings from '../BrokerSettings';
+import SettingsPanel from './SettingsPanel';
 
 type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'client-folder' | 'claim-view';
 
@@ -82,11 +82,7 @@ export default function BrokerAdminDashboard() {
         ) : null;
 
       case 'settings':
-        return (
-          <div className="p-6">
-            <BrokerSettings />
-          </div>
-        );
+        return <SettingsPanel />;
 
       default:
         return null;

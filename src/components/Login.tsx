@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
+import { supabase } from '../lib/supabase';
 import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
 
 export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
@@ -12,6 +13,14 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token || window.location.pathname === '/join') {
+      setShowSignup(true);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,13 +161,69 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitationValid, setInvitationValid] = useState(false);
+  const [invitationChecking, setInvitationChecking] = useState(false);
+  const [invitationBrokerageName, setInvitationBrokerageName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (token) {
+      validateInvitation(token);
+    }
+  }, []);
+
+  const validateInvitation = async (token: string) => {
+    setInvitationChecking(true);
+    try {
+      const hostname = window.location.hostname;
+      const subdomain = (hostname === 'localhost' || hostname === '127.0.0.1')
+        ? 'app.claimsplatform.com'
+        : hostname;
+
+      const { data, error: validationError } = await supabase
+        .rpc('validate_invitation', {
+          token_param: token,
+          subdomain_param: subdomain
+        });
+
+      if (validationError) {
+        setError('Failed to validate invitation');
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const validation = data[0];
+
+        if (validation.is_valid) {
+          setInvitationToken(token);
+          setInvitationValid(true);
+          setInvitationBrokerageName(validation.brokerage_name);
+        } else {
+          setError(validation.error_message || 'Invalid invitation');
+        }
+      }
+    } catch (err) {
+      console.error('Error validating invitation:', err);
+      setError('Failed to validate invitation');
+    } finally {
+      setInvitationChecking(false);
+    }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!brokerage) {
+    if (!invitationToken && !brokerage) {
       setError('Cannot sign up: No brokerage configuration found for this domain');
+      return;
+    }
+
+    if (invitationToken && !invitationValid) {
+      setError('Cannot sign up: Invalid or expired invitation');
       return;
     }
 
@@ -175,6 +240,10 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
         id_number: formData.idNumber,
         cell_number: formData.cellNumber,
       });
+
+      if (invitationToken) {
+        await supabase.rpc('use_invitation', { token_param: invitationToken });
+      }
     } catch (err: any) {
       setError(err.message || 'Signup failed');
     } finally {
@@ -200,7 +269,23 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           <p className="text-gray-600 text-sm">Create your account to get started</p>
         </div>
 
-        {brokerage && (
+        {invitationChecking && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">Validating invitation...</p>
+          </div>
+        )}
+
+        {invitationToken && invitationValid && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-800">
+              <span className="font-semibold">✓ Invitation Accepted</span>
+              <br />
+              Registering with: {invitationBrokerageName || brokerage?.name}
+            </p>
+          </div>
+        )}
+
+        {!invitationToken && brokerage && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               <span className="font-semibold">Registering with:</span> {brokerage.name}
@@ -215,7 +300,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           </div>
         )}
 
-        {!brokerage && (
+        {!invitationToken && !brokerage && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">
@@ -324,7 +409,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
 
           <button
             type="submit"
-            disabled={loading || !brokerage}
+            disabled={loading || (!invitationValid && !brokerage) || invitationChecking}
             className="w-full bg-blue-700 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
