@@ -201,8 +201,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log('🚪 Signing out and clearing all cached data...');
 
-    // Clear all localStorage
-    localStorage.clear();
+    // Clear ALL browser storage - use window.localStorage explicitly
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    console.log('🧹 Cleared localStorage and sessionStorage');
 
     // Sign out from Supabase
     await supabase.auth.signOut();
@@ -226,8 +228,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Starting sign in process...');
 
     // Clear any cached data before signing in
-    localStorage.clear();
-    console.log('🧹 Cleared cached data');
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -294,8 +297,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Starting broker sign in process...');
 
     // Clear any cached data before signing in
-    localStorage.clear();
-    console.log('🧹 Cleared cached data');
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -349,8 +353,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Starting client sign in process...');
 
     // Clear any cached data before signing in
-    localStorage.clear();
-    console.log('🧹 Cleared cached data');
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

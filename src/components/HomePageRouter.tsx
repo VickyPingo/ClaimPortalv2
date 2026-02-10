@@ -35,7 +35,7 @@ export default function HomePageRouter() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading profile from database...</p>
         </div>
       </div>
     );
@@ -44,6 +44,20 @@ export default function HomePageRouter() {
   // If not logged in, show login
   if (!user) {
     return <Login onBackToRole={() => {}} roleType={null} />;
+  }
+
+  // CRITICAL: If user is logged in but profile hasn't loaded yet, keep showing spinner
+  // Do NOT default to ClientPortal until database has responded
+  if (!profile && !userType) {
+    console.log('⚠️ User logged in but profile is null - waiting for database response');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Fetching profile from database...</p>
+        </div>
+      </div>
+    );
   }
 
   // Add emergency logout button (visible only when logged in)
