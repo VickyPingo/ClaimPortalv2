@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react';
-import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X } from 'lucide-react';
+import { ReactNode, useState, useMemo } from 'react';
+import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminLayoutProps {
@@ -9,15 +9,22 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
-  const { signOut } = useAuth();
+  const { signOut, isSuperAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navItems = [
-    { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'inbox' as const, icon: Inbox, label: 'Inbox (All Claims)' },
-    { id: 'clients' as const, icon: Users, label: 'Clients Directory' },
-    { id: 'settings' as const, icon: Settings, label: 'Settings' },
-  ];
+  const navItems = useMemo(() => {
+    const baseItems = [
+      { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
+      { id: 'inbox' as const, icon: Inbox, label: 'Inbox (All Claims)' },
+      { id: 'clients' as const, icon: Users, label: 'Clients Directory' },
+    ];
+
+    if (isSuperAdmin()) {
+      baseItems.push({ id: 'settings' as const, icon: Settings, label: 'Admin Settings' });
+    }
+
+    return baseItems;
+  }, [isSuperAdmin]);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings') => {
     onNavigate(view);

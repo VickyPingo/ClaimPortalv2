@@ -10,6 +10,7 @@ export interface BrokerProfile {
   cell_number: string;
   policy_number?: string;
   brokerage_id: string;
+  role?: string;
 }
 
 export interface ClientProfile {
@@ -18,11 +19,13 @@ export interface ClientProfile {
   email: string;
   cell_number: string;
   brokerage_id: string;
+  role?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   userType: 'broker' | 'client' | null;
+  userRole: string | null;
   brokerageId: string | null;
   brokerProfile: BrokerProfile | null;
   clientProfile: ClientProfile | null;
@@ -33,6 +36,7 @@ interface AuthContextType {
   brokerSignIn: (email: string, password: string) => Promise<void>;
   clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<void>;
   clientSignIn: (email: string, password: string) => Promise<void>;
+  isSuperAdmin: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { brokerage } = useBrokerage();
   const [user, setUser] = useState<User | null>(null);
   const [userType, setUserType] = useState<'broker' | 'client' | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [brokerageId, setBrokerageId] = useState<string | null>(null);
   const [brokerProfile, setBrokerProfile] = useState<BrokerProfile | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
@@ -69,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUser(null);
           setUserType(null);
+          setUserRole(null);
           setBrokerageId(null);
           setBrokerProfile(null);
           setClientProfile(null);
@@ -102,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(brokerUser.brokerage_id);
         if (profile) {
           setBrokerProfile(profile);
+          setUserRole(profile.role || null);
         }
         return;
       }
@@ -118,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserType('client');
         setBrokerageId(clientProfile.brokerage_id);
         setClientProfile(clientProfile);
+        setUserRole(clientProfile.role || null);
         return;
       }
 
@@ -131,9 +139,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setUserType(null);
+    setUserRole(null);
     setBrokerageId(null);
     setBrokerProfile(null);
     setClientProfile(null);
+  };
+
+  const isSuperAdmin = (): boolean => {
+    return userRole === 'super_admin';
   };
 
   const signIn = async (email: string, password: string) => {
@@ -239,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userType, brokerageId, brokerProfile, clientProfile, loading, signOut, signIn, brokerSignUp, brokerSignIn, clientSignUp, clientSignIn }}>
+    <AuthContext.Provider value={{ user, userType, userRole, brokerageId, brokerProfile, clientProfile, loading, signOut, signIn, brokerSignUp, brokerSignIn, clientSignUp, clientSignIn, isSuperAdmin }}>
       {children}
     </AuthContext.Provider>
   );
