@@ -32,7 +32,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'>) => Promise<void>;
+  brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<void>;
   brokerSignIn: (email: string, password: string) => Promise<void>;
   clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<void>;
   clientSignIn: (email: string, password: string) => Promise<void>;
@@ -243,9 +243,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('✓ Sign in complete, profile loaded');
   };
 
-  const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'>) => {
-    if (!brokerage?.id) {
-      throw new Error('Brokerage not loaded. Please refresh the page.');
+  const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
+    const targetBrokerageId = profile.brokerage_id || brokerage?.id;
+
+    if (!targetBrokerageId) {
+      throw new Error('Brokerage not loaded. Please refresh the page or use a valid invitation link.');
     }
 
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -256,13 +258,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    const currentBrokerageId = brokerage.id;
-
     const { error: brokerUserError } = await supabase
       .from('broker_users')
       .insert({
         id: authData.user.id,
-        brokerage_id: currentBrokerageId,
+        brokerage_id: targetBrokerageId,
         name: profile.full_name,
         phone: profile.cell_number,
         role: 'staff',
@@ -274,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from('broker_profiles')
       .insert({
         id: authData.user.id,
-        brokerage_id: currentBrokerageId,
+        brokerage_id: targetBrokerageId,
         full_name: profile.full_name,
         id_number: profile.id_number,
         cell_number: profile.cell_number,

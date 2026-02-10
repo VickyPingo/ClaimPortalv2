@@ -184,47 +184,59 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [invitationBrokerageId, setInvitationBrokerageId] = useState<string | null>(null);
   const [invitationValid, setInvitationValid] = useState(false);
   const [invitationChecking, setInvitationChecking] = useState(false);
   const [invitationBrokerageName, setInvitationBrokerageName] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
+    const inviteToken = params.get('invite');
+    const brokerageId = params.get('brokerage');
+    const legacyToken = params.get('token');
 
-    if (token) {
-      validateInvitation(token);
+    if (inviteToken && brokerageId) {
+      validateInvitation(inviteToken, brokerageId);
+    } else if (legacyToken) {
+      validateInvitation(legacyToken, null);
     }
   }, []);
 
-  const validateInvitation = async (token: string) => {
+  const validateInvitation = async (token: string, brokerageId: string | null) => {
     setInvitationChecking(true);
     try {
-      const hostname = window.location.hostname;
-      const subdomain = hostname;
+      const { data: invitationData, error: inviteError } = await supabase
+        .from('invitations')
+        .select('*, brokerages(id, name, subdomain)')
+        .eq('token', token)
+        .eq('is_active', true)
+        .maybeSingle();
 
-      const { data, error: validationError } = await supabase
-        .rpc('validate_invitation', {
-          token_param: token,
-          subdomain_param: subdomain
-        });
-
-      if (validationError) {
-        setError('Failed to validate invitation');
+      if (inviteError || !invitationData) {
+        setError('Invalid or expired invitation');
         return;
       }
 
-      if (data && data.length > 0) {
-        const validation = data[0];
-
-        if (validation.is_valid) {
-          setInvitationToken(token);
-          setInvitationValid(true);
-          setInvitationBrokerageName(validation.brokerage_name);
-        } else {
-          setError(validation.error_message || 'Invalid invitation');
-        }
+      if (brokerageId && invitationData.brokerage_id !== brokerageId) {
+        setError('Invitation does not match the specified brokerage');
+        return;
       }
+
+      const expiresAt = new Date(invitationData.expires_at);
+      if (expiresAt < new Date()) {
+        setError('This invitation has expired');
+        return;
+      }
+
+      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
+        setError('This invitation has reached its maximum number of uses');
+        return;
+      }
+
+      setInvitationToken(token);
+      setInvitationBrokerageId(invitationData.brokerage_id);
+      setInvitationValid(true);
+      setInvitationBrokerageName((invitationData.brokerages as any)?.name || 'Unknown Brokerage');
     } catch (err) {
       console.error('Error validating invitation:', err);
       setError('Failed to validate invitation');
@@ -260,14 +272,25 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
     setLoading(true);
 
     try {
-      await brokerSignUp(formData.email, formData.password, {
+      const signupResult = await brokerSignUp(formData.email, formData.password, {
         full_name: formData.fullName,
         id_number: formData.idNumber,
         cell_number: formData.cellNumber,
+        brokerage_id: invitationBrokerageId || undefined,
       });
 
       if (invitationToken) {
-        await supabase.rpc('use_invitation', { token_param: invitationToken });
+        const { error: updateError } = await supabase
+          .from('invitations')
+          .update({
+            used_count: supabase.sql`used_count + 1`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('token', invitationToken);
+
+        if (updateError) {
+          console.error('Error updating invitation count:', updateError);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Signup failed');
