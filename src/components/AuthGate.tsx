@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
 import Login from './Login';
+import Landing from './Landing';
 import BrokerDashboard from './BrokerDashboard';
 import ClientPortal from './ClientPortal';
 import StructuralDamageForm from './StructuralDamageForm';
@@ -15,8 +16,9 @@ import { Briefcase, AlertCircle } from 'lucide-react';
 
 export default function AuthGate() {
   const { user, userType, loading, brokerageId } = useAuth();
-  const { brokerage, loading: brokerageLoading, error: brokerageError } = useBrokerage();
+  const { brokerage, loading: brokerageLoading, error: brokerageError, isPlatformDomain } = useBrokerage();
   const [showLogin, setShowLogin] = useState(false);
+  const [selectedUserType, setSelectedUserType] = useState<'client' | 'broker' | null>(null);
   const [showStructuralDamageForm, setShowStructuralDamageForm] = useState(false);
   const [showAllRiskForm, setShowAllRiskForm] = useState(false);
   const [showGeyserForm, setShowGeyserForm] = useState(false);
@@ -56,7 +58,7 @@ export default function AuthGate() {
     );
   }
 
-  if (brokerageError || !brokerage) {
+  if (!isPlatformDomain && (brokerageError || !brokerage)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -160,7 +162,23 @@ export default function AuthGate() {
   }
 
   if (showLogin) {
-    return <Login onBackToRole={() => setShowLogin(false)} />;
+    return <Login onBackToRole={() => {
+      setShowLogin(false);
+      setSelectedUserType(null);
+    }} roleType={selectedUserType} />;
+  }
+
+  if (isPlatformDomain) {
+    return (
+      <Landing onSelectRole={(role) => {
+        setSelectedUserType(role);
+        setShowLogin(true);
+      }} />
+    );
+  }
+
+  if (!brokerage) {
+    return null;
   }
 
   return (

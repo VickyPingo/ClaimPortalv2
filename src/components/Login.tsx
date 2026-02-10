@@ -4,9 +4,9 @@ import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
 import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
 
-export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
+export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
   const { signIn } = useAuth();
-  const { brokerage } = useBrokerage();
+  const { brokerage, isPlatformDomain } = useBrokerage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -54,8 +54,12 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
         )}
 
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
-          <p className="text-gray-600">Sign in to your account</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {isPlatformDomain && roleType === 'broker' ? 'Super Admin Login' : 'Welcome Back'}
+          </h1>
+          <p className="text-gray-600">
+            {isPlatformDomain && roleType === 'broker' ? 'Access the platform admin dashboard' : 'Sign in to your account'}
+          </p>
         </div>
 
         {error && (
@@ -124,7 +128,13 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
         </form>
 
         <div className="mt-6">
-          {brokerage ? (
+          {isPlatformDomain ? (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-center text-sm text-blue-800">
+                Platform access is restricted to authorized administrators only.
+              </p>
+            </div>
+          ) : brokerage ? (
             <p className="text-center text-gray-600">
               Don't have an account?{' '}
               <button
@@ -149,7 +159,7 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
 
 function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; onBackToRole?: () => void }) {
   const { brokerSignUp } = useAuth();
-  const { brokerage } = useBrokerage();
+  const { brokerage, isPlatformDomain } = useBrokerage();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -179,9 +189,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
     setInvitationChecking(true);
     try {
       const hostname = window.location.hostname;
-      const subdomain = (hostname === 'localhost' || hostname === '127.0.0.1')
-        ? 'app.claimsplatform.com'
-        : hostname;
+      const subdomain = hostname;
 
       const { data, error: validationError } = await supabase
         .rpc('validate_invitation', {
@@ -216,6 +224,11 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isPlatformDomain && !invitationToken) {
+      setError('Cannot sign up on platform domain without invitation');
+      return;
+    }
 
     if (!invitationToken && !brokerage) {
       setError('Cannot sign up: No brokerage configuration found for this domain');

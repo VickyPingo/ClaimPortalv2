@@ -14,6 +14,8 @@ interface BrokerageContextType {
   brokerage: BrokerageConfig | null;
   loading: boolean;
   error: string | null;
+  isPlatformDomain: boolean;
+  currentDomain: string;
 }
 
 const BrokerageContext = createContext<BrokerageContextType | undefined>(undefined);
@@ -22,6 +24,8 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
   const [brokerage, setBrokerage] = useState<BrokerageConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPlatformDomain, setIsPlatformDomain] = useState(false);
+  const [currentDomain, setCurrentDomain] = useState('');
 
   useEffect(() => {
     loadBrokerageConfig();
@@ -33,14 +37,19 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
       setError(null);
 
       const hostname = window.location.hostname;
-      let subdomain = hostname;
+      setCurrentDomain(hostname);
 
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        subdomain = 'app.claimsplatform.com';
+      const platformDomains = ['claimsportal.co.za', 'localhost', '127.0.0.1'];
+      const isPlatform = platformDomains.includes(hostname);
+      setIsPlatformDomain(isPlatform);
+
+      if (isPlatform) {
+        setLoading(false);
+        return;
       }
 
       const { data, error: fetchError } = await supabase
-        .rpc('get_brokerage_by_subdomain', { subdomain_param: subdomain });
+        .rpc('get_brokerage_by_subdomain', { subdomain_param: hostname });
 
       if (fetchError) {
         console.error('Error fetching brokerage:', fetchError);
@@ -56,7 +65,7 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
           document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
         }
       } else {
-        setError(`No brokerage configuration found for domain: ${subdomain}`);
+        setError(`No brokerage configuration found for domain: ${hostname}`);
       }
     } catch (err) {
       console.error('Error loading brokerage config:', err);
@@ -67,7 +76,7 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <BrokerageContext.Provider value={{ brokerage, loading, error }}>
+    <BrokerageContext.Provider value={{ brokerage, loading, error, isPlatformDomain, currentDomain }}>
       {children}
     </BrokerageContext.Provider>
   );
