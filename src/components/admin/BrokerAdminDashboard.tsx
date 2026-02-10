@@ -6,19 +6,20 @@ import ClientsDirectory from './ClientsDirectory';
 import ClientFolder from './ClientFolder';
 import ClaimMasterView from './ClaimMasterView';
 import SettingsPanel from './SettingsPanel';
+import BrokeragesManager from './BrokeragesManager';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 
-type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'client-folder' | 'claim-view';
+type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin } = useAuth();
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [currentView, setCurrentView] = useState<View>(isSuperAdmin() ? 'brokerages' : 'dashboard');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings') => {
-    if (view === 'settings' && !isSuperAdmin()) {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages') => {
+    if ((view === 'settings' || view === 'brokerages') && !isSuperAdmin()) {
       setAccessDeniedMessage('Access Denied: Only super administrators can access this section.');
       setTimeout(() => setAccessDeniedMessage(null), 5000);
       return;
@@ -30,9 +31,9 @@ export default function BrokerAdminDashboard() {
   };
 
   useEffect(() => {
-    if (currentView === 'settings' && !isSuperAdmin()) {
+    if ((currentView === 'settings' || currentView === 'brokerages') && !isSuperAdmin()) {
       setCurrentView('dashboard');
-      setAccessDeniedMessage('Access Denied: You do not have permission to access admin settings.');
+      setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
       setTimeout(() => setAccessDeniedMessage(null), 5000);
     }
   }, [currentView, isSuperAdmin]);
@@ -99,6 +100,27 @@ export default function BrokerAdminDashboard() {
           />
         ) : null;
 
+      case 'brokerages':
+        return isSuperAdmin() ? (
+          <BrokeragesManager />
+        ) : (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+              <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+              <p className="text-gray-600 mb-6">
+                You do not have permission to access brokerages management. Only super administrators can view this section.
+              </p>
+              <button
+                onClick={() => handleNavigate('dashboard')}
+                className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          </div>
+        );
+
       case 'settings':
         return isSuperAdmin() ? (
           <SettingsPanel />
@@ -125,10 +147,10 @@ export default function BrokerAdminDashboard() {
     }
   };
 
-  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'settings' => {
+  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' => {
     if (currentView === 'client-folder') return 'clients';
     if (currentView === 'claim-view') return selectedClientId ? 'clients' : 'dashboard';
-    return currentView as 'dashboard' | 'inbox' | 'clients' | 'settings';
+    return currentView as 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages';
   };
 
   return (

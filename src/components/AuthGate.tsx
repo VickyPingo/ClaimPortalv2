@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
@@ -15,7 +15,7 @@ import ProtectedRoute from './ProtectedRoute';
 import { Briefcase, AlertCircle } from 'lucide-react';
 
 export default function AuthGate() {
-  const { user, userType, loading, brokerageId } = useAuth();
+  const { user, userType, loading, brokerageId, isSuperAdmin } = useAuth();
   const { brokerage, loading: brokerageLoading, error: brokerageError, isPlatformDomain } = useBrokerage();
   const [showLogin, setShowLogin] = useState(false);
   const [selectedUserType, setSelectedUserType] = useState<'client' | 'broker' | null>(null);
@@ -25,6 +25,12 @@ export default function AuthGate() {
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<any>(null);
   const [loadingClaim, setLoadingClaim] = useState(false);
+
+  useEffect(() => {
+    if (user && userType === 'broker' && isSuperAdmin()) {
+      setShowAdminDashboard(true);
+    }
+  }, [user, userType, isSuperAdmin]);
 
   const fetchClaimDetails = async (claimId: string) => {
     setLoadingClaim(true);

@@ -4,8 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  currentView: 'dashboard' | 'inbox' | 'clients' | 'settings';
-  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'settings') => void;
+  currentView: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages';
+  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages') => void;
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
@@ -20,6 +20,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     ];
 
     if (isSuperAdmin()) {
+      baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Brokerages' });
       baseItems.push({ id: 'settings' as const, icon: Settings, label: 'Admin Settings' });
     }
 
