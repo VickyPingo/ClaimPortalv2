@@ -72,27 +72,23 @@ export default function HomePageRouter() {
     </button>
   );
 
+  // STRICT ROUTING HIERARCHY - Check role FIRST, then user_type
+
   // SUPER OVERRIDE: Force super_admin for vickypingo@gmail.com
   let currentRole = profile?.role || userRole;
   if (user?.email === 'vickypingo@gmail.com') {
     console.log('🔒 SUPER OVERRIDE: vickypingo@gmail.com detected - forcing super_admin');
     currentRole = 'super_admin';
-    // Immediate redirect to break any React state loop
-    if (window.location.pathname !== '/admin') {
-      console.log('🔄 FORCING BROWSER REDIRECT TO /admin');
-      window.location.href = '/admin';
-      return null;
-    }
   }
 
-  // STEP 2: Super Admin Check - HIGHEST PRIORITY
-  // STRICT: If super_admin detected, ONLY render BrokerAdminDashboard - NO FALLBACK
-  if (currentRole === 'super_admin') {
+  // STEP 1: Super Admin Check - HIGHEST PRIORITY (check role FIRST)
+  if (currentRole === 'super_admin' || profile?.role === 'super_admin') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🛡️ SUPER ADMIN DETECTED - FORCING ADMIN VIEW');
+    console.log('🛡️ SUPER ADMIN DETECTED - RENDERING ADMIN DASHBOARD');
     console.log('📋 Current Role:', currentRole);
+    console.log('📋 Profile Role:', profile?.role);
     console.log('📋 User Email:', user?.email);
-    console.log('✅ ROUTING TO: BrokerAdminDashboard (ONLY)');
+    console.log('✅ ROUTING TO: BrokerAdminDashboard');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
       <>
@@ -102,9 +98,9 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: Broker Check
-  if (profile?.user_type === 'broker' || userType === 'broker') {
-    console.log('✅ ROUTING TO: BrokerDashboard (Broker)');
+  // STEP 2: Regular Broker Check (only if NOT super_admin)
+  if ((profile?.user_type === 'broker' || userType === 'broker') && currentRole !== 'super_admin') {
+    console.log('✅ ROUTING TO: BrokerDashboard (Regular Broker)');
     return (
       <>
         <EmergencyLogoutButton />

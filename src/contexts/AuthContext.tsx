@@ -171,12 +171,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('📋 Role type:', typeof roleValue);
           console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
           console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
-
-          // Force redirect for super_admin
-          if (roleValue === 'super_admin' && userEmail === 'vickypingo@gmail.com') {
-            console.log('🔄 FORCING REDIRECT TO /admin');
-            window.location.href = '/admin';
-          }
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
 
@@ -184,8 +178,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (userEmail === 'vickypingo@gmail.com') {
             console.log('🛡️ FALLBACK ACTIVATED: No profile but email is vickypingo@gmail.com - forcing super_admin');
             setUserRole('super_admin');
-            console.log('🔄 FORCING REDIRECT TO /admin');
-            window.location.href = '/admin';
           }
         }
         return;
@@ -223,8 +215,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is vickypingo@gmail.com - forcing super_admin and broker type');
         setUserType('broker');
         setUserRole('super_admin');
-        console.log('🔄 FORCING REDIRECT TO /admin');
-        window.location.href = '/admin';
       }
     } catch (error) {
       console.error('❌ Error determining user type:', error);
