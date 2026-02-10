@@ -16,6 +16,7 @@ export default function HomePageRouter() {
   console.log('  User Role:', userRole);
   console.log('  Is Super Admin:', isSuperAdmin());
   console.log('  Is Platform Domain:', isPlatformDomain);
+  console.log('  Brokerage Error:', brokerageError);
 
   if (loading || brokerageLoading) {
     return (
@@ -28,7 +29,7 @@ export default function HomePageRouter() {
     );
   }
 
-  if (!isPlatformDomain && (brokerageError || !brokerage)) {
+  if (!isPlatformDomain && (brokerageError || !brokerage) && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -48,16 +49,30 @@ export default function HomePageRouter() {
     );
   }
 
+  // SUPER ADMIN PRIORITY - If logged in as super admin, show admin dashboard regardless of domain issues
+  if (user && userType === 'broker' && isSuperAdmin()) {
+    console.log('→ Super admin logged in, showing SuperAdminDashboard (bypassing domain checks)');
+    return <BrokerAdminDashboard />;
+  }
+
+  // LOGGED IN AS BROKER - Show BrokerDashboard
+  if (user && userType === 'broker') {
+    console.log('→ Regular broker logged in, showing BrokerDashboard');
+    return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
+  }
+
+  // LOGGED IN AS CLIENT - Show ClientPortal
+  if (user && userType === 'client') {
+    console.log('→ Client logged in, showing ClientPortal');
+    return <ClientPortal />;
+  }
+
   // NOT LOGGED IN - Show login screen
   if (!user) {
     console.log('→ Not logged in, showing Login');
 
-    if (isPlatformDomain) {
+    if (isPlatformDomain || !brokerage) {
       return <Login onBackToRole={() => {}} roleType={null} />;
-    }
-
-    if (!brokerage) {
-      return null;
     }
 
     return (
@@ -95,24 +110,6 @@ export default function HomePageRouter() {
         </div>
       </div>
     );
-  }
-
-  // LOGGED IN AS SUPER ADMIN - Show SuperAdminDashboard
-  if (userType === 'broker' && isSuperAdmin()) {
-    console.log('→ Super admin logged in, showing SuperAdminDashboard');
-    return <BrokerAdminDashboard />;
-  }
-
-  // LOGGED IN AS BROKER - Show BrokerDashboard
-  if (userType === 'broker') {
-    console.log('→ Regular broker logged in, showing BrokerDashboard');
-    return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
-  }
-
-  // LOGGED IN AS CLIENT - Show ClientPortal
-  if (userType === 'client') {
-    console.log('→ Client logged in, showing ClientPortal');
-    return <ClientPortal />;
   }
 
   // FALLBACK - Show login

@@ -40,36 +40,61 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
       setCurrentDomain(hostname);
 
       const platformDomains = ['claimsportal.co.za', 'localhost', '127.0.0.1'];
-      const isPlatform = platformDomains.includes(hostname);
+      const isDevelopment = hostname.includes('localhost') ||
+                           hostname.includes('127.0.0.1') ||
+                           hostname.includes('webcontainer') ||
+                           hostname.includes('.local');
+
+      const isPlatform = platformDomains.includes(hostname) || isDevelopment;
       setIsPlatformDomain(isPlatform);
 
+      console.log('🌐 Domain Detection:');
+      console.log('  Hostname:', hostname);
+      console.log('  Is Development:', isDevelopment);
+      console.log('  Is Platform Domain:', isPlatform);
+
       if (isPlatform) {
+        console.log('✓ Platform/Development domain detected - skipping brokerage lookup');
         setLoading(false);
         return;
       }
 
-      const { data, error: fetchError } = await supabase
-        .rpc('get_brokerage_by_subdomain', { subdomain_param: hostname });
+      try {
+        const { data, error: fetchError } = await supabase
+          .rpc('get_brokerage_by_subdomain', { subdomain_param: hostname });
 
-      if (fetchError) {
-        console.error('Error fetching brokerage:', fetchError);
-        setError('Failed to load brokerage configuration');
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const brokerageData = data[0];
-        setBrokerage(brokerageData);
-
-        if (brokerageData.brand_color) {
-          document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
+        if (fetchError) {
+          console.error('Error fetching brokerage:', fetchError);
+          console.log('⚠️ Brokerage lookup failed, treating as platform domain');
+          setIsPlatformDomain(true);
+          setError(null);
+          return;
         }
-      } else {
-        setError(`No brokerage configuration found for domain: ${hostname}`);
+
+        if (data && data.length > 0) {
+          const brokerageData = data[0];
+          setBrokerage(brokerageData);
+
+          if (brokerageData.brand_color) {
+            document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
+          }
+          console.log('✓ Brokerage configuration loaded:', brokerageData.name);
+        } else {
+          console.log('⚠️ No brokerage found for domain, treating as platform domain');
+          setIsPlatformDomain(true);
+          setError(null);
+        }
+      } catch (lookupError) {
+        console.error('Brokerage lookup error:', lookupError);
+        console.log('⚠️ Error during lookup, treating as platform domain');
+        setIsPlatformDomain(true);
+        setError(null);
       }
     } catch (err) {
-      console.error('Error loading brokerage config:', err);
-      setError('An error occurred while loading brokerage configuration');
+      console.error('Fatal error loading brokerage config:', err);
+      console.log('⚠️ Fatal error, treating as platform domain');
+      setIsPlatformDomain(true);
+      setError(null);
     } finally {
       setLoading(false);
     }
