@@ -72,13 +72,26 @@ export default function HomePageRouter() {
     </button>
   );
 
+  // SUPER OVERRIDE: Force super_admin for vickypingo@gmail.com
+  let currentRole = profile?.role || userRole;
+  if (user?.email === 'vickypingo@gmail.com') {
+    console.log('🔒 SUPER OVERRIDE: vickypingo@gmail.com detected - forcing super_admin');
+    currentRole = 'super_admin';
+    // Immediate redirect to break any React state loop
+    if (window.location.pathname !== '/admin') {
+      console.log('🔄 FORCING BROWSER REDIRECT TO /admin');
+      window.location.href = '/admin';
+      return null;
+    }
+  }
+
   // STEP 2: Super Admin Check - HIGHEST PRIORITY
   // STRICT: If super_admin detected, ONLY render BrokerAdminDashboard - NO FALLBACK
-  if (profile?.role === 'super_admin' || userRole === 'super_admin') {
+  if (currentRole === 'super_admin') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🛡️ SUPER ADMIN DETECTED - FORCING ADMIN VIEW');
-    console.log('📋 Profile role:', profile?.role);
-    console.log('📋 UserRole:', userRole);
+    console.log('📋 Current Role:', currentRole);
+    console.log('📋 User Email:', user?.email);
     console.log('✅ ROUTING TO: BrokerAdminDashboard (ONLY)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
