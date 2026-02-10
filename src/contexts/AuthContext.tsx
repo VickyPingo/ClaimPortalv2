@@ -120,10 +120,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(brokerUser.brokerage_id);
         if (profile) {
           setBrokerProfile(profile);
-          setUserRole(profile.role || null);
+          const roleValue = profile.role || null;
+          setUserRole(roleValue);
           console.log('✓ Broker profile loaded');
-          console.log('📋 Current User Role:', profile.role || 'null');
-          console.log('👑 Is Super Admin:', profile.role === 'super_admin');
+          console.log('📋 Profile data:', JSON.stringify(profile, null, 2));
+          console.log('📋 Current User Role (raw):', roleValue);
+          console.log('📋 Role type:', typeof roleValue);
+          console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
+          console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
+        } else {
+          console.warn('⚠️ No broker profile found for user:', userId);
         }
         return;
       }

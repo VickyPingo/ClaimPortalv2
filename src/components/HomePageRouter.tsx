@@ -12,13 +12,17 @@ export default function HomePageRouter() {
 
   console.log('🏠 HomePageRouter - Routing Decision:');
   console.log('  User:', user?.id);
+  console.log('  User Email:', user?.email);
   console.log('  User Type:', userType);
-  console.log('  User Role:', userRole);
-  console.log('  Is Super Admin:', isSuperAdmin());
+  console.log('  User Role (raw):', userRole);
+  console.log('  User Role === "super_admin":', userRole === 'super_admin');
+  console.log('  Is Super Admin (function):', isSuperAdmin());
   console.log('  Is Platform Domain:', isPlatformDomain);
   console.log('  Brokerage Error:', brokerageError);
+  console.log('  Loading states - auth:', loading, '/ brokerage:', brokerageLoading);
 
   if (loading || brokerageLoading) {
+    console.log('⏳ Still loading, showing spinner...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
@@ -30,6 +34,7 @@ export default function HomePageRouter() {
   }
 
   if (!isPlatformDomain && (brokerageError || !brokerage) && !user) {
+    console.log('⚠️ Configuration error for guest user');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -49,15 +54,24 @@ export default function HomePageRouter() {
     );
   }
 
-  // SUPER ADMIN PRIORITY - If logged in as super admin, show admin dashboard regardless of domain issues
-  if (user && userType === 'broker' && isSuperAdmin()) {
-    console.log('→ Super admin logged in, showing SuperAdminDashboard (bypassing domain checks)');
+  // SUPER ADMIN PRIORITY - Check role explicitly
+  const isUserSuperAdmin = user && userType === 'broker' && (userRole === 'super_admin' || isSuperAdmin());
+
+  if (isUserSuperAdmin) {
+    console.log('👑 ==========================================');
+    console.log('👑 SUPER ADMIN DETECTED - Loading Admin Dashboard');
+    console.log('👑 User:', user?.email);
+    console.log('👑 Role:', userRole);
+    console.log('👑 ==========================================');
     return <BrokerAdminDashboard />;
   }
 
   // LOGGED IN AS BROKER - Show BrokerDashboard
   if (user && userType === 'broker') {
-    console.log('→ Regular broker logged in, showing BrokerDashboard');
+    console.log('📊 Regular broker logged in');
+    console.log('   Email:', user.email);
+    console.log('   Role:', userRole);
+    console.log('   → Showing BrokerDashboard');
     return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
   }
 
