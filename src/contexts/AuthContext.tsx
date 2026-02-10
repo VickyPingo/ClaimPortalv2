@@ -52,11 +52,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🚀 AuthContext initializing - fetching fresh session and profile');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       (async () => {
         if (session?.user) {
+          console.log('📦 Session found, fetching fresh profile from database');
           setUser(session.user);
+          // Always fetch fresh profile from database on mount
           await determineUserType(session.user.id);
+        } else {
+          console.log('❌ No session found');
         }
         setLoading(false);
       })();
@@ -64,11 +70,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       (async () => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log('🔄 Auth state changed:', event, session?.user?.id);
 
         if (session?.user) {
           setUser(session.user);
           setLoading(true);
+          // Fetch fresh profile on every auth state change
+          console.log('🔄 Refreshing profile from database');
           await determineUserType(session.user.id);
           setLoading(false);
         } else {

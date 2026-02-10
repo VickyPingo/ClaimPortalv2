@@ -20,6 +20,7 @@ export default function BrokeragesManager() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
+    console.log('🏢 BrokeragesManager component mounted - fetching brokerages');
     fetchBrokerages();
   }, []);
 

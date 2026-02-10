@@ -15,32 +15,25 @@ import ProtectedRoute from './ProtectedRoute';
 import { Briefcase, AlertCircle } from 'lucide-react';
 
 export default function AuthGate() {
-  const { user, userType, loading, brokerageId, isSuperAdmin } = useAuth();
+  const { user, userType, userRole, loading, brokerageId, isSuperAdmin } = useAuth();
   const { brokerage, loading: brokerageLoading, error: brokerageError, isPlatformDomain } = useBrokerage();
   const [showLogin, setShowLogin] = useState(false);
   const [selectedUserType, setSelectedUserType] = useState<'client' | 'broker' | null>(null);
   const [showStructuralDamageForm, setShowStructuralDamageForm] = useState(false);
   const [showAllRiskForm, setShowAllRiskForm] = useState(false);
   const [showGeyserForm, setShowGeyserForm] = useState(false);
-  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<any>(null);
   const [loadingClaim, setLoadingClaim] = useState(false);
 
+  // Log routing decisions
   useEffect(() => {
-    console.log('🔄 AuthGate - Checking user type and admin status');
-    console.log('  User:', user?.id);
+    console.log('🧭 AuthGate - Routing Decision:');
+    console.log('  User ID:', user?.id);
     console.log('  User Type:', userType);
+    console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
-
-    if (user && userType === 'broker' && isSuperAdmin()) {
-      console.log('✓ Super Admin detected - showing admin dashboard');
-      setShowAdminDashboard(true);
-    } else if (user && userType === 'broker') {
-      console.log('→ Regular broker - showing standard dashboard');
-    } else if (user && userType === 'client') {
-      console.log('→ Client user - showing client portal');
-    }
-  }, [user, userType, isSuperAdmin]);
+    console.log('  Dashboard Path:', isSuperAdmin() ? '/admin/brokerages' : '/claims');
+  }, [user, userType, userRole, isSuperAdmin]);
 
   const fetchClaimDetails = async (claimId: string) => {
     setLoadingClaim(true);
@@ -95,7 +88,9 @@ export default function AuthGate() {
   }
 
   if (user && userType === 'broker') {
-    if (showAdminDashboard) {
+    // Super admin gets routed to admin dashboard immediately
+    if (isSuperAdmin()) {
+      console.log('✅ Rendering BrokerAdminDashboard for super admin');
       return (
         <ProtectedRoute allowedRoles={['broker']}>
           <BrokerAdminDashboard />
@@ -103,6 +98,7 @@ export default function AuthGate() {
       );
     }
 
+    // Regular broker routes
     if (selectedClaim) {
       return (
         <ProtectedRoute allowedRoles={['broker']}>
@@ -150,6 +146,7 @@ export default function AuthGate() {
       );
     }
 
+    console.log('→ Rendering BrokerDashboard for regular broker');
     return (
       <ProtectedRoute allowedRoles={['broker']}>
         <BrokerDashboard
@@ -163,7 +160,6 @@ export default function AuthGate() {
             }
           }}
           onShowClaim={(claimId) => fetchClaimDetails(claimId)}
-          onShowAdminDashboard={() => setShowAdminDashboard(true)}
         />
       </ProtectedRoute>
     );
