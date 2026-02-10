@@ -1,16 +1,12 @@
 import { AuthProvider } from './contexts/AuthContext';
 import { BrokerageProvider } from './contexts/BrokerageContext';
-import AuthGate from './components/AuthGate';
-
-function AppContent() {
-  return <AuthGate />;
-}
+import HomePageRouter from './components/HomePageRouter';
 
 function App() {
   return (
     <BrokerageProvider>
       <AuthProvider>
-        <AppContent />
+        <HomePageRouter />
       </AuthProvider>
     </BrokerageProvider>
   );

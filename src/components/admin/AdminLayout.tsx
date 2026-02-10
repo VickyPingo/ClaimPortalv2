@@ -1,11 +1,11 @@
 import { ReactNode, useState, useMemo } from 'react';
-import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2 } from 'lucide-react';
+import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  currentView: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages';
-  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages') => void;
+  currentView: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations';
+  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => void;
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
@@ -21,6 +21,8 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
 
     if (isSuperAdmin()) {
       baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Brokerages' });
+      baseItems.push({ id: 'users' as const, icon: UserCog, label: 'Users' });
+      baseItems.push({ id: 'invitations' as const, icon: Link, label: 'Invitations' });
       baseItems.push({ id: 'settings' as const, icon: Settings, label: 'Admin Settings' });
     }
 
