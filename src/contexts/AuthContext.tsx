@@ -143,6 +143,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) console.error('Error fetching broker profile:', profileError);
 
+        // HARD-CODED OVERRIDE
+        if (profile && userEmail === 'vickypingo@gmail.com') {
+          profile.role = 'super_admin';
+          profile.user_type = 'broker';
+          console.log('🔒 HARD-CODED OVERRIDE APPLIED FOR vickypingo@gmail.com');
+        }
+
         setUserType('broker');
         setBrokerageId(brokerUser.brokerage_id);
 
@@ -157,12 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setBrokerProfile(profile);
           let roleValue = profile.role || null;
 
-          // FALLBACK: If email is vickypingo@gmail.com and no role, force super_admin
-          if (!roleValue && userEmail === 'vickypingo@gmail.com') {
-            console.log('🛡️ FALLBACK ACTIVATED: Setting vickypingo@gmail.com as super_admin');
-            roleValue = 'super_admin';
-          }
-
           setUserRole(roleValue);
 
           console.log('✓ Broker profile loaded and state updated');
@@ -170,6 +171,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('📋 Role type:', typeof roleValue);
           console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
           console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
+
+          // Force redirect for super_admin
+          if (roleValue === 'super_admin' && userEmail === 'vickypingo@gmail.com') {
+            console.log('🔄 FORCING REDIRECT TO /admin');
+            window.location.href = '/admin';
+          }
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
 
