@@ -27,8 +27,18 @@ export default function AuthGate() {
   const [loadingClaim, setLoadingClaim] = useState(false);
 
   useEffect(() => {
+    console.log('🔄 AuthGate - Checking user type and admin status');
+    console.log('  User:', user?.id);
+    console.log('  User Type:', userType);
+    console.log('  Is Super Admin:', isSuperAdmin());
+
     if (user && userType === 'broker' && isSuperAdmin()) {
+      console.log('✓ Super Admin detected - showing admin dashboard');
       setShowAdminDashboard(true);
+    } else if (user && userType === 'broker') {
+      console.log('→ Regular broker - showing standard dashboard');
+    } else if (user && userType === 'client') {
+      console.log('→ Client user - showing client portal');
     }
   }, [user, userType, isSuperAdmin]);
 

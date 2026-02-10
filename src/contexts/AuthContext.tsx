@@ -87,6 +87,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const determineUserType = async (userId: string) => {
     try {
+      console.log('🔍 Determining user type for user ID:', userId);
+
       const { data: brokerUser, error: brokerError } = await supabase
         .from('broker_users')
         .select('brokerage_id')
@@ -96,6 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (brokerError) console.error('Error fetching broker user:', brokerError);
 
       if (brokerUser) {
+        console.log('✓ User is a broker, fetching profile...');
+
         const { data: profile, error: profileError } = await supabase
           .from('broker_profiles')
           .select('*')
@@ -109,6 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profile) {
           setBrokerProfile(profile);
           setUserRole(profile.role || null);
+          console.log('✓ Broker profile loaded');
+          console.log('📋 Current User Role:', profile.role || 'null');
+          console.log('👑 Is Super Admin:', profile.role === 'super_admin');
         }
         return;
       }
@@ -122,16 +129,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (clientError) console.error('Error fetching client profile:', clientError);
 
       if (clientProfile) {
+        console.log('✓ User is a client');
         setUserType('client');
         setBrokerageId(clientProfile.brokerage_id);
         setClientProfile(clientProfile);
         setUserRole(clientProfile.role || null);
+        console.log('📋 Current User Role:', clientProfile.role || 'null');
         return;
       }
 
-      console.warn('No profile found for user:', userId);
+      console.warn('⚠️ No profile found for user:', userId);
     } catch (error) {
-      console.error('Error determining user type:', error);
+      console.error('❌ Error determining user type:', error);
     }
   };
 
@@ -150,12 +159,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('🔐 Starting sign in process...');
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+    if (!data.user) throw new Error('Sign in failed - no user data');
+
+    console.log('✓ Authentication successful, fetching profile...');
+
+    // Explicitly fetch and set user profile before returning
+    setUser(data.user);
+    await determineUserType(data.user.id);
+
+    console.log('✓ Sign in complete, profile loaded');
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'>) => {
@@ -203,12 +223,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('🔐 Starting broker sign in process...');
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+    if (!data.user) throw new Error('Sign in failed - no user data');
+
+    console.log('✓ Broker authentication successful, fetching profile...');
+
+    // Explicitly fetch and set user profile before returning
+    setUser(data.user);
+    await determineUserType(data.user.id);
+
+    console.log('✓ Broker sign in complete, profile loaded');
   };
 
   const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => {
@@ -243,12 +274,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clientSignIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('🔐 Starting client sign in process...');
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+    if (!data.user) throw new Error('Sign in failed - no user data');
+
+    console.log('✓ Client authentication successful, fetching profile...');
+
+    // Explicitly fetch and set user profile before returning
+    setUser(data.user);
+    await determineUserType(data.user.id);
+
+    console.log('✓ Client sign in complete, profile loaded');
   };
 
   return (

@@ -13,25 +13,38 @@ type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'cli
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin } = useAuth();
-  const [currentView, setCurrentView] = useState<View>(isSuperAdmin() ? 'brokerages' : 'dashboard');
+  const initialView = isSuperAdmin() ? 'brokerages' : 'dashboard';
+
+  console.log('🎯 BrokerAdminDashboard - Initializing');
+  console.log('  Is Super Admin:', isSuperAdmin());
+  console.log('  Initial View:', initialView);
+
+  const [currentView, setCurrentView] = useState<View>(initialView);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages') => {
+    console.log('🧭 Navigation requested to:', view);
+
     if ((view === 'settings' || view === 'brokerages') && !isSuperAdmin()) {
+      console.log('❌ Access denied - user is not super admin');
       setAccessDeniedMessage('Access Denied: Only super administrators can access this section.');
       setTimeout(() => setAccessDeniedMessage(null), 5000);
       return;
     }
 
+    console.log('✓ Navigation allowed, switching to:', view);
     setCurrentView(view);
     setSelectedClientId(null);
     setSelectedClaimId(null);
   };
 
   useEffect(() => {
+    console.log('📺 Current View Changed:', currentView);
+
     if ((currentView === 'settings' || currentView === 'brokerages') && !isSuperAdmin()) {
+      console.log('❌ Unauthorized view access detected, redirecting to dashboard');
       setCurrentView('dashboard');
       setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
       setTimeout(() => setAccessDeniedMessage(null), 5000);
@@ -63,6 +76,8 @@ export default function BrokerAdminDashboard() {
   };
 
   const renderContent = () => {
+    console.log('🎬 Rendering content for view:', currentView);
+
     switch (currentView) {
       case 'dashboard':
         return (
@@ -101,25 +116,29 @@ export default function BrokerAdminDashboard() {
         ) : null;
 
       case 'brokerages':
-        return isSuperAdmin() ? (
-          <BrokeragesManager />
-        ) : (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-              <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-6">
-                You do not have permission to access brokerages management. Only super administrators can view this section.
-              </p>
-              <button
-                onClick={() => handleNavigate('dashboard')}
-                className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
-              >
-                Return to Dashboard
-              </button>
+        if (isSuperAdmin()) {
+          console.log('✓ Rendering BrokeragesManager for super admin');
+          return <BrokeragesManager />;
+        } else {
+          console.log('❌ Rendering access denied for brokerages');
+          return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+              <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+                <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+                <p className="text-gray-600 mb-6">
+                  You do not have permission to access brokerages management. Only super administrators can view this section.
+                </p>
+                <button
+                  onClick={() => handleNavigate('dashboard')}
+                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
             </div>
-          </div>
-        );
+          );
+        }
 
       case 'settings':
         return isSuperAdmin() ? (
