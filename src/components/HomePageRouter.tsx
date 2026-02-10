@@ -10,19 +10,47 @@ export default function HomePageRouter() {
   const { user, userType, userRole, loading, isSuperAdmin } = useAuth();
   const { brokerage, loading: brokerageLoading, error: brokerageError, isPlatformDomain } = useBrokerage();
 
-  console.log('App detected role:', userRole);
+  console.log('🚦 HomePageRouter - Current State:');
+  console.log('  User:', user?.email);
+  console.log('  User Type:', userType);
+  console.log('  User Role:', userRole);
+  console.log('  Loading:', loading);
+  console.log('  Brokerage Loading:', brokerageLoading);
+  console.log('  Is Super Admin:', isSuperAdmin());
 
-  if (loading || brokerageLoading) {
+  // STEP 1: Wait for auth to load
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600">Loading authentication...</p>
         </div>
       </div>
     );
   }
 
+  // STEP 2: HIGHEST PRIORITY - Super Admin Check (BEFORE ANY OTHER LOGIC)
+  // This check happens IMMEDIATELY after auth loading completes
+  // NOTHING can override this - not brokerage checks, not domain checks, NOTHING
+  if (user && userRole === 'super_admin') {
+    console.log('✅ SUPER ADMIN DETECTED - Routing to BrokerAdminDashboard');
+    return <BrokerAdminDashboard />;
+  }
+
+  // STEP 3: Now wait for brokerage to load (only if not super admin)
+  if (brokerageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading brokerage...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // STEP 4: Check for brokerage errors (only for non-logged-in users)
   if (!isPlatformDomain && (brokerageError || !brokerage) && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -43,24 +71,21 @@ export default function HomePageRouter() {
     );
   }
 
-  // HIGHEST PRIORITY: Super Admin
-  if (userRole === 'super_admin') {
-    return <BrokerAdminDashboard />;
-  }
-
-  // SECOND PRIORITY: Broker
-  if (userType === 'broker') {
+  // STEP 5: Regular Broker (non-super-admin)
+  if (user && userType === 'broker' && userRole !== 'super_admin') {
+    console.log('✅ BROKER DETECTED - Routing to BrokerDashboard');
     return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
   }
 
-  // THIRD PRIORITY: Client
-  if (userType === 'client') {
+  // STEP 6: Client
+  if (user && userType === 'client') {
+    console.log('✅ CLIENT DETECTED - Routing to ClientPortal');
     return <ClientPortal />;
   }
 
-  // NOT LOGGED IN - Show login screen
+  // STEP 7: NOT LOGGED IN - Show login screen
   if (!user) {
-    console.log('→ Not logged in, showing Login');
+    console.log('❌ Not logged in, showing Login');
 
     if (isPlatformDomain || !brokerage) {
       return <Login onBackToRole={() => {}} roleType={null} />;
