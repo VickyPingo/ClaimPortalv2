@@ -73,10 +73,14 @@ export default function HomePageRouter() {
   );
 
   // STEP 2: Super Admin Check - HIGHEST PRIORITY
-  // Check BOTH profile.role and userRole to catch any inconsistencies
+  // STRICT: If super_admin detected, ONLY render BrokerAdminDashboard - NO FALLBACK
   if (profile?.role === 'super_admin' || userRole === 'super_admin') {
-    console.log('!! FORCING ADMIN VIEW !!');
-    console.log('✅ ROUTING TO: BrokerAdminDashboard (Super Admin)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🛡️ SUPER ADMIN DETECTED - FORCING ADMIN VIEW');
+    console.log('📋 Profile role:', profile?.role);
+    console.log('📋 UserRole:', userRole);
+    console.log('✅ ROUTING TO: BrokerAdminDashboard (ONLY)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
       <>
         <EmergencyLogoutButton />
@@ -96,12 +100,26 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 4: Default - Client Portal
-  console.log('✅ ROUTING TO: ClientPortal (Default)');
+  // STEP 4: Client Check (explicit check, not default)
+  if (profile?.user_type === 'client' || userType === 'client') {
+    console.log('✅ ROUTING TO: ClientPortal (Client)');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <ClientPortal />
+      </>
+    );
+  }
+
+  // STEP 5: Unknown state - show spinner or error
+  console.log('⚠️ Unknown user state - showing spinner');
   return (
-    <>
-      <EmergencyLogoutButton />
-      <ClientPortal />
-    </>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+      <div className="text-center">
+        <EmergencyLogoutButton />
+        <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-gray-600">Determining user type...</p>
+      </div>
+    </div>
   );
 }

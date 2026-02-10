@@ -54,11 +54,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🚀 AuthContext initializing - fetching fresh session and profile from database');
 
+    // Clear any cached data on mount
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    console.log('🧹 Cleared all cached data on AuthContext mount');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       (async () => {
         if (session?.user) {
           console.log('📦 Session found, fetching fresh profile from database');
           setUser(session.user);
+
+          // CRITICAL: Clear all state before fetching to prevent stale data
+          setUserType(null);
+          setUserRole(null);
+          setBrokerageId(null);
+          setBrokerProfile(null);
+          setClientProfile(null);
+
           await determineUserType(session.user.id);
         } else {
           console.log('❌ No session found');
@@ -74,6 +87,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           setUser(session.user);
           setLoading(true);
+
+          // CRITICAL: Clear all state before fetching to prevent stale data
+          setUserType(null);
+          setUserRole(null);
+          setBrokerageId(null);
+          setBrokerProfile(null);
+          setClientProfile(null);
+
           console.log('🔄 Refreshing profile from database');
           await determineUserType(session.user.id);
           setLoading(false);
@@ -126,6 +147,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(brokerUser.brokerage_id);
 
         if (profile) {
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('📦 RAW DATABASE RESPONSE:');
+          console.log('   Full profile object:', JSON.stringify(profile, null, 2));
+          console.log('   profile.role =', profile.role);
+          console.log('   profile.user_type =', profile.user_type);
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
           setBrokerProfile(profile);
           let roleValue = profile.role || null;
 
@@ -137,10 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           setUserRole(roleValue);
 
-          console.log('✓ Broker profile loaded');
-          console.log('📋 Profile data:', JSON.stringify(profile, null, 2));
-          console.log('📋 Role from DB:', profile.role);
-          console.log('📋 User Type from DB:', profile.user_type);
+          console.log('✓ Broker profile loaded and state updated');
           console.log('📋 Final Role Value:', roleValue);
           console.log('📋 Role type:', typeof roleValue);
           console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
@@ -166,14 +191,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (clientError) console.error('Error fetching client profile:', clientError);
 
       if (clientProfile) {
-        console.log('✓ User is a client');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📦 RAW DATABASE RESPONSE (CLIENT):');
+        console.log('   Full profile object:', JSON.stringify(clientProfile, null, 2));
+        console.log('   clientProfile.role =', clientProfile.role);
+        console.log('   clientProfile.user_type =', clientProfile.user_type);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
         setUserType('client');
         setBrokerageId(clientProfile.brokerage_id);
         setClientProfile(clientProfile);
         setUserRole(clientProfile.role || null);
 
-        console.log('📋 Role from DB:', clientProfile.role);
-        console.log('📋 User Type from DB:', clientProfile.user_type);
+        console.log('✓ Client profile loaded and state updated');
         return;
       }
 

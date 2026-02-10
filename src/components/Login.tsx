@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader, ArrowLeft, Trash2 } from 'lucide-react';
 
 export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
   const { signIn, userRole, userType, loading: authLoading } = useAuth();
@@ -46,6 +46,13 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClearCache = () => {
+    console.log('🧹 CLEARING ALL CACHE AND RELOADING');
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.location.reload();
   };
 
   if (showSignup) {
@@ -136,6 +143,15 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
             Sign In
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClearCache}
+            className="w-full bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-700 flex items-center justify-center gap-2 border-2 border-orange-700"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear Cache & Reload
           </button>
         </form>
 
