@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBrokerage } from '../contexts/BrokerageContext';
 import { Mail, Lock, Phone, User, AlertCircle, Loader, ArrowLeft, FileText } from 'lucide-react';
 
 export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void }) {
   const { clientSignIn, clientSignUp } = useAuth();
+  const { brokerage } = useBrokerage();
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +35,11 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
     e.preventDefault();
     setError('');
 
+    if (!brokerage) {
+      setError('Cannot sign up: No brokerage configuration found for this domain');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -41,12 +48,11 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
     setLoading(true);
 
     try {
-      const brokerageId = '00000000-0000-0000-0000-000000000001';
       await clientSignUp(email, password, {
         full_name: fullName,
         email: email,
         cell_number: cellNumber,
-      }, brokerageId);
+      });
     } catch (err: any) {
       setError(err.message || 'Sign up failed');
     } finally {
@@ -73,6 +79,23 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             {isSignup ? 'Sign up to file insurance claims' : 'Sign in to your client account'}
           </p>
         </div>
+
+        {isSignup && brokerage && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">Registering with:</span> {brokerage.name}
+            </p>
+          </div>
+        )}
+
+        {isSignup && !brokerage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">
+              Cannot register: This domain is not configured for sign-ups. Please contact your broker for access.
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -204,7 +227,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (isSignup && !brokerage)}
             className="w-full bg-green-700 text-white py-2.5 rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
@@ -213,18 +236,26 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
         </form>
 
         <div className="mt-6">
-          <p className="text-center text-gray-600">
-            {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button
-              onClick={() => {
-                setIsSignup(!isSignup);
-                setError('');
-              }}
-              className="text-green-700 font-semibold hover:text-green-800"
-            >
-              {isSignup ? 'Sign In' : 'Sign Up'}
-            </button>
-          </p>
+          {(isSignup || brokerage) ? (
+            <p className="text-center text-gray-600">
+              {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setError('');
+                }}
+                className="text-green-700 font-semibold hover:text-green-800"
+              >
+                {isSignup ? 'Sign In' : 'Sign Up'}
+              </button>
+            </p>
+          ) : (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-center text-sm text-amber-800">
+                Sign up is not available on this domain. Please contact your broker for access.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

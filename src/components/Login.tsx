@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBrokerage } from '../contexts/BrokerageContext';
 import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
 
 export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
   const { signIn } = useAuth();
+  const { brokerage } = useBrokerage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -113,15 +115,23 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
         </form>
 
         <div className="mt-6">
-          <p className="text-center text-gray-600">
-            Don't have an account?{' '}
-            <button
-              onClick={() => setShowSignup(true)}
-              className="text-blue-700 font-semibold hover:text-blue-800"
-            >
-              Sign Up
-            </button>
-          </p>
+          {brokerage ? (
+            <p className="text-center text-gray-600">
+              Don't have an account?{' '}
+              <button
+                onClick={() => setShowSignup(true)}
+                className="text-blue-700 font-semibold hover:text-blue-800"
+              >
+                Sign Up
+              </button>
+            </p>
+          ) : (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-center text-sm text-amber-800">
+                Sign up is not available on this domain. Please contact your broker for access.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -130,6 +140,7 @@ export default function Login({ onBackToRole }: { onBackToRole?: () => void }) {
 
 function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; onBackToRole?: () => void }) {
   const { brokerSignUp } = useAuth();
+  const { brokerage } = useBrokerage();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -145,6 +156,11 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!brokerage) {
+      setError('Cannot sign up: No brokerage configuration found for this domain');
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -184,10 +200,27 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           <p className="text-gray-600 text-sm">Create your account to get started</p>
         </div>
 
+        {brokerage && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">Registering with:</span> {brokerage.name}
+            </p>
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {!brokerage && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">
+              Cannot register: This domain is not configured for sign-ups. Please contact your broker for access.
+            </p>
           </div>
         )}
 
@@ -291,7 +324,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !brokerage}
             className="w-full bg-blue-700 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}

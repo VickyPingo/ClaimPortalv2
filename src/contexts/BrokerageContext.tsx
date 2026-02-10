@@ -56,7 +56,7 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
           document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
         }
       } else {
-        setError('Brokerage not found for this domain');
+        setError(`No brokerage configuration found for domain: ${subdomain}`);
       }
     } catch (err) {
       console.error('Error loading brokerage config:', err);
