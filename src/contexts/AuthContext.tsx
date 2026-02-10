@@ -93,7 +93,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const determineUserType = async (userId: string) => {
     try {
-      console.log('🔍 Determining user type for user ID:', userId);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 DETERMINING USER TYPE FOR USER ID:', userId);
+      console.log('⚠️ NO CACHE - FETCHING FRESH FROM DATABASE');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Get current user's email for fallback check
       const { data: { user: currentUser } } = await supabase.auth.getUser();

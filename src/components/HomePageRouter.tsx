@@ -3,9 +3,10 @@ import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import BrokerDashboard from './BrokerDashboard';
 import ClientPortal from './ClientPortal';
+import { LogOut } from 'lucide-react';
 
 export default function HomePageRouter() {
-  const { user, userType, userRole, loading, brokerProfile, clientProfile } = useAuth();
+  const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut } = useAuth();
 
   // Create a unified profile object for easier debugging
   const profile = brokerProfile || clientProfile;
@@ -13,6 +14,20 @@ export default function HomePageRouter() {
   console.log('Router detected role:', profile?.role);
   console.log('Router detected user_type:', profile?.user_type);
   console.log('Router state - userType:', userType, 'userRole:', userRole);
+
+  const handleForceLogout = async () => {
+    console.log('🧹 FORCING COMPLETE LOGOUT AND CACHE CLEAR');
+
+    // Clear ALL browser storage
+    localStorage.clear();
+    sessionStorage.clear();
+
+    // Clear Supabase auth
+    await signOut();
+
+    // Force reload to clear any remaining state
+    window.location.reload();
+  };
 
   // STEP 1: Loading State - Show spinner while profile is loading
   if (loading) {
@@ -31,21 +46,48 @@ export default function HomePageRouter() {
     return <Login onBackToRole={() => {}} roleType={null} />;
   }
 
+  // Add emergency logout button (visible only when logged in)
+  const EmergencyLogoutButton = () => (
+    <button
+      onClick={handleForceLogout}
+      className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 font-medium transition-colors"
+      title="Clear cache and force logout"
+    >
+      <LogOut className="w-4 h-4" />
+      Force Logout
+    </button>
+  );
+
   // STEP 2: Super Admin Check - HIGHEST PRIORITY
   // Check BOTH profile.role and userRole to catch any inconsistencies
   if (profile?.role === 'super_admin' || userRole === 'super_admin') {
     console.log('!! FORCING ADMIN VIEW !!');
     console.log('✅ ROUTING TO: BrokerAdminDashboard (Super Admin)');
-    return <BrokerAdminDashboard />;
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
   }
 
   // STEP 3: Broker Check
   if (profile?.user_type === 'broker' || userType === 'broker') {
     console.log('✅ ROUTING TO: BrokerDashboard (Broker)');
-    return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />
+      </>
+    );
   }
 
   // STEP 4: Default - Client Portal
   console.log('✅ ROUTING TO: ClientPortal (Default)');
-  return <ClientPortal />;
+  return (
+    <>
+      <EmergencyLogoutButton />
+      <ClientPortal />
+    </>
+  );
 }
