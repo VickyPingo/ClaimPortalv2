@@ -132,10 +132,3 @@ export default function HomePageRouter() {
     </div>
   );
 }
-
-// HARD OVERRIDE FOR SUPER ADMIN
-if (user?.email === 'vickypingo@gmail.com') {
-  console.log('--- SUPER ADMIN BYPASS ACTIVATED ---');
-  return <BrokerAdminDashboard />;
-}
-
