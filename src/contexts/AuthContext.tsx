@@ -97,6 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Determining user type for user ID:', userId);
 
+      // Get current user's email for fallback check
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userEmail = currentUser?.email;
+      console.log('📧 User email:', userEmail);
+
       const { data: brokerUser, error: brokerError } = await supabase
         .from('broker_users')
         .select('brokerage_id')
@@ -110,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data: profile, error: profileError } = await supabase
           .from('broker_profiles')
-          .select('*')
+          .select('role, user_type, *')
           .eq('id', userId)
           .maybeSingle();
 
@@ -118,25 +123,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUserType('broker');
         setBrokerageId(brokerUser.brokerage_id);
+
         if (profile) {
           setBrokerProfile(profile);
-          const roleValue = profile.role || null;
+          let roleValue = profile.role || null;
+
+          // FALLBACK: If email is vickypingo@gmail.com and no role, force super_admin
+          if (!roleValue && userEmail === 'vickypingo@gmail.com') {
+            console.log('🛡️ FALLBACK ACTIVATED: Setting vickypingo@gmail.com as super_admin');
+            roleValue = 'super_admin';
+          }
+
           setUserRole(roleValue);
           console.log('✓ Broker profile loaded');
           console.log('📋 Profile data:', JSON.stringify(profile, null, 2));
-          console.log('📋 Current User Role (raw):', roleValue);
+          console.log('📋 Role from DB:', profile.role);
+          console.log('📋 User Type from DB:', profile.user_type);
+          console.log('📋 Final Role Value:', roleValue);
           console.log('📋 Role type:', typeof roleValue);
           console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
           console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
+
+          // FALLBACK: If no profile but email is vickypingo@gmail.com, force super_admin
+          if (userEmail === 'vickypingo@gmail.com') {
+            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is vickypingo@gmail.com - forcing super_admin');
+            setUserRole('super_admin');
+          }
         }
         return;
       }
 
       const { data: clientProfile, error: clientError } = await supabase
         .from('client_profiles')
-        .select('*')
+        .select('role, user_type, *')
         .eq('id', userId)
         .maybeSingle();
 
@@ -148,13 +169,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(clientProfile.brokerage_id);
         setClientProfile(clientProfile);
         setUserRole(clientProfile.role || null);
-        console.log('📋 Current User Role:', clientProfile.role || 'null');
+        console.log('📋 Role from DB:', clientProfile.role);
+        console.log('📋 User Type from DB:', clientProfile.user_type);
         return;
       }
 
       console.warn('⚠️ No profile found for user:', userId);
+
+      // FALLBACK: If nothing worked but email is vickypingo@gmail.com, force super_admin
+      if (userEmail === 'vickypingo@gmail.com') {
+        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is vickypingo@gmail.com - forcing super_admin and broker type');
+        setUserType('broker');
+        setUserRole('super_admin');
+      }
     } catch (error) {
       console.error('❌ Error determining user type:', error);
+
+      // FALLBACK: On any error, check email
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser?.email === 'vickypingo@gmail.com') {
+        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is vickypingo@gmail.com - forcing super_admin');
+        setUserType('broker');
+        setUserRole('super_admin');
+      }
     }
   };
 
