@@ -32,13 +32,15 @@ export default function HomePageRouter() {
   }
 
   // STEP 2: Super Admin Check - HIGHEST PRIORITY
-  if (userRole === 'super_admin') {
+  // Check BOTH profile.role and userRole to catch any inconsistencies
+  if (profile?.role === 'super_admin' || userRole === 'super_admin') {
+    console.log('!! FORCING ADMIN VIEW !!');
     console.log('✅ ROUTING TO: BrokerAdminDashboard (Super Admin)');
     return <BrokerAdminDashboard />;
   }
 
   // STEP 3: Broker Check
-  if (userType === 'broker') {
+  if (profile?.user_type === 'broker' || userType === 'broker') {
     console.log('✅ ROUTING TO: BrokerDashboard (Broker)');
     return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
   }

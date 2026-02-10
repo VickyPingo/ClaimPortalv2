@@ -52,33 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🚀 AuthContext initializing - fetching fresh session and profile');
-
-    // Try to restore from localStorage first for instant display
-    const cachedUserType = localStorage.getItem('userType') as 'broker' | 'client' | null;
-    const cachedUserRole = localStorage.getItem('userRole');
-    const cachedBrokerageId = localStorage.getItem('brokerageId');
-
-    if (cachedUserType) {
-      console.log('📦 Restored from cache:', { cachedUserType, cachedUserRole, cachedBrokerageId });
-      setUserType(cachedUserType);
-      setUserRole(cachedUserRole);
-      setBrokerageId(cachedBrokerageId);
-    }
+    console.log('🚀 AuthContext initializing - fetching fresh session and profile from database');
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       (async () => {
         if (session?.user) {
           console.log('📦 Session found, fetching fresh profile from database');
           setUser(session.user);
-          // Always fetch fresh profile from database on mount
           await determineUserType(session.user.id);
         } else {
           console.log('❌ No session found');
-          // Clear localStorage cache
-          localStorage.removeItem('userType');
-          localStorage.removeItem('userRole');
-          localStorage.removeItem('brokerageId');
         }
         setLoading(false);
       })();
@@ -91,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           setUser(session.user);
           setLoading(true);
-          // Fetch fresh profile on every auth state change
           console.log('🔄 Refreshing profile from database');
           await determineUserType(session.user.id);
           setLoading(false);
@@ -102,10 +84,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setBrokerageId(null);
           setBrokerProfile(null);
           setClientProfile(null);
-          // Clear localStorage cache
-          localStorage.removeItem('userType');
-          localStorage.removeItem('userRole');
-          localStorage.removeItem('brokerageId');
         }
       })();
     });
@@ -144,10 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserType('broker');
         setBrokerageId(brokerUser.brokerage_id);
 
-        // Persist to localStorage
-        localStorage.setItem('userType', 'broker');
-        localStorage.setItem('brokerageId', brokerUser.brokerage_id);
-
         if (profile) {
           setBrokerProfile(profile);
           let roleValue = profile.role || null;
@@ -160,11 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           setUserRole(roleValue);
 
-          // Persist role to localStorage
-          if (roleValue) {
-            localStorage.setItem('userRole', roleValue);
-          }
-
           console.log('✓ Broker profile loaded');
           console.log('📋 Profile data:', JSON.stringify(profile, null, 2));
           console.log('📋 Role from DB:', profile.role);
@@ -173,7 +142,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('📋 Role type:', typeof roleValue);
           console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
           console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
-          console.log('💾 Persisted to localStorage:', { userType: 'broker', userRole: roleValue });
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
 
@@ -181,7 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (userEmail === 'vickypingo@gmail.com') {
             console.log('🛡️ FALLBACK ACTIVATED: No profile but email is vickypingo@gmail.com - forcing super_admin');
             setUserRole('super_admin');
-            localStorage.setItem('userRole', 'super_admin');
           }
         }
         return;
@@ -202,16 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setClientProfile(clientProfile);
         setUserRole(clientProfile.role || null);
 
-        // Persist to localStorage
-        localStorage.setItem('userType', 'client');
-        localStorage.setItem('brokerageId', clientProfile.brokerage_id);
-        if (clientProfile.role) {
-          localStorage.setItem('userRole', clientProfile.role);
-        }
-
         console.log('📋 Role from DB:', clientProfile.role);
         console.log('📋 User Type from DB:', clientProfile.user_type);
-        console.log('💾 Persisted to localStorage:', { userType: 'client', userRole: clientProfile.role });
         return;
       }
 
