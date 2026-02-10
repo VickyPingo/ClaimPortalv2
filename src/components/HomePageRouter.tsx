@@ -10,19 +10,9 @@ export default function HomePageRouter() {
   const { user, userType, userRole, loading, isSuperAdmin } = useAuth();
   const { brokerage, loading: brokerageLoading, error: brokerageError, isPlatformDomain } = useBrokerage();
 
-  console.log('🏠 HomePageRouter - Routing Decision:');
-  console.log('  User:', user?.id);
-  console.log('  User Email:', user?.email);
-  console.log('  User Type:', userType);
-  console.log('  User Role (raw):', userRole);
-  console.log('  User Role === "super_admin":', userRole === 'super_admin');
-  console.log('  Is Super Admin (function):', isSuperAdmin());
-  console.log('  Is Platform Domain:', isPlatformDomain);
-  console.log('  Brokerage Error:', brokerageError);
-  console.log('  Loading states - auth:', loading, '/ brokerage:', brokerageLoading);
+  console.log('App detected role:', userRole);
 
   if (loading || brokerageLoading) {
-    console.log('⏳ Still loading, showing spinner...');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
@@ -34,7 +24,6 @@ export default function HomePageRouter() {
   }
 
   if (!isPlatformDomain && (brokerageError || !brokerage) && !user) {
-    console.log('⚠️ Configuration error for guest user');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -54,30 +43,18 @@ export default function HomePageRouter() {
     );
   }
 
-  // SUPER ADMIN PRIORITY - Check role explicitly
-  const isUserSuperAdmin = user && userType === 'broker' && (userRole === 'super_admin' || isSuperAdmin());
-
-  if (isUserSuperAdmin) {
-    console.log('👑 ==========================================');
-    console.log('👑 SUPER ADMIN DETECTED - Loading Admin Dashboard');
-    console.log('👑 User:', user?.email);
-    console.log('👑 Role:', userRole);
-    console.log('👑 ==========================================');
+  // HIGHEST PRIORITY: Super Admin
+  if (userRole === 'super_admin') {
     return <BrokerAdminDashboard />;
   }
 
-  // LOGGED IN AS BROKER - Show BrokerDashboard
-  if (user && userType === 'broker') {
-    console.log('📊 Regular broker logged in');
-    console.log('   Email:', user.email);
-    console.log('   Role:', userRole);
-    console.log('   → Showing BrokerDashboard');
+  // SECOND PRIORITY: Broker
+  if (userType === 'broker') {
     return <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />;
   }
 
-  // LOGGED IN AS CLIENT - Show ClientPortal
-  if (user && userType === 'client') {
-    console.log('→ Client logged in, showing ClientPortal');
+  // THIRD PRIORITY: Client
+  if (userType === 'client') {
     return <ClientPortal />;
   }
 
