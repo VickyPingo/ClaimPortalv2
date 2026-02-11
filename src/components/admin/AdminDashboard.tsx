@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Loader2, Calendar, MapPin, Car, Droplet, Shield, Home, Briefcase, FileText, User } from 'lucide-react';
 
 interface Claim {
@@ -11,6 +12,7 @@ interface Claim {
   claimant_phone: string | null;
   location_address: string | null;
   user_id: string | null;
+  brokerage_id: string | null;
   client_name?: string;
 }
 
@@ -20,6 +22,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashboardProps) {
+  const { isSuperAdmin, brokerProfile } = useAuth();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,12 +40,25 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
     try {
       setLoading(true);
 
-      const { data: claimsData, error: claimsError } = await supabase
-        .from('claims')
-        .select('*')
-        .order('created_at', { ascending: false });
+      console.log('🔍 AdminDashboard - Loading claims');
+      console.log('  Is Super Admin:', isSuperAdmin());
+      console.log('  Broker Profile:', brokerProfile);
+
+      let query = supabase.from('claims').select('*');
+
+      // If not super admin, filter by brokerage_id
+      if (!isSuperAdmin() && brokerProfile?.brokerage_id) {
+        console.log('  Filtering by brokerage_id:', brokerProfile.brokerage_id);
+        query = query.eq('brokerage_id', brokerProfile.brokerage_id);
+      } else {
+        console.log('  Loading ALL claims (Super Admin)');
+      }
+
+      const { data: claimsData, error: claimsError } = await query.order('created_at', { ascending: false });
 
       if (claimsError) throw claimsError;
+
+      console.log('  Claims loaded:', claimsData?.length || 0);
 
       const claimsWithClientNames = (claimsData || []).map((claim) => ({
         ...claim,

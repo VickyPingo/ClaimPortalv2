@@ -95,14 +95,15 @@ export default function HomePageRouter() {
     );
   }
 
-  // Check Broker Profile
+  // Check Broker Profile (Regular Brokers)
   if (brokerProfile && brokerProfile.role !== 'super_admin') {
-    console.log('✅ ROUTING TO: BrokerDashboard (Regular Broker)');
+    console.log('✅ ROUTING TO: BrokerAdminDashboard (Regular Broker)');
     console.log('📋 Broker Profile:', brokerProfile);
+    console.log('📋 Broker sees limited view - their brokerage only');
     return (
       <>
         <EmergencyLogoutButton />
-        <BrokerDashboard onSelectClaimType={() => {}} onShowClaim={() => {}} />
+        <BrokerAdminDashboard />
       </>
     );
   }

@@ -29,7 +29,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     return baseItems;
   }, [isSuperAdmin]);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     onNavigate(view);
     setMobileMenuOpen(false);
   };

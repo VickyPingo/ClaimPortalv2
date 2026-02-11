@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Loader2, User, Phone, Mail, FileText, Search } from 'lucide-react';
 
 interface Client {
@@ -7,6 +8,7 @@ interface Client {
   full_name: string;
   email: string;
   cell_number: string;
+  brokerage_id: string;
   created_at: string;
   claim_count?: number;
 }
@@ -16,6 +18,7 @@ interface ClientsDirectoryProps {
 }
 
 export default function ClientsDirectory({ onViewClient }: ClientsDirectoryProps) {
+  const { isSuperAdmin, brokerProfile } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,12 +48,25 @@ export default function ClientsDirectory({ onViewClient }: ClientsDirectoryProps
     try {
       setLoading(true);
 
-      const { data: clientsData, error: clientsError } = await supabase
-        .from('client_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      console.log('🔍 ClientsDirectory - Loading clients');
+      console.log('  Is Super Admin:', isSuperAdmin());
+      console.log('  Broker Profile:', brokerProfile);
+
+      let query = supabase.from('client_profiles').select('*');
+
+      // If not super admin, filter by brokerage_id
+      if (!isSuperAdmin() && brokerProfile?.brokerage_id) {
+        console.log('  Filtering by brokerage_id:', brokerProfile.brokerage_id);
+        query = query.eq('brokerage_id', brokerProfile.brokerage_id);
+      } else {
+        console.log('  Loading ALL clients (Super Admin)');
+      }
+
+      const { data: clientsData, error: clientsError } = await query.order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
+
+      console.log('  Clients loaded:', clientsData?.length || 0);
 
       const clientsWithCounts = await Promise.all(
         (clientsData || []).map(async (client) => {
