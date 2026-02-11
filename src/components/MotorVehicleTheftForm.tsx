@@ -342,7 +342,7 @@ export default function MotorVehicleTheftForm({
                   </p>
                   <p className="text-sm text-yellow-800 mt-1">
                     Your broker will send a permission to settle letter to {financeBank} for
-                    settlement authorization.
+                    settlement authorisation.
                   </p>
                 </div>
               </div>

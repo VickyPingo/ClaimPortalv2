@@ -117,6 +117,9 @@ export default function InvitationManager() {
       console.log('🔄 Refreshing auth session...');
       await supabase.auth.refreshSession();
 
+      // Small delay to allow schema cache to refresh
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + newInvitation.daysValid);
 
@@ -127,44 +130,67 @@ export default function InvitationManager() {
       console.log('🎯 Target brokerage: Independi');
       console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
 
-      // Direct insert without permission checks
-      const { data, error } = await supabase
-        .from('invitations')
-        .insert([{
-          email: null,
-          brokerage_id: INDEPENDI_BROKERAGE_ID,
-          role: 'broker',
-          token: token,
-          expires_at: expiresAt.toISOString(),
-          max_uses: newInvitation.maxUses,
-          is_active: true,
-          used_count: 0
-        }])
-        .select()
-        .single();
+      // Retry logic for schema cache issues
+      let attempt = 0;
+      let lastError = null;
+      const maxAttempts = 3;
 
-      if (error) {
-        console.error('❌ Insert error:', error);
-        throw error;
+      while (attempt < maxAttempts) {
+        attempt++;
+        console.log(`🔄 Attempt ${attempt}/${maxAttempts}...`);
+
+        const { data, error } = await supabase
+          .from('invitations')
+          .insert([{
+            email: null,
+            brokerage_id: INDEPENDI_BROKERAGE_ID,
+            role: 'broker',
+            token: token,
+            expires_at: expiresAt.toISOString(),
+            max_uses: newInvitation.maxUses,
+            is_active: true,
+            used_count: 0
+          }])
+          .select()
+          .single();
+
+        if (!error && data) {
+          // Success!
+          const generatedUrl = getInvitationUrl(data.token, INDEPENDI_BROKERAGE_ID);
+          console.log('✅ Independi Invite Authorised!');
+          console.log('🔗 Invitation URL:', generatedUrl);
+          console.log('📊 Token:', data.token);
+          console.log('🏢 Brokerage: Independi');
+          console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
+
+          alert('✅ Independi Invite Authorised');
+
+          setInvitations([data, ...invitations]);
+          setShowCreateForm(false);
+          setNewInvitation({
+            brokerage_id: brokerageId || '',
+            role: 'staff',
+            daysValid: 7,
+            maxUses: null
+          });
+          return;
+        }
+
+        lastError = error;
+        console.warn(`⚠️ Attempt ${attempt} failed:`, error?.message);
+
+        // Wait before retrying (exponential backoff)
+        if (attempt < maxAttempts) {
+          const delay = 1000 * attempt;
+          console.log(`⏳ Waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
 
-      const generatedUrl = getInvitationUrl(data.token, INDEPENDI_BROKERAGE_ID);
-      console.log('✅ Independi Invite Authorised!');
-      console.log('🔗 Invitation URL:', generatedUrl);
-      console.log('📊 Token:', data.token);
-      console.log('🏢 Brokerage: Independi');
-      console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
+      // All attempts failed
+      console.error('❌ All attempts failed. Last error:', lastError);
+      throw lastError || new Error('Failed to create invitation after multiple attempts');
 
-      alert('✅ Independi Invite Authorised');
-
-      setInvitations([data, ...invitations]);
-      setShowCreateForm(false);
-      setNewInvitation({
-        brokerage_id: brokerageId || '',
-        role: 'staff',
-        daysValid: 7,
-        maxUses: null
-      });
     } catch (error: any) {
       console.error('❌ Error creating invitation:', error);
       alert('Failed to authorise Independi invitation: ' + error.message);
