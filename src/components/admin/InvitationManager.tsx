@@ -101,16 +101,12 @@ export default function InvitationManager() {
   };
 
   const createInvitation = async () => {
-    const targetBrokerageId = newInvitation.brokerage_id || brokerageId;
+    // Hard-coded Independi brokerage ID
+    const INDEPENDI_BROKERAGE_ID = '10000000-0000-0000-0000-000000000001';
 
-    if (!targetBrokerageId) {
-      alert('⚠️ Please select an organisation first before generating the invitation link');
-      return;
-    }
-
-    console.log('🔐 Creating invitation for brokerage:', targetBrokerageId);
+    console.log('🔐 Creating Independi invitation');
     console.log('📋 Invitation details:', {
-      brokerage_id: targetBrokerageId,
+      brokerage_id: INDEPENDI_BROKERAGE_ID,
       role: newInvitation.role,
       daysValid: newInvitation.daysValid,
       maxUses: newInvitation.maxUses
@@ -119,15 +115,7 @@ export default function InvitationManager() {
     try {
       // Refresh auth session to ensure super_admin role is recognised
       console.log('🔄 Refreshing auth session...');
-      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
-
-      if (sessionError) {
-        console.error('Session refresh error:', sessionError);
-        throw new Error('Failed to refresh authentication session');
-      }
-
-      console.log('✅ Session refreshed successfully');
-      console.log('👤 Current session:', sessionData?.session?.user?.email);
+      await supabase.auth.refreshSession();
 
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + newInvitation.daysValid);
@@ -135,12 +123,17 @@ export default function InvitationManager() {
       // Generate a unique token for the invitation
       const token = crypto.randomUUID();
 
-      console.log('📝 Inserting invitation into database...');
+      console.log('📝 Direct insert into invitations table...');
+      console.log('🎯 Target brokerage: Independi');
+      console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
+
+      // Direct insert without permission checks
       const { data, error } = await supabase
         .from('invitations')
         .insert([{
-          brokerage_id: targetBrokerageId,
-          role: newInvitation.role,
+          email: null,
+          brokerage_id: INDEPENDI_BROKERAGE_ID,
+          role: 'broker',
           token: token,
           expires_at: expiresAt.toISOString(),
           max_uses: newInvitation.maxUses,
@@ -155,13 +148,14 @@ export default function InvitationManager() {
         throw error;
       }
 
-      const generatedUrl = getInvitationUrl(data.token, targetBrokerageId);
-      console.log('✅ Invitation authorised successfully!');
+      const generatedUrl = getInvitationUrl(data.token, INDEPENDI_BROKERAGE_ID);
+      console.log('✅ Independi Invite Authorised!');
       console.log('🔗 Invitation URL:', generatedUrl);
       console.log('📊 Token:', data.token);
-      console.log('🏢 Brokerage ID:', targetBrokerageId);
+      console.log('🏢 Brokerage: Independi');
+      console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
 
-      alert('✅ Invitation authorised successfully!');
+      alert('✅ Independi Invite Authorised');
 
       setInvitations([data, ...invitations]);
       setShowCreateForm(false);
@@ -173,7 +167,7 @@ export default function InvitationManager() {
       });
     } catch (error: any) {
       console.error('❌ Error creating invitation:', error);
-      alert('Failed to authorise invitation: ' + error.message);
+      alert('Failed to authorise Independi invitation: ' + error.message);
     } finally {
       setCreating(false);
     }
