@@ -176,18 +176,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 Signing in');
+    console.log('🔐 Signing in with password');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // ALWAYS use signInWithPassword for email/password auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed');
+      if (error) {
+        console.error('❌ Password login failed:', error.message);
 
-    setUser(data.user);
-    await loadUserProfile(data.user.id, data.user.email);
+        // SESSION RESET: Immediately sign out to prevent session conflicts
+        console.log('🧹 Clearing session after failed login attempt');
+        await supabase.auth.signOut();
+
+        // PROVIDER CHECK: Check if user exists but with different auth method
+        const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail?.(email).catch(() => ({ data: { user: null } }));
+
+        if (existingUser) {
+          console.log('⚠️ User exists but password login failed');
+          console.log('   User auth providers:', existingUser.app_metadata?.providers || 'unknown');
+
+          // Check if user only has OAuth and no email provider
+          const identities = existingUser.identities || [];
+          const hasEmailProvider = identities.some(identity => identity.provider === 'email');
+
+          if (!hasEmailProvider && identities.length > 0) {
+            throw new Error('This account uses OAuth login. Please contact your administrator to set up password login.');
+          }
+        }
+
+        throw error;
+      }
+
+      if (!data.user) {
+        await supabase.auth.signOut();
+        throw new Error('Sign in failed');
+      }
+
+      console.log('✓ Password login successful');
+      setUser(data.user);
+      await loadUserProfile(data.user.id, data.user.email);
+    } catch (error) {
+      // Ensure session is cleared on any error
+      await supabase.auth.signOut();
+      throw error;
+    }
   };
 
   const brokerSignUp = async (
@@ -252,18 +288,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignIn = async (email: string, password: string) => {
-    console.log('🔐 Broker signing in');
+    console.log('🔐 Broker signing in with password');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // ALWAYS use signInWithPassword for email/password auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed');
+      if (error) {
+        console.error('❌ Password login failed:', error.message);
 
-    setUser(data.user);
-    await loadUserProfile(data.user.id, data.user.email);
+        // SESSION RESET: Immediately sign out to prevent session conflicts
+        console.log('🧹 Clearing session after failed login attempt');
+        await supabase.auth.signOut();
+
+        // PROVIDER CHECK: Check if user exists but with different auth method
+        const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail?.(email).catch(() => ({ data: { user: null } }));
+
+        if (existingUser) {
+          console.log('⚠️ User exists but password login failed');
+          console.log('   User auth providers:', existingUser.app_metadata?.providers || 'unknown');
+
+          // Check if user only has OAuth and no email provider
+          const identities = existingUser.identities || [];
+          const hasEmailProvider = identities.some(identity => identity.provider === 'email');
+
+          if (!hasEmailProvider && identities.length > 0) {
+            throw new Error('This account uses OAuth login. Please contact your administrator to set up password login.');
+          }
+        }
+
+        throw error;
+      }
+
+      if (!data.user) {
+        await supabase.auth.signOut();
+        throw new Error('Sign in failed');
+      }
+
+      console.log('✓ Broker password login successful');
+      setUser(data.user);
+      await loadUserProfile(data.user.id, data.user.email);
+    } catch (error) {
+      // Ensure session is cleared on any error
+      await supabase.auth.signOut();
+      throw error;
+    }
   };
 
   const clientSignUp = async (
@@ -314,18 +386,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clientSignIn = async (email: string, password: string) => {
-    console.log('🔐 Client signing in');
+    console.log('🔐 Client signing in with password');
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // ALWAYS use signInWithPassword for email/password auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed');
+      if (error) {
+        console.error('❌ Password login failed:', error.message);
 
-    setUser(data.user);
-    await loadUserProfile(data.user.id, data.user.email);
+        // SESSION RESET: Immediately sign out to prevent session conflicts
+        console.log('🧹 Clearing session after failed login attempt');
+        await supabase.auth.signOut();
+
+        throw error;
+      }
+
+      if (!data.user) {
+        await supabase.auth.signOut();
+        throw new Error('Sign in failed');
+      }
+
+      console.log('✓ Client password login successful');
+      setUser(data.user);
+      await loadUserProfile(data.user.id, data.user.email);
+    } catch (error) {
+      // Ensure session is cleared on any error
+      await supabase.auth.signOut();
+      throw error;
+    }
   };
 
   return (
