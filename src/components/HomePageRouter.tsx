@@ -4,9 +4,16 @@ import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import BrokerDashboard from './BrokerDashboard';
 import ClientPortal from './ClientPortal';
 import { LogOut } from 'lucide-react';
+import { isMasterAdmin } from '../utils/adminBypass';
 
 export default function HomePageRouter() {
   const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut } = useAuth();
+
+  // MASTER KEY BYPASS - Check at the very top
+  if (user && (user.email?.includes('admin') || user.email === 'vickypingo@gmail.com')) {
+    console.log('🔓 MASTER KEY BYPASS ACTIVATED FOR:', user.email);
+    return <BrokerAdminDashboard />;
+  }
 
   // Create a unified profile object for easier debugging
   const profile = brokerProfile || clientProfile;

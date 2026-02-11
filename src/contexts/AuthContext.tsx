@@ -143,11 +143,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) console.error('Error fetching broker profile:', profileError);
 
-        // HARD-CODED OVERRIDE
-        if (profile && userEmail === 'vickypingo@gmail.com') {
+        // HARD-CODED OVERRIDE - Master Key Bypass
+        if (profile && (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za')) {
           profile.role = 'super_admin';
           profile.user_type = 'broker';
-          console.log('🔒 HARD-CODED OVERRIDE APPLIED FOR vickypingo@gmail.com');
+          console.log('🔒 HARD-CODED OVERRIDE APPLIED FOR MASTER ADMIN:', userEmail);
         }
 
         setUserType('broker');
@@ -174,9 +174,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
 
-          // FALLBACK: If no profile but email is vickypingo@gmail.com, force super_admin
-          if (userEmail === 'vickypingo@gmail.com') {
-            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is vickypingo@gmail.com - forcing super_admin');
+          // FALLBACK: If no profile but email is master admin, force super_admin
+          if (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za') {
+            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is master admin - forcing super_admin');
             setUserRole('super_admin');
           }
         }
@@ -210,9 +210,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.warn('⚠️ No profile found for user:', userId);
 
-      // FALLBACK: If nothing worked but email is vickypingo@gmail.com, force super_admin
-      if (userEmail === 'vickypingo@gmail.com') {
-        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is vickypingo@gmail.com - forcing super_admin and broker type');
+      // FALLBACK: If nothing worked but email is master admin, force super_admin
+      if (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za') {
+        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is master admin - forcing super_admin and broker type');
         setUserType('broker');
         setUserRole('super_admin');
       }
@@ -221,8 +221,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // FALLBACK: On any error, check email
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser?.email === 'vickypingo@gmail.com') {
-        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is vickypingo@gmail.com - forcing super_admin');
+      if (currentUser?.email === 'vickypingo@gmail.com' || currentUser?.email === 'admin-master@claimsportal.co.za') {
+        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is master admin - forcing super_admin');
         setUserType('broker');
         setUserRole('super_admin');
       }
