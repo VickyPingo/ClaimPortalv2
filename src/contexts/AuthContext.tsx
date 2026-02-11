@@ -314,6 +314,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: profile.full_name,
+          role: 'broker',
+          brokerage_id: targetBrokerageId,
+          user_type: 'broker',
+        },
+      },
     });
 
     if (authError) throw authError;
@@ -326,7 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         brokerage_id: targetBrokerageId,
         name: profile.full_name,
         phone: profile.cell_number,
-        role: 'staff',
+        role: 'broker',
       });
 
     if (brokerUserError) {
@@ -344,6 +352,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cell_number: profile.cell_number,
         policy_number: profile.policy_number || null,
         user_type: 'broker',
+        role: 'broker',
       });
 
     if (profileError) {
@@ -351,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw profileError;
     }
 
-    console.log('✅ Broker profile created successfully');
+    console.log('✅ Broker profile created successfully with role: broker');
 
     setUser(authData.user);
     await determineUserType(authData.user.id);
@@ -387,19 +396,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('   Brokerage ID:', brokerageId);
     console.log('   Profile:', profile);
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('User creation failed');
-
     const currentBrokerageId = brokerageId || brokerage?.id;
 
     if (!currentBrokerageId) {
       throw new Error('Brokerage not loaded. Please refresh the page.');
     }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: profile.full_name,
+          role: 'client',
+          brokerage_id: currentBrokerageId,
+          user_type: 'client',
+        },
+      },
+    });
+
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('User creation failed');
 
     const { error: profileError } = await supabase
       .from('client_profiles')
@@ -418,7 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw profileError;
     }
 
-    console.log('✅ Client profile created successfully');
+    console.log('✅ Client profile created successfully with role: client');
 
     setUser(authData.user);
     await determineUserType(authData.user.id);

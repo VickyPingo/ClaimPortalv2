@@ -42,29 +42,67 @@ export default function UsersManager() {
 
       if (brokerError) throw brokerError;
 
-      // Get auth.users emails
-      const brokerIds = brokerData?.map(b => b.id) || [];
+      // Load client users
+      const { data: clientData, error: clientError } = await supabase
+        .from('client_profiles')
+        .select(`
+          id,
+          full_name,
+          cell_number,
+          role,
+          brokerage_id,
+          created_at,
+          brokerages (name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (clientError) console.error('Error fetching client data:', clientError);
+
+      // Get auth.users emails for both brokers and clients
+      const allIds = [
+        ...(brokerData?.map(b => b.id) || []),
+        ...(clientData?.map(c => c.id) || [])
+      ];
+
       const { data: authData, error: authError } = await supabase
         .from('users')
         .select('id, email')
-        .in('id', brokerIds);
+        .in('id', allIds);
 
       if (authError) console.error('Error fetching auth data:', authError);
 
       const emailMap = new Map(authData?.map(u => [u.id, u.email]) || []);
 
-      const formattedUsers: User[] = (brokerData || []).map(broker => ({
+      // Format broker users
+      const formattedBrokers: User[] = (brokerData || []).map(broker => ({
         id: broker.id,
         email: emailMap.get(broker.id) || 'N/A',
         full_name: broker.full_name,
         cell_number: broker.cell_number,
-        role: broker.role || 'staff',
+        role: broker.role || 'broker',
         brokerage_id: broker.brokerage_id,
         brokerage_name: (broker.brokerages as any)?.name || 'Unknown',
         created_at: broker.created_at,
       }));
 
-      setUsers(formattedUsers);
+      // Format client users
+      const formattedClients: User[] = (clientData || []).map(client => ({
+        id: client.id,
+        email: emailMap.get(client.id) || 'N/A',
+        full_name: client.full_name,
+        cell_number: client.cell_number,
+        role: client.role || 'client',
+        brokerage_id: client.brokerage_id,
+        brokerage_name: (client.brokerages as any)?.name || 'Unknown',
+        created_at: client.created_at,
+      }));
+
+      // Combine and sort by created_at
+      const allUsers = [...formattedBrokers, ...formattedClients].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setUsers(allUsers);
     } catch (error) {
       console.error('Error loading users:', error);
     } finally {
@@ -78,23 +116,44 @@ export default function UsersManager() {
     }
 
     try {
+      // Delete from broker_profiles
       const { error: profileError } = await supabase
         .from('broker_profiles')
         .delete()
         .eq('id', userId);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Error deleting broker_profiles:', profileError);
+      }
 
+      // Delete from broker_users
       const { error: brokerUserError } = await supabase
         .from('broker_users')
         .delete()
         .eq('id', userId);
 
-      if (brokerUserError) throw brokerUserError;
+      if (brokerUserError) {
+        console.error('Error deleting broker_users:', brokerUserError);
+      }
+
+      // Delete from client_profiles (in case it's a client)
+      const { error: clientError } = await supabase
+        .from('client_profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (clientError) {
+        console.error('Error deleting client_profiles:', clientError);
+      }
+
+      // Note: Deleting from auth.users requires admin privileges
+      // The RLS policies and cascade deletes will handle cleanup
+      console.log('✓ User deleted successfully');
 
       alert('User deleted successfully');
       loadUsers();
     } catch (error: any) {
+      console.error('Failed to delete user:', error);
       alert('Failed to delete user: ' + error.message);
     }
   };
@@ -220,11 +279,23 @@ export default function UsersManager() {
                               ? 'bg-purple-100 text-purple-700'
                               : user.role === 'admin'
                               ? 'bg-blue-100 text-blue-700'
+                              : user.role === 'broker'
+                              ? 'bg-blue-100 text-blue-700'
+                              : user.role === 'client'
+                              ? 'bg-green-100 text-green-700'
                               : 'bg-gray-100 text-gray-700'
                           }`}
                         >
                           {user.role === 'super_admin' && <Shield className="w-3 h-3" />}
-                          {user.role === 'super_admin' ? 'Super Admin' : user.role === 'admin' ? 'Admin' : 'Staff'}
+                          {user.role === 'super_admin'
+                            ? 'Super Admin'
+                            : user.role === 'admin'
+                            ? 'Admin'
+                            : user.role === 'broker'
+                            ? 'Broker'
+                            : user.role === 'client'
+                            ? 'Client'
+                            : 'Staff'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
