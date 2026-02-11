@@ -1,46 +1,51 @@
+import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
-import BrokerDashboard from './BrokerDashboard';
 import ClientPortal from './ClientPortal';
-import { LogOut } from 'lucide-react';
+import { LogOut, AlertCircle } from 'lucide-react';
 
 export default function HomePageRouter() {
-  const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut } = useAuth();
+  const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut, isSuperAdmin } = useAuth();
 
   console.log('Router state - userType:', userType, 'userRole:', userRole);
   console.log('Router brokerProfile:', brokerProfile);
   console.log('Router clientProfile:', clientProfile);
 
+  const currentPath = window.location.pathname;
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Determine the correct path based on role
+    let targetPath = '/';
+
+    if (isSuperAdmin() || userRole === 'super_admin') {
+      targetPath = '/admin-dashboard';
+    } else if (userType === 'broker' || userRole === 'broker') {
+      targetPath = '/broker-dashboard';
+    } else if (userType === 'client' || userRole === 'client') {
+      targetPath = '/claims-portal';
+    }
+
+    // Redirect if not on the correct path
+    if (currentPath !== targetPath && currentPath !== '/') {
+      console.log(`🔀 Redirecting from ${currentPath} to ${targetPath}`);
+      window.history.replaceState(null, '', targetPath);
+    } else if (currentPath === '/') {
+      window.history.replaceState(null, '', targetPath);
+    }
+  }, [user, userType, userRole, currentPath, isSuperAdmin]);
+
   const handleForceLogout = async () => {
     console.log('🧹 FORCING COMPLETE LOGOUT AND CACHE CLEAR');
-
-    // Clear ALL browser storage
     localStorage.clear();
     sessionStorage.clear();
-
-    // Clear Supabase auth
     await signOut();
-
-    // Force reload to clear any remaining state
+    window.history.replaceState(null, '', '/');
     window.location.reload();
   };
 
-  // STEP 1: If not logged in, show login
-  if (!user) {
-    return <Login roleType={null} />;
-  }
-
-  // STEP 2: SUPER ADMIN PRIORITY CHECK - Before anything else
-  if (user.email === 'vickypingo@gmail.com') {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 SUPER ADMIN EMAIL DETECTED: vickypingo@gmail.com');
-    console.log('✅ ROUTING TO: BrokerAdminDashboard (Priority Override)');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return <BrokerAdminDashboard />;
-  }
-
-  // Add emergency logout button (visible only when logged in)
   const EmergencyLogoutButton = () => (
     <button
       onClick={handleForceLogout}
@@ -52,15 +57,37 @@ export default function HomePageRouter() {
     </button>
   );
 
-  // STEP 3: ROLE-BASED ROUTING - Use userType as primary indicator
+  // STEP 1: If not logged in, show login
+  if (!user) {
+    return <Login roleType={null} />;
+  }
 
-  // Check Super Admin by role (secondary check after email)
-  if (brokerProfile?.role === 'super_admin') {
+  // STEP 2: Check if client is trying to access broker/admin routes
+  if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
+      userType === 'client' && userRole === 'client') {
+    console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - BLOCKING');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-6">
+            You don't have permission to access this area. Redirecting to your claims portal...
+          </p>
+        </div>
+        {setTimeout(() => {
+          window.history.replaceState(null, '', '/claims-portal');
+          window.location.reload();
+        }, 2000)}
+      </div>
+    );
+  }
+
+  // STEP 3: SUPER ADMIN ROUTING
+  if (isSuperAdmin() || userRole === 'super_admin') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🛡️ SUPER ADMIN ROLE DETECTED');
-    console.log('📋 Profile Role:', brokerProfile?.role);
-    console.log('📋 User Email:', user?.email);
-    console.log('✅ ROUTING TO: BrokerAdminDashboard');
+    console.log('👑 SUPER ADMIN DETECTED');
+    console.log('✅ ROUTING TO: /admin-dashboard');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
       <>
@@ -70,10 +97,9 @@ export default function HomePageRouter() {
     );
   }
 
-  // Route by userType (even if profile is still loading)
-  if (userType === 'broker') {
-    console.log('✅ ROUTING TO: BrokerAdminDashboard (userType: broker)');
-    console.log('📋 Broker Profile:', brokerProfile || 'Loading...');
+  // STEP 4: BROKER ROUTING
+  if (userType === 'broker' || userRole === 'broker') {
+    console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
       <>
         <EmergencyLogoutButton />
@@ -82,9 +108,9 @@ export default function HomePageRouter() {
     );
   }
 
-  if (userType === 'client') {
-    console.log('✅ ROUTING TO: ClientPortal (userType: client)');
-    console.log('📋 Client Profile:', clientProfile || 'Loading...');
+  // STEP 5: CLIENT ROUTING
+  if (userType === 'client' || userRole === 'client') {
+    console.log('✅ ROUTING TO: /claims-portal (userType: client)');
     return (
       <>
         <EmergencyLogoutButton />
@@ -93,12 +119,14 @@ export default function HomePageRouter() {
     );
   }
 
-  // FALLBACK: Default to broker dashboard if userType not set yet
-  console.log('⚠️ UserType not set, defaulting to BrokerAdminDashboard');
+  // FALLBACK: Still loading or no role detected
+  console.log('⚠️ UserType/Role not determined yet, showing loading state');
   return (
-    <>
-      <EmergencyLogoutButton />
-      <BrokerAdminDashboard />
-    </>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading your dashboard...</p>
+      </div>
+    </div>
   );
 }
