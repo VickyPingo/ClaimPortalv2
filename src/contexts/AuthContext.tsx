@@ -339,11 +339,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
-    // NUCLEAR OPTION: Minimal signup with fixed brokerage_id
+    console.log('🔵 BROKER SIGNUP - Creating broker account with manual profile creation');
+
+    // Fixed brokerage_id for Independi subdomain
+    const brokerageId = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
+
     const metadata: Record<string, any> = {
       role: 'broker',
       user_type: 'broker',
-      brokerage_id: 'f67b67c8-086b-4b42-8d27-917a0783e9b0',
+      brokerage_id: brokerageId,
     };
 
     // Include profile fields if provided
@@ -360,6 +364,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
+
+    console.log('✅ Auth user created:', authData.user.id);
+    console.log('🔨 Manually creating profile in database...');
+
+    // FORCE PROFILE CREATION: Manually insert into broker_users
+    const { error: brokerUserError } = await supabase
+      .from('broker_users')
+      .insert({
+        id: authData.user.id,
+        brokerage_id: brokerageId,
+      });
+
+    if (brokerUserError) {
+      console.error('❌ Failed to create broker_users entry:', brokerUserError);
+      throw new Error(`Failed to create broker user: ${brokerUserError.message}`);
+    }
+
+    console.log('✅ broker_users entry created');
+
+    // FORCE PROFILE CREATION: Manually insert into broker_profiles
+    const { error: brokerProfileError } = await supabase
+      .from('broker_profiles')
+      .insert({
+        id: authData.user.id,
+        full_name: profile.full_name || email,
+        id_number: profile.id_number || '',
+        cell_number: profile.cell_number || '',
+        policy_number: profile.policy_number || null,
+        brokerage_id: brokerageId,
+        role: 'broker',
+        user_type: 'broker',
+      });
+
+    if (brokerProfileError) {
+      console.error('❌ Failed to create broker_profiles entry:', brokerProfileError);
+      throw new Error(`Failed to create broker profile: ${brokerProfileError.message}`);
+    }
+
+    console.log('✅ broker_profiles entry created with role=broker');
+    console.log('✅ Profile creation complete - user should now appear in Users Management');
 
     return authData.user;
   };
