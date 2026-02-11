@@ -10,19 +10,26 @@ import BrokeragesManager from './BrokeragesManager';
 import UsersManager from './UsersManager';
 import InvitationManager from './InvitationManager';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
+import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
 type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin, userRole, user } = useAuth();
 
-  // CRITICAL: Only super_admin role should see Organisations view
-  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin';
+  const onIndependiSubdomain = isIndependiSubdomain();
+  const onSuperAdminDomain = isSuperAdminDomain();
+
+  // CRITICAL: On Independi subdomain, NEVER show super admin features
+  // Only on super admin domain can super_admin role access admin features
+  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain && !onIndependiSubdomain;
   const initialView = isActualSuperAdmin ? 'brokerages' : 'dashboard';
 
   console.log('🎯 BrokerAdminDashboard - Initialising');
   console.log('  User Email:', user?.email);
   console.log('  User Role:', userRole);
+  console.log('  On Independi Subdomain:', onIndependiSubdomain);
+  console.log('  On Super Admin Domain:', onSuperAdminDomain);
   console.log('  Is Super Admin:', isSuperAdmin());
   console.log('  Is Actual Super Admin:', isActualSuperAdmin);
   console.log('  Initial View:', initialView);
@@ -36,13 +43,24 @@ export default function BrokerAdminDashboard() {
     console.log('🧭 Navigation requested to:', view);
     console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
+    console.log('  On Independi Subdomain:', onIndependiSubdomain);
 
-    // CRITICAL: Only super_admin role can access these sections
+    // CRITICAL: On Independi subdomain, block ALL super admin sections
+    if (onIndependiSubdomain && (view === 'settings' || view === 'brokerages' || view === 'users' || view === 'invitations')) {
+      console.log('❌ Access denied - Independi subdomain blocks super admin features');
+      setAccessDeniedMessage('Access Denied: This section is not available on the Independi subdomain.');
+      setTimeout(() => setAccessDeniedMessage(null), 5000);
+      setCurrentView('dashboard');
+      return;
+    }
+
+    // CRITICAL: Only super_admin role can access these sections (and only on super admin domain)
     if ((view === 'settings' || view === 'brokerages' || view === 'users' || view === 'invitations')) {
-      if (!isSuperAdmin() || userRole !== 'super_admin') {
-        console.log('❌ Access denied - user is not super_admin');
+      if (!isSuperAdmin() || userRole !== 'super_admin' || !onSuperAdminDomain) {
+        console.log('❌ Access denied - user is not super_admin or not on admin domain');
         console.log('  Email:', user?.email);
         console.log('  Role:', userRole);
+        console.log('  On Super Admin Domain:', onSuperAdminDomain);
         setAccessDeniedMessage('Access Denied: Only super administrators can access this section.');
         setTimeout(() => setAccessDeniedMessage(null), 5000);
         setCurrentView('dashboard');
@@ -60,10 +78,20 @@ export default function BrokerAdminDashboard() {
     console.log('📺 Current View Changed:', currentView);
     console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
+    console.log('  On Independi Subdomain:', onIndependiSubdomain);
+
+    // CRITICAL: On Independi subdomain, block ALL super admin sections
+    if (onIndependiSubdomain && (currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
+      console.log('❌ Independi subdomain blocks super admin views, redirecting to dashboard');
+      setCurrentView('dashboard');
+      setAccessDeniedMessage('Access Denied: Super admin features are not available on the Independi subdomain.');
+      setTimeout(() => setAccessDeniedMessage(null), 5000);
+      return;
+    }
 
     // CRITICAL: Check if user is trying to access super admin sections without proper role
     if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
-      if (!isSuperAdmin() || userRole !== 'super_admin') {
+      if (!isSuperAdmin() || userRole !== 'super_admin' || !onSuperAdminDomain) {
         console.log('❌ Unauthorised view access detected, redirecting to dashboard');
         console.log('  Blocked view:', currentView);
         console.log('  User email:', user?.email);
@@ -72,7 +100,7 @@ export default function BrokerAdminDashboard() {
         setTimeout(() => setAccessDeniedMessage(null), 5000);
       }
     }
-  }, [currentView, isSuperAdmin, userRole, user]);
+  }, [currentView, isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain]);
 
   const handleViewClient = (clientId: string) => {
     setSelectedClientId(clientId);

@@ -1,21 +1,44 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import ClientPortal from './ClientPortal';
-import { LogOut, AlertCircle } from 'lucide-react';
+import { LogOut, AlertCircle, Building2 } from 'lucide-react';
+import { isIndependiSubdomain, isSuperAdminDomain } from '../utils/subdomain';
 
 export default function HomePageRouter() {
   const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut, isSuperAdmin } = useAuth();
+  const [profileWaitTime, setProfileWaitTime] = useState(0);
 
-  console.log('Router state - userType:', userType, 'userRole:', userRole);
-  console.log('Router brokerProfile:', brokerProfile);
-  console.log('Router clientProfile:', clientProfile);
+  const onIndependiSubdomain = isIndependiSubdomain();
+  const onSuperAdminDomain = isSuperAdminDomain();
+
+  console.log('🌐 Router state:');
+  console.log('  User Type:', userType);
+  console.log('  User Role:', userRole);
+  console.log('  On Independi Subdomain:', onIndependiSubdomain);
+  console.log('  On Super Admin Domain:', onSuperAdminDomain);
+  console.log('  Broker Profile:', brokerProfile);
+  console.log('  Client Profile:', clientProfile);
 
   const currentPath = window.location.pathname;
 
   useEffect(() => {
     if (!user) return;
+
+    // CRITICAL: On Independi subdomain (claims.independi.co.za), FORCE broker dashboard
+    if (onIndependiSubdomain) {
+      console.log('🔒 INDEPENDI SUBDOMAIN - FORCING BROKER ACCESS ONLY');
+
+      // Even super_admin must use broker dashboard on this subdomain
+      if (currentPath !== '/broker-dashboard' && currentPath !== '/') {
+        console.log('  Redirecting to broker dashboard');
+        window.history.replaceState(null, '', '/broker-dashboard');
+      } else if (currentPath === '/') {
+        window.history.replaceState(null, '', '/broker-dashboard');
+      }
+      return;
+    }
 
     // CRITICAL: Brokers should never access super admin routes
     const restrictedPaths = ['/organisations', '/users-management', '/invitations', '/admin-settings'];
@@ -31,7 +54,7 @@ export default function HomePageRouter() {
     // Determine the correct path based on role
     let targetPath = '/';
 
-    if (isSuperAdmin() && userRole === 'super_admin') {
+    if (isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain) {
       targetPath = '/admin-dashboard';
     } else if (userType === 'broker' || userRole === 'broker') {
       targetPath = '/broker-dashboard';
@@ -46,7 +69,18 @@ export default function HomePageRouter() {
     } else if (currentPath === '/') {
       window.history.replaceState(null, '', targetPath);
     }
-  }, [user, userType, userRole, currentPath, isSuperAdmin]);
+  }, [user, userType, userRole, currentPath, isSuperAdmin, onIndependiSubdomain, onSuperAdminDomain]);
+
+  // Profile wait timeout - show welcome page after 3 seconds if no profile
+  useEffect(() => {
+    if (!user) return;
+
+    const timer = setInterval(() => {
+      setProfileWaitTime(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [user]);
 
   const handleForceLogout = async () => {
     console.log('🧹 FORCING COMPLETE LOGOUT AND CACHE CLEAR');
@@ -94,10 +128,24 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: SUPER ADMIN ROUTING
-  if (isSuperAdmin() || userRole === 'super_admin') {
+  // STEP 3: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard
+  if (onIndependiSubdomain) {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 SUPER ADMIN DETECTED');
+    console.log('🏢 INDEPENDI SUBDOMAIN - BROKER ONLY ACCESS');
+    console.log('✅ FORCING BROKER DASHBOARD VIEW');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
+  }
+
+  // STEP 4: SUPER ADMIN ROUTING (only on super admin domain)
+  if ((isSuperAdmin() || userRole === 'super_admin') && onSuperAdminDomain) {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('👑 SUPER ADMIN DETECTED ON ADMIN DOMAIN');
     console.log('✅ ROUTING TO: /admin-dashboard');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
@@ -108,7 +156,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 4: BROKER ROUTING
+  // STEP 5: BROKER ROUTING
   if (userType === 'broker' || userRole === 'broker') {
     console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
@@ -119,7 +167,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 5: CLIENT ROUTING
+  // STEP 6: CLIENT ROUTING
   if (userType === 'client' || userRole === 'client') {
     console.log('✅ ROUTING TO: /claims-portal (userType: client)');
     return (
@@ -130,6 +178,38 @@ export default function HomePageRouter() {
     );
   }
 
+  // FALLBACK: Profile not found after 3 seconds - show welcome page
+  if (profileWaitTime >= 3) {
+    console.log('⚠️ Profile not found after 3 seconds - showing welcome page');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+        <EmergencyLogoutButton />
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <Building2 className="w-16 h-16 text-blue-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome!</h2>
+          <p className="text-gray-600 mb-4">
+            Your account has been created successfully. We're setting up your profile.
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            If this takes too long, please refresh the page or contact support.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors mb-3"
+          >
+            Refresh Page
+          </button>
+          <button
+            onClick={handleForceLogout}
+            className="w-full bg-gray-100 text-gray-700 py-2.5 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // FALLBACK: Still loading or no role detected
   console.log('⚠️ UserType/Role not determined yet, showing loading state');
   return (
@@ -137,6 +217,7 @@ export default function HomePageRouter() {
       <div className="text-center">
         <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
         <p className="text-gray-600">Connecting to server...</p>
+        <p className="text-sm text-gray-500 mt-2">{profileWaitTime}s</p>
       </div>
     </div>
   );

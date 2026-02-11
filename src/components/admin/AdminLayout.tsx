@@ -1,6 +1,7 @@
 import { ReactNode, useState, useMemo } from 'react';
 import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -12,6 +13,9 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
   const { signOut, isSuperAdmin, userRole, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const onIndependiSubdomain = isIndependiSubdomain();
+  const onSuperAdminDomain = isSuperAdminDomain();
+
   const navItems = useMemo(() => {
     const baseItems = [
       { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,11 +23,15 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'clients' as const, icon: Users, label: 'Clients' },
     ];
 
-    // CRITICAL: Only show super admin menu items if role is 'super_admin'
-    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin';
-    console.log('AdminLayout - Is Actual Super Admin:', isActualSuperAdmin);
+    // CRITICAL: On Independi subdomain, NEVER show super admin menu items
+    // Only show super admin items if on super admin domain AND role is super_admin
+    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain && !onIndependiSubdomain;
+    console.log('AdminLayout - Menu Items Calculation:');
+    console.log('  Is Actual Super Admin:', isActualSuperAdmin);
     console.log('  User Email:', user?.email);
     console.log('  User Role:', userRole);
+    console.log('  On Independi Subdomain:', onIndependiSubdomain);
+    console.log('  On Super Admin Domain:', onSuperAdminDomain);
 
     if (isActualSuperAdmin) {
       baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Organisations' });
@@ -33,7 +41,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     }
 
     return baseItems;
-  }, [isSuperAdmin, userRole, user]);
+  }, [isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain]);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     onNavigate(view);

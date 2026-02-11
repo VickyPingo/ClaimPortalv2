@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { useBrokerage } from './BrokerageContext';
 import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
+import { isIndependiSubdomain } from '../utils/subdomain';
 
 // BROKERAGE ID FOR CLAIMS.INDEPENDI.CO.ZA
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
@@ -182,6 +183,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }
   ) => {
     console.log('🔵 BROKER SIGNUP - Manual profile creation');
+    console.log('   Email:', email);
+    console.log('   Is Independi Subdomain:', isIndependiSubdomain());
+
+    // CRITICAL: Determine role based on email and subdomain
+    let assignedRole = 'broker';
+
+    // Only vickypingo@gmail.com can be super_admin
+    if (email === 'vickypingo@gmail.com') {
+      assignedRole = 'super_admin';
+      console.log('   ⭐ Super Admin signup detected');
+    } else if (isIndependiSubdomain()) {
+      // FORCE broker role for Independi subdomain
+      assignedRole = 'broker';
+      console.log('   🔒 Independi subdomain: forcing broker role');
+    }
+
+    console.log('   Assigned Role:', assignedRole);
 
     // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -207,8 +225,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         cell_number: profile.cell_number || '',
         policy_number: profile.policy_number || null,
         brokerage_id: brokerageId,
-        role: 'broker',
-        user_type: 'broker',
+        role: assignedRole,
+        user_type: assignedRole === 'super_admin' ? 'super_admin' : 'broker',
       });
 
     if (profileError) {
@@ -216,7 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(`Failed to create profile: ${profileError.message}`);
     }
 
-    console.log('✅ Profile created successfully');
+    console.log('✅ Profile created with role:', assignedRole);
     return authData.user;
   };
 
