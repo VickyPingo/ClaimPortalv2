@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { Mail, Lock, AlertCircle, Loader, User, Phone, CreditCard } from 'lucide-react';
+import { clearSupabaseSession, shouldResetSession } from '../utils/sessionClear';
 
 // BROKERAGE ID FOR INDEPENDI
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
@@ -14,13 +15,24 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [sessionCleared, setSessionCleared] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('signup') === 'true') {
       setShowSignup(true);
     }
-  }, []);
+
+    if (shouldResetSession() && !sessionCleared) {
+      console.log('🔄 Reset flag detected - clearing session');
+      clearSupabaseSession();
+      setSessionCleared(true);
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [sessionCleared]);
 
   // Redirect authenticated users
   if (user && userType) {
@@ -40,12 +52,38 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     setError('');
     setLoading(true);
 
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Login timeout - resetting button state');
+      setLoading(false);
+    }, 15000);
+
+    console.log('🔐 Starting login attempt...');
+    clearSupabaseSession();
+    console.log('✓ Session cleared before login');
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
       await signIn(email, password);
+      clearTimeout(safetyTimeout);
       console.log('✓ Sign-in successful');
     } catch (err: any) {
+      clearTimeout(safetyTimeout);
+      console.error('❌ Login failed:', err);
       setError(err.message || 'Sign-in failed');
       setLoading(false);
+
+      console.log('🧹 Clearing session after failed login');
+      clearSupabaseSession();
+
+      setTimeout(() => {
+        const currentPath = window.location.pathname;
+        const currentSearch = window.location.search;
+        if (!currentSearch.includes('reset=true')) {
+          console.log('🔄 Redirecting with reset flag');
+          window.location.href = `${currentPath}?reset=true`;
+        }
+      }, 2000);
     }
   };
 
@@ -172,9 +210,19 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
 
     setLoading(true);
 
+    console.log('🧹 Clearing session before signup');
+    clearSupabaseSession();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Signup timeout - resetting button state');
+      setLoading(false);
+    }, 15000);
+
     // 3-SECOND TIMEOUT: Redirect regardless of database response
     const timeoutId = setTimeout(() => {
       console.log('⏰ 3-second timeout reached - redirecting anyway');
+      clearTimeout(safetyTimeout);
       if (formData.email === 'vickypingo@gmail.com') {
         window.location.href = '/admin-dashboard';
       } else {
@@ -197,6 +245,7 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
 
       console.log('✅ Sign-up complete, redirecting');
       clearTimeout(timeoutId);
+      clearTimeout(safetyTimeout);
 
       // Redirect to appropriate dashboard
       if (formData.email === 'vickypingo@gmail.com') {
@@ -206,9 +255,13 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
+      clearTimeout(safetyTimeout);
       console.error('❌ SIGN-UP ERROR:', err);
       setError(err.message || 'Sign-up failed');
       setLoading(false);
+
+      console.log('🧹 Clearing session after failed signup');
+      clearSupabaseSession();
     }
   };
 
