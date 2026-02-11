@@ -319,45 +319,31 @@ function Signup() {
 
     setLoading(true);
 
-    // Failsafe timeout - force redirect after 3 seconds
-    const timeoutId = setTimeout(() => {
-      console.log('⏰ Timeout reached - forcing redirect');
-      if (formData.email === 'vickypingo@gmail.com') {
-        window.location.href = '/admin-dashboard';
-      } else {
-        window.location.href = '/broker-dashboard';
-      }
-    }, 3000);
-
     try {
-      console.log('🟢 Signing up as BROKER');
-      console.log('   Brokerage ID:', invitationBrokerageId);
-      console.log('   Has broker param:', hasBrokerParam);
+      console.log('🟢 ZERO-WAIT SIGNUP - Creating broker account');
 
-      const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
-      const finalBrokerageId = invitationBrokerageId || INDEPENDI_BROKERAGE_ID;
-
-      console.log('   Final Brokerage ID (string):', finalBrokerageId, typeof finalBrokerageId);
-
+      // Call signup with ONLY the required metadata
       const user = await brokerSignUp(formData.email, formData.password, {
         full_name: formData.fullName,
         id_number: formData.idNumber,
         cell_number: formData.cellNumber,
-        brokerage_id: finalBrokerageId,
+        brokerage_id: 'f67b67c8-086b-4b42-8d27-917a0783e9b0',
       });
 
+      console.log('✅ Signup returned user, redirecting IMMEDIATELY');
+
+      // Update invitation in background (don't wait for it)
       if (invitationToken) {
-        await supabase
+        supabase
           .from('invitations')
           .update({
             used_count: supabase.sql`used_count + 1`,
             updated_at: new Date().toISOString()
           })
-          .eq('token', invitationToken);
+          .eq('token', invitationToken)
+          .then(() => console.log('✓ Invitation updated'))
+          .catch(err => console.log('⚠️ Invitation update failed (non-blocking):', err.message));
       }
-
-      console.log('✅ Sign-up complete, redirecting immediately');
-      clearTimeout(timeoutId);
 
       // IMMEDIATE REDIRECT - Check if super admin
       if (formData.email === 'vickypingo@gmail.com') {
@@ -366,7 +352,6 @@ function Signup() {
         window.location.href = '/broker-dashboard';
       }
     } catch (err: any) {
-      clearTimeout(timeoutId);
       console.error('❌ SIGNUP ERROR:', err);
       console.error('   Error message:', err.message);
       console.error('   Error details:', JSON.stringify(err, null, 2));
