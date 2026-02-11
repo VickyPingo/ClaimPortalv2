@@ -4,7 +4,7 @@ import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
 import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
 
-export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
+export default function Login({ roleType }: { roleType?: 'client' | 'broker' | null }) {
   const { signIn, userRole, userType, loading: authLoading } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [email, setEmail] = useState('');
@@ -69,7 +69,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
   };
 
   if (showSignup) {
-    return <Signup onBackToLogin={() => setShowSignup(false)} onBackToRole={onBackToRole} />;
+    return <Signup onBackToLogin={() => setShowSignup(false)} />;
   }
 
   return (
@@ -179,7 +179,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
   );
 }
 
-function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; onBackToRole?: () => void }) {
+function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
   const { brokerSignUp } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [formData, setFormData] = useState({
