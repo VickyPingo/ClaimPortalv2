@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
 
 export default function Login({ roleType }: { roleType?: 'client' | 'broker' | null }) {
-  const { signIn, userRole, userType, loading: authLoading } = useAuth();
+  const { signIn, userRole, userType, loading: authLoading, user } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,15 +24,18 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     }
   }, []);
 
-  // Wait for profile to load after login before navigation happens
-  useEffect(() => {
-    if (!authLoading && userType && userRole !== null) {
-      console.log('✅ Profile loaded after login, navigation will occur');
-      console.log('   User Type:', userType);
-      console.log('   User Role:', userRole);
-      console.log('   Dashboard:', userRole === 'super_admin' ? '/admin/brokerages' : '/claims');
-    }
-  }, [authLoading, userType, userRole]);
+  // Don't render login/signup if user is authenticated - let HomePageRouter take over
+  if (user && userType) {
+    console.log('✅ User authenticated with type, letting HomePageRouter handle navigation');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Initialising your professional dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,7 +204,6 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [invitationBrokerageId, setInvitationBrokerageId] = useState<string | null>(null);
   const [invitationValid, setInvitationValid] = useState(false);
@@ -325,10 +327,10 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
         }
       }
 
-      setSuccess(true);
+      console.log('✅ Signup complete, auth state will trigger redirect');
+      // Keep loading state - Login component will show loading screen and HomePageRouter will take over
     } catch (err: any) {
       setError(err.message || 'Signup failed');
-    } finally {
       setLoading(false);
     }
   };
@@ -341,19 +343,11 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           <p className="text-gray-600 text-sm">Create your account to access the portal</p>
         </div>
 
-        {loading && !error && !success && (
+        {loading && !error && (
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
             <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
             <p className="text-sm text-blue-800 font-medium">
               Initialising your professional dashboard...
-            </p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800 font-semibold text-center">
-              Account authorised. Redirecting to your dashboard...
             </p>
           </div>
         )}
@@ -514,7 +508,7 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           </button>
         </form>
 
-        {!loading && !success && (
+        {!loading && (
           <div className="mt-4 text-center">
             <p className="text-gray-600 text-sm">
               Already have an account?{' '}

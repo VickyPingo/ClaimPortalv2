@@ -331,34 +331,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created, database trigger will handle profiles');
+    console.log('✅ Auth user created, database trigger will handle profiles asynchronously');
 
-    // Wait for profile to be created by trigger (with retries)
-    let retries = 0;
-    const maxRetries = 10;
-    const retryDelay = 500; // ms
-
-    while (retries < maxRetries) {
-      const { data: brokerUser } = await supabase
-        .from('broker_users')
-        .select('id')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-
-      if (brokerUser) {
-        console.log('✅ Broker profile verified in database');
-        setUser(authData.user);
-        await determineUserType(authData.user.id);
-        return;
-      }
-
-      retries++;
-      console.log(`⏳ Waiting for profile creation (attempt ${retries}/${maxRetries})...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-    }
-
-    // If we reach here, profile wasn't created in time
-    throw new Error('Profile creation timeout. Please try signing in.');
+    // Set user and type immediately - redirect will happen in Login component
+    setUser(authData.user);
+    setUserType('broker');
+    setBrokerageId(targetBrokerageId);
   };
 
   const brokerSignIn = async (email: string, password: string) => {
@@ -416,34 +394,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created, database trigger will handle profiles');
+    console.log('✅ Auth user created, database trigger will handle profiles asynchronously');
 
-    // Wait for profile to be created by trigger (with retries)
-    let retries = 0;
-    const maxRetries = 10;
-    const retryDelay = 500; // ms
-
-    while (retries < maxRetries) {
-      const { data: clientProfile } = await supabase
-        .from('client_profiles')
-        .select('id')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-
-      if (clientProfile) {
-        console.log('✅ Client profile verified in database');
-        setUser(authData.user);
-        await determineUserType(authData.user.id);
-        return;
-      }
-
-      retries++;
-      console.log(`⏳ Waiting for profile creation (attempt ${retries}/${maxRetries})...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
-    }
-
-    // If we reach here, profile wasn't created in time
-    throw new Error('Profile creation timeout. Please try signing in.');
+    // Set user and type immediately - redirect will happen in Login component
+    setUser(authData.user);
+    setUserType('client');
+    setBrokerageId(currentBrokerageId);
   };
 
   const clientSignIn = async (email: string, password: string) => {
