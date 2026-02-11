@@ -1,12 +1,12 @@
 import { ReactNode, useState, useMemo } from 'react';
-import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link } from 'lucide-react';
+import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link, UsersRound } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  currentView: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations';
-  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => void;
+  currentView: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations';
+  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations') => void;
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
@@ -21,6 +21,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
       { id: 'inbox' as const, icon: Inbox, label: 'All Claims' },
       { id: 'clients' as const, icon: Users, label: 'Clients' },
+      { id: 'team' as const, icon: UsersRound, label: 'Team' },
     ];
 
     // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin menu items
@@ -48,7 +49,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     return baseItems;
   }, [isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain]);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     onNavigate(view);
     setMobileMenuOpen(false);
   };

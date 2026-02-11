@@ -9,10 +9,11 @@ import SettingsPanel from './SettingsPanel';
 import BrokeragesManager from './BrokeragesManager';
 import UsersManager from './UsersManager';
 import InvitationManager from './InvitationManager';
+import TeamManagement from './TeamManagement';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
-type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
+type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin, userRole, user } = useAuth();
@@ -44,7 +45,7 @@ export default function BrokerAdminDashboard() {
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     console.log('🧭 Navigation requested to:', view);
     console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
@@ -159,6 +160,9 @@ export default function BrokerAdminDashboard() {
 
       case 'clients':
         return <ClientsDirectory onViewClient={handleViewClient} />;
+
+      case 'team':
+        return <TeamManagement />;
 
       case 'client-folder':
         return selectedClientId ? (
@@ -286,10 +290,10 @@ export default function BrokerAdminDashboard() {
     }
   };
 
-  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations' => {
+  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' => {
     if (currentView === 'client-folder') return 'clients';
     if (currentView === 'claim-view') return selectedClientId ? 'clients' : 'dashboard';
-    return currentView as 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations';
+    return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations';
   };
 
   return (
