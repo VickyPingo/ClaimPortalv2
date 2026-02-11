@@ -302,6 +302,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
+    console.log('🟢 BROKER SIGNUP - Creating broker profile');
+    console.log('   Brokerage ID:', profile.brokerage_id);
+
     const targetBrokerageId = profile.brokerage_id || brokerage?.id;
 
     if (!targetBrokerageId) {
@@ -326,7 +329,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'staff',
       });
 
-    if (brokerUserError) throw brokerUserError;
+    if (brokerUserError) {
+      console.error('❌ Error creating broker_users entry:', brokerUserError);
+      throw brokerUserError;
+    }
 
     const { error: profileError } = await supabase
       .from('broker_profiles')
@@ -337,9 +343,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id_number: profile.id_number,
         cell_number: profile.cell_number,
         policy_number: profile.policy_number || null,
+        role: 'broker',
+        user_type: 'broker',
       });
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('❌ Error creating broker profile:', profileError);
+      throw profileError;
+    }
+
+    console.log('✅ Broker profile created successfully');
 
     setUser(authData.user);
     await determineUserType(authData.user.id);
@@ -371,6 +384,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => {
+    console.log('🔵 CLIENT SIGNUP - Creating client profile');
+    console.log('   Brokerage ID:', brokerageId);
+    console.log('   Profile:', profile);
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -393,9 +410,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: profile.full_name,
         email: profile.email,
         cell_number: profile.cell_number,
+        role: 'client',
+        user_type: 'client',
       });
 
-    if (profileError) throw profileError;
+    if (profileError) {
+      console.error('❌ Error creating client profile:', profileError);
+      throw profileError;
+    }
+
+    console.log('✅ Client profile created successfully');
 
     setUser(authData.user);
     await determineUserType(authData.user.id);
