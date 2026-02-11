@@ -180,10 +180,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      // Check if response exists before destructuring
+      if (!response) {
+        console.error('❌ No response from auth service');
+        await supabase.auth.signOut();
+        throw new Error('Authentication service error');
+      }
+
+      const { data, error } = response;
 
       if (error) {
         console.error('❌ Password login failed:', error.message);
@@ -192,28 +201,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
 
-        // PROVIDER CHECK: Check if user exists but with different auth method
-        const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail?.(email).catch(() => ({ data: { user: null } }));
-
-        if (existingUser) {
-          console.log('⚠️ User exists but password login failed');
-          console.log('   User auth providers:', existingUser.app_metadata?.providers || 'unknown');
-
-          // Check if user only has OAuth and no email provider
-          const identities = existingUser.identities || [];
-          const hasEmailProvider = identities.some(identity => identity.provider === 'email');
-
-          if (!hasEmailProvider && identities.length > 0) {
-            throw new Error('This account uses OAuth login. Please contact your administrator to set up password login.');
-          }
+        // Provide helpful error message for invalid credentials
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
         }
 
         throw error;
       }
 
-      if (!data.user) {
+      if (!data || !data.user) {
         await supabase.auth.signOut();
-        throw new Error('Sign in failed');
+        throw new Error('Sign in failed - no user data returned');
       }
 
       console.log('✓ Password login successful');
@@ -292,10 +290,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      // Check if response exists before destructuring
+      if (!response) {
+        console.error('❌ No response from auth service');
+        await supabase.auth.signOut();
+        throw new Error('Authentication service error');
+      }
+
+      const { data, error } = response;
 
       if (error) {
         console.error('❌ Password login failed:', error.message);
@@ -304,28 +311,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
 
-        // PROVIDER CHECK: Check if user exists but with different auth method
-        const { data: { user: existingUser } } = await supabase.auth.admin.getUserByEmail?.(email).catch(() => ({ data: { user: null } }));
-
-        if (existingUser) {
-          console.log('⚠️ User exists but password login failed');
-          console.log('   User auth providers:', existingUser.app_metadata?.providers || 'unknown');
-
-          // Check if user only has OAuth and no email provider
-          const identities = existingUser.identities || [];
-          const hasEmailProvider = identities.some(identity => identity.provider === 'email');
-
-          if (!hasEmailProvider && identities.length > 0) {
-            throw new Error('This account uses OAuth login. Please contact your administrator to set up password login.');
-          }
+        // Provide helpful error message for invalid credentials
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
         }
 
         throw error;
       }
 
-      if (!data.user) {
+      if (!data || !data.user) {
         await supabase.auth.signOut();
-        throw new Error('Sign in failed');
+        throw new Error('Sign in failed - no user data returned');
       }
 
       console.log('✓ Broker password login successful');
@@ -390,10 +386,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const response = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      // Check if response exists before destructuring
+      if (!response) {
+        console.error('❌ No response from auth service');
+        await supabase.auth.signOut();
+        throw new Error('Authentication service error');
+      }
+
+      const { data, error } = response;
 
       if (error) {
         console.error('❌ Password login failed:', error.message);
@@ -405,9 +410,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
 
-      if (!data.user) {
+      if (!data || !data.user) {
         await supabase.auth.signOut();
-        throw new Error('Sign in failed');
+        throw new Error('Sign in failed - no user data returned');
       }
 
       console.log('✓ Client password login successful');
