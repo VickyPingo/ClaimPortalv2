@@ -53,19 +53,25 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
 
       let query = supabase.from('claims').select('*');
 
-      // If not super admin, filter by brokerage_id
-      if (!isSuperAdmin() && brokerProfile?.brokerage_id) {
-        console.log('  Filtering by brokerage_id:', brokerProfile.brokerage_id);
+      // ACCESS CONTROL:
+      // - Super Admin (role: 'super_admin'): See ALL claims across ALL brokerages
+      // - Broker (role: 'broker'): ONLY see claims from their specific brokerage_id
+      if (isSuperAdmin()) {
+        console.log('  ⭐ SUPER ADMIN: Loading ALL claims from ALL brokerages');
+      } else if (brokerProfile?.brokerage_id) {
+        console.log('  🔒 BROKER: Filtering by brokerage_id:', brokerProfile.brokerage_id);
         query = query.eq('brokerage_id', brokerProfile.brokerage_id);
       } else {
-        console.log('  Loading ALL claims (Super Admin)');
+        console.warn('  ⚠️ No brokerage_id found - no claims will be loaded');
+        setLoading(false);
+        return;
       }
 
       const { data: claimsData, error: claimsError } = await query.order('created_at', { ascending: false });
 
       if (claimsError) throw claimsError;
 
-      console.log('  Claims loaded:', claimsData?.length || 0);
+      console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
       const claimsWithClientNames = (claimsData || []).map((claim) => ({
         ...claim,

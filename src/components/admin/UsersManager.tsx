@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Users, Search, Shield, Trash2, Edit, Mail, Phone, Building2 } from 'lucide-react';
 
 interface User {
@@ -14,49 +15,71 @@ interface User {
 }
 
 export default function UsersManager() {
+  const { isSuperAdmin, brokerProfile } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     console.log('👥 UsersManager component mounted - fetching users');
+    console.log('  Is Super Admin:', isSuperAdmin());
+    console.log('  Broker Profile:', brokerProfile);
     loadUsers();
   }, []);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
+      console.log('📊 Loading users with access control');
+
+      // Build queries with access control
+      let brokerQuery = supabase.from('broker_profiles').select(`
+        id,
+        full_name,
+        cell_number,
+        role,
+        brokerage_id,
+        created_at,
+        brokerages (name)
+      `);
+
+      let clientQuery = supabase.from('client_profiles').select(`
+        id,
+        full_name,
+        cell_number,
+        role,
+        brokerage_id,
+        created_at,
+        brokerages (name)
+      `);
+
+      // ACCESS CONTROL:
+      // - Super Admin (role: 'super_admin'): See ALL users from ALL brokerages
+      // - Broker (role: 'broker'): ONLY see users from their specific brokerage
+      if (isSuperAdmin()) {
+        console.log('  ⭐ SUPER ADMIN: Loading ALL users from ALL brokerages');
+      } else if (brokerProfile?.brokerage_id) {
+        console.log('  🔒 BROKER: Filtering to brokerage_id:', brokerProfile.brokerage_id);
+        brokerQuery = brokerQuery.eq('brokerage_id', brokerProfile.brokerage_id);
+        clientQuery = clientQuery.eq('brokerage_id', brokerProfile.brokerage_id);
+      } else {
+        console.warn('  ⚠️ No access to users');
+        setLoading(false);
+        return;
+      }
+
       // Load broker users
-      const { data: brokerData, error: brokerError } = await supabase
-        .from('broker_profiles')
-        .select(`
-          id,
-          full_name,
-          cell_number,
-          role,
-          brokerage_id,
-          created_at,
-          brokerages (name)
-        `)
-        .order('created_at', { ascending: false });
+      const { data: brokerData, error: brokerError } = await brokerQuery.order('created_at', { ascending: false });
 
       if (brokerError) throw brokerError;
 
       // Load client users
-      const { data: clientData, error: clientError } = await supabase
-        .from('client_profiles')
-        .select(`
-          id,
-          full_name,
-          cell_number,
-          role,
-          brokerage_id,
-          created_at,
-          brokerages (name)
-        `)
-        .order('created_at', { ascending: false });
+      const { data: clientData, error: clientError } = await clientQuery.order('created_at', { ascending: false });
 
       if (clientError) console.error('Error fetching client data:', clientError);
+
+      console.log('  ✓ Broker users loaded:', brokerData?.length || 0);
+      console.log('  ✓ Client users loaded:', clientData?.length || 0);
 
       // Get auth.users emails for both brokers and clients
       const allIds = [

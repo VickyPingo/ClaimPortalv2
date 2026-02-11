@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Building2, Plus, Edit, Trash2, Search, Globe, Mail, Copy, Check, Link as LinkIcon, X } from 'lucide-react';
 
 interface Brokerage {
@@ -22,6 +23,7 @@ interface Invitation {
 }
 
 export default function BrokeragesManager() {
+  const { isSuperAdmin, brokerProfile } = useAuth();
   const [brokerages, setBrokerages] = useState<Brokerage[]>([]);
   const [invitations, setInvitations] = useState<Record<string, Invitation>>({});
   const [loading, setLoading] = useState(true);
@@ -40,17 +42,36 @@ export default function BrokeragesManager() {
 
   useEffect(() => {
     console.log('🏢 BrokeragesManager component mounted - fetching brokerages');
+    console.log('  Is Super Admin:', isSuperAdmin());
+    console.log('  Broker Profile:', brokerProfile);
     fetchBrokerages();
   }, []);
 
   const fetchBrokerages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('brokerages')
-        .select('*')
-        .order('created_at', { ascending: false });
+      console.log('📊 Fetching brokerages with access control');
+
+      let query = supabase.from('brokerages').select('*');
+
+      // ACCESS CONTROL:
+      // - Super Admin (role: 'super_admin'): See ALL brokerages
+      // - Broker (role: 'broker'): ONLY see their specific brokerage
+      if (isSuperAdmin()) {
+        console.log('  ⭐ SUPER ADMIN: Loading ALL brokerages');
+      } else if (brokerProfile?.brokerage_id) {
+        console.log('  🔒 BROKER: Filtering to brokerage_id:', brokerProfile.brokerage_id);
+        query = query.eq('id', brokerProfile.brokerage_id);
+      } else {
+        console.warn('  ⚠️ No access to brokerages');
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      console.log('  ✓ Brokerages loaded:', data?.length || 0);
       setBrokerages(data || []);
 
       if (data) {

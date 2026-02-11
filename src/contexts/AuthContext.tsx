@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Loading profile for user:', userId);
 
-      // Check if user is super admin
+      // Check if user is super admin by email
       const isUserSuperAdmin = isSuperAdmin(userEmail);
 
       // Try to load broker profile first
@@ -106,6 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (brokerProfileData) {
         console.log('✓ Broker profile found');
+        console.log('  Role:', brokerProfileData.role);
+        console.log('  Brokerage ID:', brokerProfileData.brokerage_id);
 
         // Force super_admin role if email is in SUPER_ADMINS list
         if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
@@ -117,9 +119,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setUserType('broker');
-        setBrokerageId(brokerProfileData.brokerage_id);
-        setBrokerProfile(brokerProfileData);
         setUserRole(brokerProfileData.role || 'broker');
+
+        // SUPER ADMIN NEUTRALITY: Super admins see ALL data regardless of brokerage_id
+        // Even if brokerage_id is NULL, they have full system access
+        if (brokerProfileData.role === 'super_admin') {
+          console.log('  ⭐ SUPER ADMIN: Full system access granted');
+          setBrokerageId(null);
+        } else {
+          // Regular brokers are restricted to their brokerage
+          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
+          setBrokerageId(brokerProfileData.brokerage_id);
+        }
+
+        setBrokerProfile(brokerProfileData);
         return;
       }
 

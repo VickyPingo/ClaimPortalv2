@@ -54,19 +54,25 @@ export default function ClientsDirectory({ onViewClient }: ClientsDirectoryProps
 
       let query = supabase.from('client_profiles').select('*');
 
-      // If not super admin, filter by brokerage_id
-      if (!isSuperAdmin() && brokerProfile?.brokerage_id) {
-        console.log('  Filtering by brokerage_id:', brokerProfile.brokerage_id);
+      // ACCESS CONTROL:
+      // - Super Admin (role: 'super_admin'): See ALL clients across ALL brokerages
+      // - Broker (role: 'broker'): ONLY see clients from their specific brokerage_id
+      if (isSuperAdmin()) {
+        console.log('  ⭐ SUPER ADMIN: Loading ALL clients from ALL brokerages');
+      } else if (brokerProfile?.brokerage_id) {
+        console.log('  🔒 BROKER: Filtering by brokerage_id:', brokerProfile.brokerage_id);
         query = query.eq('brokerage_id', brokerProfile.brokerage_id);
       } else {
-        console.log('  Loading ALL clients (Super Admin)');
+        console.warn('  ⚠️ No brokerage_id found - no clients will be loaded');
+        setLoading(false);
+        return;
       }
 
       const { data: clientsData, error: clientsError } = await query.order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
 
-      console.log('  Clients loaded:', clientsData?.length || 0);
+      console.log('  ✓ Clients loaded:', clientsData?.length || 0);
 
       const clientsWithCounts = await Promise.all(
         (clientsData || []).map(async (client) => {
