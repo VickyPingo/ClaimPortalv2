@@ -54,7 +54,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
         cell_number: cellNumber,
       });
     } catch (err: any) {
-      setError(err.message || 'Sign up failed');
+      setError(err.message || 'Sign-up failed');
     } finally {
       setLoading(false);
     }
@@ -252,7 +252,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
           ) : (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-center text-sm text-amber-800">
-                Sign up is not available on this domain. Please contact your broker for access.
+                Sign-up is not available on this domain. Please contact your broker for access.
               </p>
             </div>
           )}

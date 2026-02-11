@@ -339,55 +339,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
-    console.log('🟢 BROKER SIGNUP - Creating broker account');
-    console.log('   Email:', email);
-    console.log('   Profile data:', JSON.stringify(profile, null, 2));
-
-    const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
-    const targetBrokerageId = profile.brokerage_id || brokerage?.id || INDEPENDI_BROKERAGE_ID;
-
-    console.log('   Target Brokerage ID (final):', targetBrokerageId);
-    console.log('   Target Brokerage ID type:', typeof targetBrokerageId);
-
-    // Create auth user with metadata - database trigger will auto-create profiles
-    // Trigger expects: role='broker' AND user_type='broker' to create broker_users & broker_profiles
-    // Using exact metadata structure as specified to avoid database errors
+    // NUCLEAR OPTION: Minimal signup with fixed brokerage_id
     const metadata: Record<string, any> = {
       role: 'broker',
       user_type: 'broker',
       brokerage_id: 'f67b67c8-086b-4b42-8d27-917a0783e9b0',
     };
 
-    // Only include profile fields if they have non-empty values
+    // Include profile fields if provided
     if (profile.full_name?.trim()) metadata.full_name = profile.full_name.trim();
     if (profile.id_number?.trim()) metadata.id_number = profile.id_number.trim();
     if (profile.cell_number?.trim()) metadata.cell_number = profile.cell_number.trim();
     if (profile.policy_number?.trim()) metadata.policy_number = profile.policy_number.trim();
 
-    console.log('   Metadata being sent:', JSON.stringify(metadata, null, 2));
-
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: metadata,
-      },
+      options: { data: metadata },
     });
 
-    if (authError) {
-      console.error('❌ Auth signup error:', authError);
-      console.error('   Error code:', authError.code);
-      console.error('   Error status:', authError.status);
-      console.error('   Error message:', authError.message);
-      console.error('   Full error:', JSON.stringify(authError, null, 2));
-      throw authError;
-    }
-    if (!authData.user) {
-      console.error('❌ User creation failed - no user returned');
-      throw new Error('User creation failed');
-    }
-
-    console.log('✅ Auth user created - database trigger will auto-create profile');
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('User creation failed');
 
     return authData.user;
   };
