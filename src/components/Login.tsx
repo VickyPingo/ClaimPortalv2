@@ -166,7 +166,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
           {isPlatformDomain ? (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-center text-sm text-blue-800">
-                Platform access is restricted to authorized administrators only.
+                Platform access is restricted to authorised administrators only.
               </p>
             </div>
           ) : brokerage ? (

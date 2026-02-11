@@ -18,6 +18,7 @@ interface Invitation {
   id: string;
   token: string;
   role: string;
+  brokerage_id: string;
   expires_at: string;
   used_count: number;
   max_uses: number | null;
@@ -25,16 +26,24 @@ interface Invitation {
   created_at: string;
 }
 
+interface Brokerage {
+  id: string;
+  name: string;
+  subdomain: string;
+}
+
 export default function InvitationManager() {
-  const { brokerageId } = useAuth();
+  const { brokerageId, isSuperAdmin } = useAuth();
   const { brokerage } = useBrokerage();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [brokerages, setBrokerages] = useState<Brokerage[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const [newInvitation, setNewInvitation] = useState({
+    brokerage_id: brokerageId || '',
     role: 'staff',
     daysValid: 7,
     maxUses: null as number | null,
@@ -42,18 +51,45 @@ export default function InvitationManager() {
 
   useEffect(() => {
     loadInvitations();
+    if (isSuperAdmin()) {
+      loadBrokerages();
+    }
   }, [brokerageId]);
 
-  const loadInvitations = async () => {
-    if (!brokerageId) return;
+  useEffect(() => {
+    if (brokerageId && !newInvitation.brokerage_id) {
+      setNewInvitation(prev => ({ ...prev, brokerage_id: brokerageId }));
+    }
+  }, [brokerageId]);
 
-    setLoading(true);
+  const loadBrokerages = async () => {
     try {
       const { data, error } = await supabase
+        .from('brokerages')
+        .select('id, name, subdomain')
+        .order('name');
+
+      if (error) throw error;
+      setBrokerages(data || []);
+    } catch (error) {
+      console.error('Error loading brokerages:', error);
+    }
+  };
+
+  const loadInvitations = async () => {
+    setLoading(true);
+    try {
+      let query = supabase
         .from('invitations')
         .select('*')
-        .eq('brokerage_id', brokerageId)
         .order('created_at', { ascending: false });
+
+      // If not super admin, filter by brokerage
+      if (!isSuperAdmin() && brokerageId) {
+        query = query.eq('brokerage_id', brokerageId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setInvitations(data || []);
@@ -65,7 +101,12 @@ export default function InvitationManager() {
   };
 
   const createInvitation = async () => {
-    if (!brokerageId) return;
+    const targetBrokerageId = newInvitation.brokerage_id || brokerageId;
+
+    if (!targetBrokerageId) {
+      alert('Please select a brokerage');
+      return;
+    }
 
     setCreating(true);
     try {
@@ -75,7 +116,7 @@ export default function InvitationManager() {
       const { data, error } = await supabase
         .from('invitations')
         .insert({
-          brokerage_id: brokerageId,
+          brokerage_id: targetBrokerageId,
           role: newInvitation.role,
           expires_at: expiresAt.toISOString(),
           max_uses: newInvitation.maxUses,
@@ -87,7 +128,12 @@ export default function InvitationManager() {
 
       setInvitations([data, ...invitations]);
       setShowCreateForm(false);
-      setNewInvitation({ role: 'staff', daysValid: 7, maxUses: null });
+      setNewInvitation({
+        brokerage_id: brokerageId || '',
+        role: 'staff',
+        daysValid: 7,
+        maxUses: null
+      });
     } catch (error: any) {
       alert('Failed to create invitation: ' + error.message);
     } finally {
@@ -114,22 +160,16 @@ export default function InvitationManager() {
     }
   };
 
-  const copyInvitationLink = (token: string) => {
-    const baseUrl = brokerage?.subdomain
-      ? `https://${brokerage.subdomain}`
-      : window.location.origin;
-    const inviteUrl = `${baseUrl}/join?token=${token}`;
+  const copyInvitationLink = (token: string, invitationBrokerageId: string) => {
+    const inviteUrl = `https://claimsportal.co.za/signup?token=${token}&brokerId=${invitationBrokerageId}`;
 
     navigator.clipboard.writeText(inviteUrl);
     setCopiedToken(token);
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const getInvitationUrl = (token: string) => {
-    const baseUrl = brokerage?.subdomain
-      ? `https://${brokerage.subdomain}`
-      : window.location.origin;
-    return `${baseUrl}/join?token=${token}`;
+  const getInvitationUrl = (token: string, invitationBrokerageId: string) => {
+    return `https://claimsportal.co.za/signup?token=${token}&brokerId=${invitationBrokerageId}`;
   };
 
   const isExpired = (expiresAt: string) => {
@@ -138,6 +178,11 @@ export default function InvitationManager() {
 
   const isMaxedOut = (inv: Invitation) => {
     return inv.max_uses !== null && inv.used_count >= inv.max_uses;
+  };
+
+  const getBrokerageName = (brokerageId: string) => {
+    const broker = brokerages.find(b => b.id === brokerageId);
+    return broker ? broker.name : 'Unknown';
   };
 
   if (loading) {
@@ -171,6 +216,29 @@ export default function InvitationManager() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">New Invitation</h3>
 
           <div className="space-y-4">
+            {isSuperAdmin() && brokerages.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Brokerage
+                </label>
+                <select
+                  value={newInvitation.brokerage_id}
+                  onChange={(e) =>
+                    setNewInvitation({ ...newInvitation, brokerage_id: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Select a brokerage</option>
+                  {brokerages.map((broker) => (
+                    <option key={broker.id} value={broker.id}>
+                      {broker.name} ({broker.subdomain})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Role
@@ -288,6 +356,11 @@ export default function InvitationManager() {
                         {invitation.role.charAt(0).toUpperCase() +
                           invitation.role.slice(1)}
                       </span>
+                      {isSuperAdmin() && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                          {getBrokerageName(invitation.brokerage_id)}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
@@ -321,13 +394,13 @@ export default function InvitationManager() {
                     )}
 
                     <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono text-gray-700 break-all">
-                      {getInvitationUrl(invitation.token)}
+                      {getInvitationUrl(invitation.token, invitation.brokerage_id)}
                     </div>
                   </div>
 
                   <div className="flex gap-2 ml-4">
                     <button
-                      onClick={() => copyInvitationLink(invitation.token)}
+                      onClick={() => copyInvitationLink(invitation.token, invitation.brokerage_id)}
                       disabled={inactive}
                       className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Copy link"

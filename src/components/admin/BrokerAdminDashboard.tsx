@@ -46,7 +46,7 @@ export default function BrokerAdminDashboard() {
     console.log('📺 Current View Changed:', currentView);
 
     if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations') && !isSuperAdmin()) {
-      console.log('❌ Unauthorized view access detected, redirecting to dashboard');
+      console.log('❌ Unauthorised view access detected, redirecting to dashboard');
       setCurrentView('dashboard');
       setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
       setTimeout(() => setAccessDeniedMessage(null), 5000);

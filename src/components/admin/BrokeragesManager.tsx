@@ -203,7 +203,7 @@ export default function BrokeragesManager() {
   };
 
   const copyInviteLink = (brokerageId: string, token: string) => {
-    const inviteLink = `https://claimsportal.co.za/signup?invite=${token}&brokerage=${brokerageId}`;
+    const inviteLink = `https://claimsportal.co.za/signup?token=${token}&brokerId=${brokerageId}`;
     navigator.clipboard.writeText(inviteLink);
     setCopiedId(brokerageId);
     setTimeout(() => setCopiedId(null), 2000);
