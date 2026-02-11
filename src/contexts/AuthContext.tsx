@@ -61,53 +61,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🧹 Cleared all cached data on AuthContext mount');
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      (async () => {
-        if (session?.user) {
-          console.log('📦 Session found, fetching fresh profile from database');
-          setUser(session.user);
+      if (session?.user) {
+        console.log('📦 Session found, setting user immediately');
+        setUser(session.user);
 
-          // CRITICAL: Clear all state before fetching to prevent stale data
-          setUserType(null);
-          setUserRole(null);
-          setBrokerageId(null);
-          setBrokerProfile(null);
-          setClientProfile(null);
-
-          await determineUserType(session.user.id);
-        } else {
-          console.log('❌ No session found');
-        }
+        // IMMEDIATE: Set loading to false to unblock UI
         setLoading(false);
-      })();
+
+        // BACKGROUND: Fetch profile data without blocking
+        (async () => {
+          await determineUserType(session.user.id);
+        })();
+      } else {
+        console.log('❌ No session found');
+        setLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      (async () => {
-        console.log('🔄 Auth state changed:', event, session?.user?.id);
+      console.log('🔄 Auth state changed:', event, session?.user?.id);
 
-        if (session?.user) {
-          setUser(session.user);
-          setLoading(true);
+      if (session?.user) {
+        setUser(session.user);
 
-          // CRITICAL: Clear all state before fetching to prevent stale data
-          setUserType(null);
-          setUserRole(null);
-          setBrokerageId(null);
-          setBrokerProfile(null);
-          setClientProfile(null);
-
+        // BACKGROUND: Fetch profile data without blocking UI
+        (async () => {
           console.log('🔄 Refreshing profile from database');
           await determineUserType(session.user.id);
-          setLoading(false);
-        } else {
-          setUser(null);
-          setUserType(null);
-          setUserRole(null);
-          setBrokerageId(null);
-          setBrokerProfile(null);
-          setClientProfile(null);
-        }
-      })();
+        })();
+      } else {
+        setUser(null);
+        setUserType(null);
+        setUserRole(null);
+        setBrokerageId(null);
+        setBrokerProfile(null);
+        setClientProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -190,12 +179,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('📋 Final Role Value:', profile.role);
           console.log('👑 Is Super Admin (computed):', profile.role === 'super_admin');
         } else {
-          console.warn('⚠️ No broker profile found for user:', userId);
+          console.warn('⚠️ No broker profile found, creating default profile...');
 
-          // FALLBACK: If no profile but email is super admin, force super_admin
-          if (isUserSuperAdmin) {
-            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is super admin - forcing super_admin');
-            setUserRole('super_admin');
+          // CREATE DEFAULT PROFILE
+          const defaultProfile: BrokerProfile = {
+            id: userId,
+            full_name: userEmail || 'User',
+            id_number: '',
+            cell_number: '',
+            brokerage_id: brokerUser.brokerage_id,
+            role: isUserSuperAdmin ? 'super_admin' : 'broker',
+          };
+
+          const { error: insertError } = await supabase
+            .from('broker_profiles')
+            .upsert(defaultProfile, { onConflict: 'id' });
+
+          if (insertError) {
+            console.error('❌ Error creating default broker profile:', insertError);
+          } else {
+            console.log('✅ Created default broker profile');
+            setBrokerProfile(defaultProfile);
+            setUserRole(defaultProfile.role || null);
           }
         }
         return;
@@ -225,13 +230,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.warn('⚠️ No profile found for user:', userId);
+      console.warn('⚠️ No profile found for user, creating default broker profile...');
 
-      // FALLBACK: If nothing worked but email is super admin, force super_admin
-      if (isUserSuperAdmin) {
-        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is super admin - forcing super_admin and broker type');
+      // CREATE DEFAULT BROKER_USER AND PROFILE
+      const defaultBrokerageId = brokerage?.id || '00000000-0000-0000-0000-000000000000';
+
+      // Create broker_users entry
+      const { error: brokerUserError } = await supabase
+        .from('broker_users')
+        .upsert({ id: userId, brokerage_id: defaultBrokerageId }, { onConflict: 'id' });
+
+      if (brokerUserError) {
+        console.error('❌ Error creating broker_users entry:', brokerUserError);
+      }
+
+      // Create broker_profiles entry
+      const defaultProfile: BrokerProfile = {
+        id: userId,
+        full_name: userEmail || 'User',
+        id_number: '',
+        cell_number: '',
+        brokerage_id: defaultBrokerageId,
+        role: isUserSuperAdmin ? 'super_admin' : 'broker',
+      };
+
+      const { error: profileError } = await supabase
+        .from('broker_profiles')
+        .upsert(defaultProfile, { onConflict: 'id' });
+
+      if (profileError) {
+        console.error('❌ Error creating default broker profile:', profileError);
+      } else {
+        console.log('✅ Created default broker profile');
         setUserType('broker');
-        setUserRole('super_admin');
+        setBrokerageId(defaultBrokerageId);
+        setBrokerProfile(defaultProfile);
+        setUserRole(defaultProfile.role || null);
       }
     } catch (error) {
       console.error('❌ Error determining user type:', error);

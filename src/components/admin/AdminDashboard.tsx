@@ -44,6 +44,13 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
       console.log('  Is Super Admin:', isSuperAdmin());
       console.log('  Broker Profile:', brokerProfile);
 
+      // If not super admin and profile not loaded yet, wait briefly
+      if (!isSuperAdmin() && !brokerProfile) {
+        console.log('  Profile not loaded yet, waiting...');
+        setTimeout(loadClaims, 500);
+        return;
+      }
+
       let query = supabase.from('claims').select('*');
 
       // If not super admin, filter by brokerage_id

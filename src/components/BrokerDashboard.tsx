@@ -108,7 +108,7 @@ export default function BrokerDashboard({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-                Welcome, {brokerProfile?.full_name.split(' ')[0]}
+                Welcome, {brokerProfile?.full_name?.split(' ')[0] || 'User'}
               </h1>
               <p className="text-gray-600 text-sm mt-1">View and manage insurance claims</p>
             </div>
