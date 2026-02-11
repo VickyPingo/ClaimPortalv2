@@ -521,20 +521,6 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
             Create Account
           </button>
         </form>
-
-        {!loading && (
-          <div className="mt-4 text-center">
-            <p className="text-gray-600 text-sm">
-              Already have an account?{' '}
-              <button
-                onClick={onBackToLogin}
-                className="text-blue-600 font-semibold hover:text-blue-700"
-              >
-                Sign In
-              </button>
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );
