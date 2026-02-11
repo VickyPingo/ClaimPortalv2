@@ -25,7 +25,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
     try {
       await clientSignIn(email, password);
     } catch (err: any) {
-      setError(err.message || 'Sign-in failed');
+      setError(err.message || 'Sign in failed');
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
         cell_number: cellNumber,
       });
     } catch (err: any) {
-      setError(err.message || 'Sign-up failed');
+      setError(err.message || 'Sign up failed');
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             {isSignup ? 'Create Account' : 'Welcome Back'}
           </h1>
           <p className="text-gray-600 text-sm">
-            {isSignup ? 'Sign-up to file insurance claims' : 'Sign-in to your client account'}
+            {isSignup ? 'Sign up to file insurance claims' : 'Sign in to your client account'}
           </p>
         </div>
 
@@ -92,7 +92,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">
-              Cannot register: This domain is not configured for sign-ups. Please contact your broker for access.
+              Cannot register: This domain is not configured for sign ups. Please contact your broker for access.
             </p>
           </div>
         )}
@@ -231,7 +231,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             className="w-full bg-green-700 text-white py-2.5 rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
-            {isSignup ? 'Create Account' : 'Sign-in'}
+            {isSignup ? 'Create Account' : 'Sign in'}
           </button>
         </form>
 
@@ -246,13 +246,13 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
                 }}
                 className="text-green-700 font-semibold hover:text-green-800"
               >
-                {isSignup ? 'Sign-in' : 'Sign-up'}
+                {isSignup ? 'Sign in' : 'Sign up'}
               </button>
             </p>
           ) : (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-center text-sm text-amber-800">
-                Sign-up is not available on this domain. Please contact your broker for access.
+                Sign up is not available on this domain. Please contact your broker for access.
               </p>
             </div>
           )}

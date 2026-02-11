@@ -54,7 +54,7 @@ export default function Landing({ onSelectRole }: LandingProps) {
               Access your dashboard to manage claims and view analytics
             </p>
             <div className="text-blue-700 font-semibold flex items-center">
-              Sign-in
+              Sign In
               <span className="ml-2">→</span>
             </div>
           </button>

@@ -22,7 +22,7 @@ export default function BrokerDashboard({
   onShowClaim?: (claimId: string) => void;
   onShowAdminDashboard?: () => void;
 }) {
-  const { brokerProfile, signOut } = useAuth();
+  const { brokerProfile, signOut, loading: authLoading } = useAuth();
   const [recentClaims, setRecentClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -100,6 +100,18 @@ export default function BrokerDashboard({
     };
     return labels[type] || type;
   };
+
+  // Show initialising message if profile is not loaded yet
+  if (!brokerProfile && authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Initialising Profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">

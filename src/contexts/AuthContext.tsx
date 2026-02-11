@@ -327,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign-in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed - no user data');
 
     console.log('✓ Authentication successful, fetching fresh profile from database...');
 
@@ -417,7 +417,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign-in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed - no user data');
 
     console.log('✓ Broker authentication successful, fetching fresh profile from database...');
 
@@ -472,7 +472,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign-in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed - no user data');
 
     console.log('✓ Client authentication successful, fetching fresh profile from database...');
 

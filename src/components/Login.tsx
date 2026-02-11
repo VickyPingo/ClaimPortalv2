@@ -43,7 +43,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     setLoading(true);
 
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Sign-in timeout reached - forcing redirect to break hang');
+      console.log('⏰ Sign in timeout reached - forcing redirect to break hang');
       window.location.href = '/broker-dashboard';
     }, 2000);
 
@@ -53,7 +53,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
       clearTimeout(timeoutId);
     } catch (err: any) {
       clearTimeout(timeoutId);
-      setError(err.message || 'Sign-in failed');
+      setError(err.message || 'Sign in failed');
       setLoading(false);
     }
   };
@@ -85,7 +85,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     }
 
     // Client subdomains (e.g., claims.independi.co.za)
-    return 'Sign-in to your organisation\'s portal';
+    return 'Sign in to your organisation\'s portal';
   };
 
   if (showSignup) {
@@ -174,7 +174,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
-            Sign-in
+            Sign In
           </button>
         </form>
 
@@ -192,7 +192,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
                 onClick={() => setShowSignup(true)}
                 className="text-blue-600 font-semibold hover:text-blue-700"
               >
-                Sign-up
+                Sign Up
               </button>
             </p>
           ) : (
@@ -298,17 +298,17 @@ function Signup() {
     setError('');
 
     if (isPlatformDomain && !invitationToken && !hasBrokerParam) {
-      setError('Cannot sign-up on platform domain without invitation');
+      setError('Cannot sign up on platform domain without invitation');
       return;
     }
 
     if (!invitationToken && !brokerage && !hasBrokerParam) {
-      setError('Cannot sign-up: No brokerage configuration found for this domain');
+      setError('Cannot sign up: No brokerage configuration found for this domain');
       return;
     }
 
     if (invitationToken && !invitationValid) {
-      setError('Cannot sign-up: Invalid or expired invitation');
+      setError('Cannot sign up: Invalid or expired invitation');
       return;
     }
 
@@ -450,7 +450,7 @@ function Signup() {
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">
-              Cannot register: This domain is not configured for sign-ups. Please contact your broker for access.
+              Cannot register: This domain is not configured for sign ups. Please contact your broker for access.
             </p>
           </div>
         )}
