@@ -42,11 +42,17 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     setError('');
     setLoading(true);
 
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Sign-in timeout reached - forcing redirect to break hang');
+      window.location.href = '/broker-dashboard';
+    }, 2000);
+
     try {
       await signIn(email, password);
       console.log('✓ Login successful, profile loaded');
-      // Keep loading state active while redirecting
+      clearTimeout(timeoutId);
     } catch (err: any) {
+      clearTimeout(timeoutId);
       setError(err.message || 'Login failed');
       setLoading(false);
     }

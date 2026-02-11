@@ -60,7 +60,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.sessionStorage.clear();
     console.log('🧹 Cleared all cached data on AuthContext mount');
 
+    const hangTimeout = setTimeout(() => {
+      console.log('⏰ Session loading timeout - forcing loading state to false');
+      setLoading(false);
+    }, 2000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(hangTimeout);
       if (session?.user) {
         console.log('📦 Session found, setting user immediately');
         setUser(session.user);
@@ -99,7 +105,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(hangTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const determineUserType = async (userId: string) => {
