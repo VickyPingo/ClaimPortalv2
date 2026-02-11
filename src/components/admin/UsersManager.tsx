@@ -110,7 +110,13 @@ export default function UsersManager() {
     }
   };
 
-  const deleteUser = async (userId: string) => {
+  const deleteUser = async (userId: string, userEmail: string) => {
+    // Protect vickypingo@gmail.com from deletion
+    if (userEmail === 'vickypingo@gmail.com') {
+      alert('Cannot delete the super admin account (vickypingo@gmail.com)');
+      return;
+    }
+
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
@@ -146,8 +152,6 @@ export default function UsersManager() {
         console.error('Error deleting client_profiles:', clientError);
       }
 
-      // Note: Deleting from auth.users requires admin privileges
-      // The RLS policies and cascade deletes will handle cleanup
       console.log('✓ User deleted successfully');
 
       alert('User deleted successfully');
@@ -275,27 +279,27 @@ export default function UsersManager() {
                       <td className="px-6 py-4">
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                            user.role === 'super_admin'
+                            user.role?.toLowerCase() === 'super_admin'
                               ? 'bg-purple-100 text-purple-700'
-                              : user.role === 'admin'
+                              : user.role?.toLowerCase() === 'admin'
                               ? 'bg-blue-100 text-blue-700'
-                              : user.role === 'broker'
+                              : user.role?.toLowerCase() === 'broker'
                               ? 'bg-blue-100 text-blue-700'
-                              : user.role === 'client'
+                              : user.role?.toLowerCase() === 'client'
                               ? 'bg-green-100 text-green-700'
                               : 'bg-gray-100 text-gray-700'
                           }`}
                         >
-                          {user.role === 'super_admin' && <Shield className="w-3 h-3" />}
-                          {user.role === 'super_admin'
+                          {user.role?.toLowerCase() === 'super_admin' && <Shield className="w-3 h-3" />}
+                          {user.role?.toLowerCase() === 'super_admin'
                             ? 'Super Admin'
-                            : user.role === 'admin'
+                            : user.role?.toLowerCase() === 'admin'
                             ? 'Admin'
-                            : user.role === 'broker'
+                            : user.role?.toLowerCase() === 'broker'
                             ? 'Broker'
-                            : user.role === 'client'
+                            : user.role?.toLowerCase() === 'client'
                             ? 'Client'
-                            : 'Staff'}
+                            : user.role || 'Unknown'}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
@@ -304,9 +308,18 @@ export default function UsersManager() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => deleteUser(user.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete user"
+                            onClick={() => deleteUser(user.id, user.email)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              user.email === 'vickypingo@gmail.com'
+                                ? 'text-gray-300 cursor-not-allowed'
+                                : 'text-red-600 hover:bg-red-50'
+                            }`}
+                            title={
+                              user.email === 'vickypingo@gmail.com'
+                                ? 'Cannot delete super admin'
+                                : 'Delete user'
+                            }
+                            disabled={user.email === 'vickypingo@gmail.com'}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
