@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, AlertCircle, Loader, ArrowLeft, Trash2 } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
 
 export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
   const { signIn, userRole, userType, loading: authLoading } = useAuth();
@@ -48,18 +48,22 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
     }
   };
 
-  const handleEmergencyReset = async () => {
-    console.log('🧹 EMERGENCY RESET: Clearing all cache, signing out, and reloading');
-
-    try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error('Error signing out:', err);
+  // Detect branding based on subdomain
+  const getBrandingTitle = () => {
+    if (brokerage?.name === 'Independi' || window.location.hostname.includes('independi')) {
+      return 'Independi Claims Portal';
     }
+    if (brokerage?.name) {
+      return `${brokerage.name} Claims Portal`;
+    }
+    return 'Claims Portal';
+  };
 
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    window.location.reload();
+  const getBrandingDescription = () => {
+    if (isPlatformDomain && roleType === 'broker') {
+      return 'Access the platform admin dashboard';
+    }
+    return 'Please sign in to your organisation\'s portal';
   };
 
   if (showSignup) {
@@ -81,10 +85,10 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
 
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            {isPlatformDomain && roleType === 'broker' ? 'Super Admin Login' : 'Welcome Back'}
+            {getBrandingTitle()}
           </h1>
           <p className="text-gray-600">
-            {isPlatformDomain && roleType === 'broker' ? 'Access the platform admin dashboard' : 'Sign in to your account'}
+            {getBrandingDescription()}
           </p>
         </div>
 
@@ -146,19 +150,10 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-700 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
             Sign In
-          </button>
-
-          <button
-            type="button"
-            onClick={handleEmergencyReset}
-            className="w-full bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center gap-2 border-2 border-red-700"
-          >
-            <Trash2 className="w-4 h-4" />
-            Emergency Reset
           </button>
         </form>
 
@@ -174,7 +169,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
               Don't have an account?{' '}
               <button
                 onClick={() => setShowSignup(true)}
-                className="text-blue-700 font-semibold hover:text-blue-800"
+                className="text-blue-600 font-semibold hover:text-blue-700"
               >
                 Sign Up
               </button>
@@ -182,7 +177,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
           ) : (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-center text-sm text-amber-800">
-                Sign up is not available on this domain. Please contact your broker for access.
+                Registration is not available on this domain. Please contact your broker for access.
               </p>
             </div>
           )}
@@ -481,7 +476,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           <button
             type="submit"
             disabled={loading || (!invitationValid && !brokerage) || invitationChecking}
-            className="w-full bg-blue-700 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
             Create Account
@@ -491,7 +486,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
         <div className="mt-4">
           <button
             onClick={onBackToLogin}
-            className="w-full text-blue-700 font-semibold hover:text-blue-800 py-2"
+            className="w-full text-blue-600 font-semibold hover:text-blue-700 py-2"
           >
             Back to Login
           </button>
