@@ -8,12 +8,9 @@ import { LogOut } from 'lucide-react';
 export default function HomePageRouter() {
   const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut } = useAuth();
 
-  // Create a unified profile object for easier debugging
-  const profile = brokerProfile || clientProfile;
-
-  console.log('Router detected role:', profile?.role);
-  console.log('Router detected user_type:', profile?.user_type);
   console.log('Router state - userType:', userType, 'userRole:', userRole);
+  console.log('Router brokerProfile:', brokerProfile);
+  console.log('Router clientProfile:', clientProfile);
 
   const handleForceLogout = async () => {
     console.log('🧹 FORCING COMPLETE LOGOUT AND CACHE CLEAR');
@@ -41,14 +38,22 @@ export default function HomePageRouter() {
     );
   }
 
-  // If not logged in, show login
+  // STEP 2: If not logged in, show login
   if (!user) {
     return <Login onBackToRole={() => {}} roleType={null} />;
   }
 
-  // CRITICAL: If user is logged in but profile hasn't loaded yet, keep showing spinner
-  // Do NOT default to ClientPortal until database has responded
-  if (!profile && !userType) {
+  // STEP 3: SUPER ADMIN PRIORITY CHECK - Before anything else
+  if (user.email === 'vickypingo@gmail.com') {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('👑 SUPER ADMIN EMAIL DETECTED: vickypingo@gmail.com');
+    console.log('✅ ROUTING TO: BrokerAdminDashboard (Priority Override)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    return <BrokerAdminDashboard />;
+  }
+
+  // STEP 4: If user is logged in but profile hasn't loaded yet, keep showing spinner
+  if (!brokerProfile && !clientProfile) {
     console.log('⚠️ User logged in but profile is null - waiting for database response');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
@@ -72,13 +77,13 @@ export default function HomePageRouter() {
     </button>
   );
 
-  // ROUTER STABILITY - Check role FIRST, prioritize profile?.role
+  // STEP 5: STRICT ROLE-BASED ROUTING - No Fallbacks
 
-  // STEP 1: Super Admin Check - HIGHEST PRIORITY (check profile.role FIRST)
-  if (profile?.role === 'super_admin') {
+  // Check Super Admin by role (secondary check after email)
+  if (brokerProfile?.role === 'super_admin') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🛡️ SUPER ADMIN DETECTED - RENDERING ADMIN DASHBOARD');
-    console.log('📋 Profile Role:', profile?.role);
+    console.log('🛡️ SUPER ADMIN ROLE DETECTED');
+    console.log('📋 Profile Role:', brokerProfile?.role);
     console.log('📋 User Email:', user?.email);
     console.log('✅ ROUTING TO: BrokerAdminDashboard');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -90,9 +95,10 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 2: Regular Broker Check (only if NOT super_admin)
-  if (profile?.user_type === 'broker' || userType === 'broker') {
+  // Check Broker Profile
+  if (brokerProfile && brokerProfile.role !== 'super_admin') {
     console.log('✅ ROUTING TO: BrokerDashboard (Regular Broker)');
+    console.log('📋 Broker Profile:', brokerProfile);
     return (
       <>
         <EmergencyLogoutButton />
@@ -101,9 +107,10 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: Client Check (explicit check, not default)
-  if (profile?.user_type === 'client' || userType === 'client') {
+  // Check Client Profile
+  if (clientProfile) {
     console.log('✅ ROUTING TO: ClientPortal (Client)');
+    console.log('📋 Client Profile:', clientProfile);
     return (
       <>
         <EmergencyLogoutButton />
@@ -112,14 +119,34 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 5: Unknown state - show spinner or error
-  console.log('⚠️ Unknown user state - showing spinner');
+  // STEP 6: Profile Error State - No valid profile found
+  console.error('❌ ERROR: User is logged in but has no valid profile');
+  console.error('User ID:', user.id);
+  console.error('User Email:', user.email);
+  console.error('Broker Profile:', brokerProfile);
+  console.error('Client Profile:', clientProfile);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
+      <div className="text-center max-w-md mx-auto p-8">
         <EmergencyLogoutButton />
-        <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-        <p className="text-gray-600">Determining user type...</p>
+        <div className="bg-white rounded-lg shadow-xl p-8">
+          <div className="text-red-600 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Profile Not Found</h2>
+          <p className="text-gray-600 mb-6">
+            Your account exists but has no profile configured. Please contact your administrator.
+          </p>
+          <div className="space-y-2 text-sm text-left bg-gray-50 p-4 rounded">
+            <p><strong>User ID:</strong> {user.id}</p>
+            <p><strong>Email:</strong> {user.email}</p>
+          </div>
+          <button
+            onClick={handleForceLogout}
+            className="mt-6 w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+          >
+            Sign Out & Clear Data
+          </button>
+        </div>
       </div>
     </div>
   );

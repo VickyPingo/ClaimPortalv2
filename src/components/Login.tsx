@@ -48,8 +48,15 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
     }
   };
 
-  const handleClearCache = () => {
-    console.log('🧹 CLEARING ALL CACHE AND RELOADING');
+  const handleEmergencyReset = async () => {
+    console.log('🧹 EMERGENCY RESET: Clearing all cache, signing out, and reloading');
+
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.location.reload();
@@ -147,11 +154,11 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
 
           <button
             type="button"
-            onClick={handleClearCache}
-            className="w-full bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-700 flex items-center justify-center gap-2 border-2 border-orange-700"
+            onClick={handleEmergencyReset}
+            className="w-full bg-red-600 text-white py-2.5 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center gap-2 border-2 border-red-700"
           >
             <Trash2 className="w-4 h-4" />
-            Clear Cache & Reload
+            Emergency Reset
           </button>
         </form>
 
