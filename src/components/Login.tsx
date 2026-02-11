@@ -53,7 +53,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
       clearTimeout(timeoutId);
     } catch (err: any) {
       clearTimeout(timeoutId);
-      setError(err.message || 'Login failed');
+      setError(err.message || 'Sign-in failed');
       setLoading(false);
     }
   };
@@ -334,11 +334,16 @@ function Signup() {
       console.log('   Brokerage ID:', invitationBrokerageId);
       console.log('   Has broker param:', hasBrokerParam);
 
+      const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
+      const finalBrokerageId = invitationBrokerageId || INDEPENDI_BROKERAGE_ID;
+
+      console.log('   Final Brokerage ID (string):', finalBrokerageId, typeof finalBrokerageId);
+
       const user = await brokerSignUp(formData.email, formData.password, {
         full_name: formData.fullName,
         id_number: formData.idNumber,
         cell_number: formData.cellNumber,
-        brokerage_id: invitationBrokerageId || undefined,
+        brokerage_id: finalBrokerageId,
       });
 
       if (invitationToken) {
@@ -362,6 +367,9 @@ function Signup() {
       }
     } catch (err: any) {
       clearTimeout(timeoutId);
+      console.error('❌ SIGNUP ERROR:', err);
+      console.error('   Error message:', err.message);
+      console.error('   Error details:', JSON.stringify(err, null, 2));
       setError(err.message || 'Sign-up failed');
       setLoading(false);
     }

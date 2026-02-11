@@ -327,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign-in failed - no user data');
 
     console.log('✓ Authentication successful, fetching fresh profile from database...');
 
@@ -342,11 +342,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🟢 BROKER SIGNUP - Creating broker account');
     console.log('   Brokerage ID:', profile.brokerage_id);
 
-    const targetBrokerageId = profile.brokerage_id || brokerage?.id;
+    const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
+    const targetBrokerageId = profile.brokerage_id || brokerage?.id || INDEPENDI_BROKERAGE_ID;
 
-    if (!targetBrokerageId) {
-      throw new Error('Brokerage not loaded. Please refresh the page or use a valid invitation link.');
-    }
+    console.log('   Target Brokerage ID (final):', targetBrokerageId);
 
     // Create auth user with metadata - database trigger will auto-create profiles
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -354,19 +353,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         data: {
-          full_name: profile.full_name,
-          id_number: profile.id_number,
-          cell_number: profile.cell_number,
+          full_name: profile.full_name || '',
+          id_number: profile.id_number || '',
+          cell_number: profile.cell_number || '',
           policy_number: profile.policy_number || null,
           role: 'broker',
-          brokerage_id: targetBrokerageId,
+          brokerage_id: String(targetBrokerageId),
           user_type: 'broker',
         },
       },
     });
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('User creation failed');
+    if (authError) {
+      console.error('❌ Auth signup error:', authError);
+      throw authError;
+    }
+    if (!authData.user) {
+      console.error('❌ User creation failed - no user returned');
+      throw new Error('User creation failed');
+    }
 
     console.log('✅ Auth user created - database trigger will auto-create profile');
 
@@ -382,7 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign-in failed - no user data');
 
     console.log('✓ Broker authentication successful, fetching fresh profile from database...');
 
@@ -437,7 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign-in failed - no user data');
 
     console.log('✓ Client authentication successful, fetching fresh profile from database...');
 
