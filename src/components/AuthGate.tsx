@@ -220,7 +220,7 @@ export default function AuthGate() {
         <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Welcome</h2>
           <p className="text-gray-600 mb-8">
-            Sign in to access your dashboard and manage insurance claims
+            Sign-in to access your dashboard and manage insurance claims
           </p>
 
           <button
@@ -231,7 +231,7 @@ export default function AuthGate() {
               ":hover": { filter: 'brightness(0.9)' }
             }}
           >
-            Sign In
+            Sign-in
           </button>
 
           <div className="mt-8 pt-8 border-t border-gray-200">

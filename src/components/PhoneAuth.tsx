@@ -215,7 +215,7 @@ export default function PhoneAuth({ role, brokerageId, onBack }: PhoneAuthProps)
             )}
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {step === 'input' ? (isSignUp ? 'Create Account' : 'Sign In') : 'Verify Code'}
+            {step === 'input' ? (isSignUp ? 'Create Account' : 'Sign-in') : 'Verify Code'}
           </h2>
           <p className="text-gray-600">
             {step === 'input'
@@ -291,17 +291,17 @@ export default function PhoneAuth({ role, brokerageId, onBack }: PhoneAuthProps)
                   {loading ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                      {isSignUp ? 'Creating Account...' : 'Signing-in...'}
                     </>
                   ) : (
-                    isSignUp ? 'Create Account' : 'Sign In'
+                    isSignUp ? 'Create Account' : 'Sign-in'
                   )}
                 </button>
                 <button
                   onClick={() => setIsSignUp(!isSignUp)}
                   className="w-full text-blue-700 py-2 text-sm hover:underline"
                 >
-                  {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+                  {isSignUp ? 'Already have an account? Sign-in' : 'Need an account? Sign-up'}
                 </button>
               </>
             ) : (

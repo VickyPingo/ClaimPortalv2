@@ -25,7 +25,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
     try {
       await clientSignIn(email, password);
     } catch (err: any) {
-      setError(err.message || 'Sign in failed');
+      setError(err.message || 'Sign-in failed');
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             {isSignup ? 'Create Account' : 'Welcome Back'}
           </h1>
           <p className="text-gray-600 text-sm">
-            {isSignup ? 'Sign up to file insurance claims' : 'Sign in to your client account'}
+            {isSignup ? 'Sign-up to file insurance claims' : 'Sign-in to your client account'}
           </p>
         </div>
 
@@ -231,7 +231,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             className="w-full bg-green-700 text-white py-2.5 rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
-            {isSignup ? 'Create Account' : 'Sign In'}
+            {isSignup ? 'Create Account' : 'Sign-in'}
           </button>
         </form>
 
@@ -246,7 +246,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
                 }}
                 className="text-green-700 font-semibold hover:text-green-800"
               >
-                {isSignup ? 'Sign In' : 'Sign Up'}
+                {isSignup ? 'Sign-in' : 'Sign-up'}
               </button>
             </p>
           ) : (

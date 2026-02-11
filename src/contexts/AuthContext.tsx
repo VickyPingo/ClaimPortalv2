@@ -351,15 +351,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Create auth user with metadata - database trigger will auto-create profiles
     // Trigger expects: role='broker' AND user_type='broker' to create broker_users & broker_profiles
-    const metadata = {
+    // Using exact metadata structure as specified to avoid database errors
+    const metadata: Record<string, any> = {
       role: 'broker',
       user_type: 'broker',
-      brokerage_id: targetBrokerageId,
-      full_name: profile.full_name || '',
-      id_number: profile.id_number || '',
-      cell_number: profile.cell_number || '',
-      policy_number: profile.policy_number || null,
+      brokerage_id: 'f67b67c8-086b-4b42-8d27-917a0783e9b0',
     };
+
+    // Only include profile fields if they have non-empty values
+    if (profile.full_name?.trim()) metadata.full_name = profile.full_name.trim();
+    if (profile.id_number?.trim()) metadata.id_number = profile.id_number.trim();
+    if (profile.cell_number?.trim()) metadata.cell_number = profile.cell_number.trim();
+    if (profile.policy_number?.trim()) metadata.policy_number = profile.policy_number.trim();
 
     console.log('   Metadata being sent:', JSON.stringify(metadata, null, 2));
 

@@ -911,7 +911,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
                         Property theft or burglary claim
                       </p>
                       <p className="text-xs text-green-700 font-medium">
-                        Please sign in or create an account to file a theft claim
+                        Please sign-in or create an account to file a theft claim
                       </p>
                     </div>
                   </div>
@@ -931,7 +931,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
                         Report a stolen or hijacked motor vehicle
                       </p>
                       <p className="text-xs text-orange-700 font-medium">
-                        Please sign in or create an account to file a motor vehicle theft claim
+                        Please sign-in or create an account to file a motor vehicle theft claim
                       </p>
                     </div>
                   </div>
@@ -951,7 +951,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
                         Storm, water, fire, or impact damage to your property
                       </p>
                       <p className="text-xs text-amber-700 font-medium">
-                        Please sign in or create an account to file a structural damage claim
+                        Please sign-in or create an account to file a structural damage claim
                       </p>
                     </div>
                   </div>
@@ -971,7 +971,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
                         Items lost or damaged outside your home
                       </p>
                       <p className="text-xs text-purple-700 font-medium">
-                        Please sign in or create an account to file an all-risk claim
+                        Please sign-in or create an account to file an all-risk claim
                       </p>
                     </div>
                   </div>
