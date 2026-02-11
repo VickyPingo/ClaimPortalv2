@@ -49,6 +49,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   cookieOptions: {
     domain: getCookieDomain(),
     path: '/',
-    sameSite: 'Lax'
+    sameSite: 'Lax',
+    secure: true
   }
 });

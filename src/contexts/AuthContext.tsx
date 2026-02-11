@@ -53,12 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🚀 AuthContext initializing - fetching fresh session and profile from database');
-
-    // Clear any cached data on mount
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    console.log('🧹 Cleared all cached data on AuthContext mount');
+    console.log('🚀 AuthContext initializing - fetching session from storage');
 
     const hangTimeout = setTimeout(() => {
       console.log('⏰ Session loading timeout - forcing loading state to false');
@@ -87,6 +82,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔄 Auth state changed:', event, session?.user?.id);
 
+      if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out - clearing state');
+        setUser(null);
+        setUserType(null);
+        setUserRole(null);
+        setBrokerageId(null);
+        setBrokerProfile(null);
+        setClientProfile(null);
+        return;
+      }
+
       if (session?.user) {
         setUser(session.user);
 
@@ -95,13 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('🔄 Refreshing profile from database');
           await determineUserType(session.user.id);
         })();
-      } else {
-        setUser(null);
-        setUserType(null);
-        setUserRole(null);
-        setBrokerageId(null);
-        setBrokerProfile(null);
-        setClientProfile(null);
       }
     });
 
@@ -322,11 +321,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log('🔐 Starting sign in process...');
 
-    // Clear any cached data before signing in
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -407,11 +401,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const brokerSignIn = async (email: string, password: string) => {
     console.log('🔐 Starting broker sign in process...');
 
-    // Clear any cached data before signing in
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -483,11 +472,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clientSignIn = async (email: string, password: string) => {
     console.log('🔐 Starting client sign in process...');
-
-    // Clear any cached data before signing in
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    console.log('🧹 Cleared all cached data (localStorage + sessionStorage)');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

@@ -3,9 +3,6 @@ import { BrokerageProvider } from './contexts/BrokerageContext';
 import HomePageRouter from './components/HomePageRouter';
 
 function App() {
-  // Clean slate on every app load - clear all cached data
-  localStorage.clear();
-
   return (
     <BrokerageProvider>
       <AuthProvider>
