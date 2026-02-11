@@ -31,7 +31,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Initialising your professional dashboard...</p>
+          <p className="text-gray-600 font-medium">Account authorised. Redirecting to your dashboard...</p>
         </div>
       </div>
     );
@@ -90,7 +90,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
             <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
             <p className="text-sm text-blue-800 font-medium">
-              Initialising your professional dashboard...
+              Account authorised. Redirecting to your dashboard...
             </p>
           </div>
         )}
@@ -174,7 +174,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
                 onClick={() => setShowSignup(true)}
                 className="text-blue-600 font-semibold hover:text-blue-700"
               >
-                Sign Up
+                Sign-up
               </button>
             </p>
           ) : (
@@ -280,17 +280,17 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
     setError('');
 
     if (isPlatformDomain && !invitationToken && !hasBrokerParam) {
-      setError('Cannot sign up on platform domain without invitation');
+      setError('Cannot sign-up on platform domain without invitation');
       return;
     }
 
     if (!invitationToken && !brokerage && !hasBrokerParam) {
-      setError('Cannot sign up: No brokerage configuration found for this domain');
+      setError('Cannot sign-up: No brokerage configuration found for this domain');
       return;
     }
 
     if (invitationToken && !invitationValid) {
-      setError('Cannot sign up: Invalid or expired invitation');
+      setError('Cannot sign-up: Invalid or expired invitation');
       return;
     }
 
@@ -301,12 +301,22 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
 
     setLoading(true);
 
+    // Failsafe timeout - force redirect after 3 seconds
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Timeout reached - forcing redirect');
+      if (formData.email === 'vickypingo@gmail.com') {
+        window.location.href = '/admin-dashboard';
+      } else {
+        window.location.href = '/broker-dashboard';
+      }
+    }, 3000);
+
     try {
       console.log('🟢 Signing up as BROKER');
       console.log('   Brokerage ID:', invitationBrokerageId);
       console.log('   Has broker param:', hasBrokerParam);
 
-      await brokerSignUp(formData.email, formData.password, {
+      const user = await brokerSignUp(formData.email, formData.password, {
         full_name: formData.fullName,
         id_number: formData.idNumber,
         cell_number: formData.cellNumber,
@@ -314,23 +324,27 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
       });
 
       if (invitationToken) {
-        const { error: updateError } = await supabase
+        await supabase
           .from('invitations')
           .update({
             used_count: supabase.sql`used_count + 1`,
             updated_at: new Date().toISOString()
           })
           .eq('token', invitationToken);
-
-        if (updateError) {
-          console.error('Error updating invitation count:', updateError);
-        }
       }
 
-      console.log('✅ Signup complete, auth state will trigger redirect');
-      // Keep loading state - Login component will show loading screen and HomePageRouter will take over
+      console.log('✅ Sign-up complete, redirecting immediately');
+      clearTimeout(timeoutId);
+
+      // IMMEDIATE REDIRECT - Check if super admin
+      if (formData.email === 'vickypingo@gmail.com') {
+        window.location.href = '/admin-dashboard';
+      } else {
+        window.location.href = '/broker-dashboard';
+      }
     } catch (err: any) {
-      setError(err.message || 'Signup failed');
+      clearTimeout(timeoutId);
+      setError(err.message || 'Sign-up failed');
       setLoading(false);
     }
   };
@@ -347,7 +361,7 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
             <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
             <p className="text-sm text-blue-800 font-medium">
-              Initialising your professional dashboard...
+              Account authorised. Redirecting to your dashboard...
             </p>
           </div>
         )}

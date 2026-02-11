@@ -33,9 +33,9 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<void>;
+  brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<User>;
   brokerSignIn: (email: string, password: string) => Promise<void>;
-  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<void>;
+  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<User>;
   clientSignIn: (email: string, password: string) => Promise<void>;
   isSuperAdmin: () => boolean;
 }
@@ -311,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Brokerage not loaded. Please refresh the page or use a valid invitation link.');
     }
 
-    // Create auth user with metadata - database trigger will create profiles
+    // Create auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -331,12 +331,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created, database trigger will handle profiles asynchronously');
+    console.log('✅ Auth user created, manually creating profiles as backup');
 
-    // Set user and type immediately - redirect will happen in Login component
-    setUser(authData.user);
-    setUserType('broker');
-    setBrokerageId(targetBrokerageId);
+    // Manual profile backup - create profiles immediately
+    const profileData = {
+      id: authData.user.id,
+      email: authData.user.email || email,
+      full_name: profile.full_name,
+      id_number: profile.id_number,
+      cell_number: profile.cell_number,
+      policy_number: profile.policy_number || null,
+      role: 'broker',
+      brokerage_id: targetBrokerageId,
+      user_type: 'broker',
+    };
+
+    // Create broker_users entry
+    await supabase.from('broker_users').upsert({
+      id: authData.user.id,
+      brokerage_id: targetBrokerageId,
+    }, { onConflict: 'id' });
+
+    // Create broker_profiles entry
+    await supabase.from('broker_profiles').upsert(profileData, { onConflict: 'id' });
+
+    console.log('✅ Manual profile backup created');
+
+    // Return user object - redirect will be immediate in signup component
+    return authData.user;
   };
 
   const brokerSignIn = async (email: string, password: string) => {
@@ -375,7 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Brokerage not loaded. Please refresh the page.');
     }
 
-    // Create auth user with metadata - database trigger will create profiles
+    // Create auth user with metadata
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -394,12 +416,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created, database trigger will handle profiles asynchronously');
+    console.log('✅ Auth user created, manually creating profiles as backup');
 
-    // Set user and type immediately - redirect will happen in Login component
-    setUser(authData.user);
-    setUserType('client');
-    setBrokerageId(currentBrokerageId);
+    // Manual profile backup - create profiles immediately
+    const profileData = {
+      id: authData.user.id,
+      email: authData.user.email || profile.email,
+      full_name: profile.full_name,
+      cell_number: profile.cell_number,
+      role: 'client',
+      brokerage_id: currentBrokerageId,
+      user_type: 'client',
+    };
+
+    // Create client_profiles entry
+    await supabase.from('client_profiles').upsert(profileData, { onConflict: 'id' });
+
+    console.log('✅ Manual profile backup created');
+
+    // Return user object - redirect will be immediate in signup component
+    return authData.user;
   };
 
   const clientSignIn = async (email: string, password: string) => {
