@@ -72,12 +72,12 @@ export default function HomePageRouter() {
 
   // Route by userType (even if profile is still loading)
   if (userType === 'broker') {
-    console.log('✅ ROUTING TO: BrokerDashboard (userType: broker)');
+    console.log('✅ ROUTING TO: BrokerAdminDashboard (userType: broker)');
     console.log('📋 Broker Profile:', brokerProfile || 'Loading...');
     return (
       <>
         <EmergencyLogoutButton />
-        <BrokerDashboard />
+        <BrokerAdminDashboard />
       </>
     );
   }
@@ -94,11 +94,11 @@ export default function HomePageRouter() {
   }
 
   // FALLBACK: Default to broker dashboard if userType not set yet
-  console.log('⚠️ UserType not set, defaulting to BrokerDashboard');
+  console.log('⚠️ UserType not set, defaulting to BrokerAdminDashboard');
   return (
     <>
       <EmergencyLogoutButton />
-      <BrokerDashboard />
+      <BrokerAdminDashboard />
     </>
   );
 }

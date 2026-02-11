@@ -45,7 +45,7 @@ export default function InvitationManager() {
 
   const [newInvitation, setNewInvitation] = useState({
     brokerage_id: brokerageId || '',
-    role: 'staff',
+    role: 'broker',
     daysValid: 7,
     maxUses: null as number | null,
   });
@@ -173,7 +173,7 @@ export default function InvitationManager() {
           setShowCreateForm(false);
           setNewInvitation({
             brokerage_id: brokerageId || '',
-            role: 'staff',
+            role: 'broker',
             daysValid: 7,
             maxUses: null
           });
@@ -323,8 +323,6 @@ export default function InvitationManager() {
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="staff">Staff</option>
-                <option value="agent">Agent</option>
                 <option value="broker">Broker</option>
                 <option value="admin">Admin</option>
               </select>

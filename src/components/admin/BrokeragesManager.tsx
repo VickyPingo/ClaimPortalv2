@@ -234,10 +234,10 @@ export default function BrokeragesManager() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                 <Building2 className="w-8 h-8 text-blue-700" />
-                Brokerages Management
+                Organisations Management
               </h1>
               <p className="text-gray-600 mt-2">
-                Manage all brokerage accounts and organisation configurations
+                Manage all organisation accounts and configurations
               </p>
             </div>
             <button
@@ -245,7 +245,7 @@ export default function BrokeragesManager() {
               className="flex items-center gap-2 bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-md"
             >
               <Plus className="w-5 h-5" />
-              Add Brokerage
+              Add Organisation
             </button>
           </div>
 
@@ -414,7 +414,7 @@ export default function BrokeragesManager() {
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Building2 className="w-6 h-6 text-blue-700" />
-                Edit Brokerage
+                Edit Organisation
               </h2>
               <button
                 onClick={() => {
@@ -438,7 +438,7 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Brokerage Name
+                  Organisation Name
                 </label>
                 <input
                   type="text"
@@ -517,7 +517,7 @@ export default function BrokeragesManager() {
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Building2 className="w-6 h-6 text-blue-700" />
-                Add New Brokerage
+                Add New Organisation
               </h2>
               <button
                 onClick={() => {
@@ -540,7 +540,7 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Brokerage Name
+                  Organisation Name
                 </label>
                 <input
                   type="text"
@@ -596,7 +596,7 @@ export default function BrokeragesManager() {
                 </h3>
                 <ul className="text-sm text-blue-800 space-y-1">
                   <li>• A unique invitation link will be generated automatically</li>
-                  <li>• Share the link with organisation staff to sign up</li>
+                  <li>• Share the link with organisation brokers to sign up</li>
                   <li>• They'll be automatically assigned to this organisation</li>
                   <li>• They will be authorised as broker users</li>
                 </ul>

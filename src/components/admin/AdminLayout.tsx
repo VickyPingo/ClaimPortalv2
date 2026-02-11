@@ -15,12 +15,12 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
   const navItems = useMemo(() => {
     const baseItems = [
       { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
-      { id: 'inbox' as const, icon: Inbox, label: 'Inbox (All Claims)' },
-      { id: 'clients' as const, icon: Users, label: 'Clients Directory' },
+      { id: 'inbox' as const, icon: Inbox, label: 'All Claims' },
+      { id: 'clients' as const, icon: Users, label: 'Clients' },
     ];
 
     if (isSuperAdmin()) {
-      baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Brokerages' });
+      baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Organisations' });
       baseItems.push({ id: 'users' as const, icon: UserCog, label: 'Users' });
       baseItems.push({ id: 'invitations' as const, icon: Link, label: 'Invitations' });
       baseItems.push({ id: 'settings' as const, icon: Settings, label: 'Admin Settings' });
