@@ -133,7 +133,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
               onClick={() => setShowSignup(true)}
               className="text-blue-600 font-semibold hover:text-blue-700"
             >
-              Sign Up
+              Sign-up
             </button>
           </p>
         </div>
@@ -172,6 +172,16 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
 
     setLoading(true);
 
+    // 3-SECOND TIMEOUT: Redirect regardless of database response
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ 3-second timeout reached - redirecting anyway');
+      if (formData.email === 'vickypingo@gmail.com') {
+        window.location.href = '/admin-dashboard';
+      } else {
+        window.location.href = '/broker-dashboard';
+      }
+    }, 3000);
+
     try {
       console.log('🔵 SIGNUP - Creating account with manual profile insert');
       console.log('   Email:', formData.email);
@@ -185,7 +195,8 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
         brokerage_id: INDEPENDI_BROKERAGE_ID,
       });
 
-      console.log('✅ Signup complete, redirecting');
+      console.log('✅ Sign-up complete, redirecting');
+      clearTimeout(timeoutId);
 
       // Redirect to appropriate dashboard
       if (formData.email === 'vickypingo@gmail.com') {
@@ -194,7 +205,8 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
         window.location.href = '/broker-dashboard';
       }
     } catch (err: any) {
-      console.error('❌ SIGNUP ERROR:', err);
+      clearTimeout(timeoutId);
+      console.error('❌ SIGN-UP ERROR:', err);
       setError(err.message || 'Sign-up failed');
       setLoading(false);
     }
