@@ -37,7 +37,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    storageKey: 'supabase-auth',
+    storageKey: 'sb-independi-auth',
     storage: window.localStorage,
     redirectTo: `${window.location.origin}/auth/callback`
   },
