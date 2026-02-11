@@ -193,6 +193,7 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [invitationBrokerageId, setInvitationBrokerageId] = useState<string | null>(null);
   const [invitationValid, setInvitationValid] = useState(false);
@@ -315,6 +316,8 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           console.error('Error updating invitation count:', updateError);
         }
       }
+
+      setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Signup failed');
     } finally {
@@ -329,6 +332,14 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Independi Claims Portal</h1>
           <p className="text-gray-600 text-sm">Create your account to access the portal</p>
         </div>
+
+        {success && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-sm text-green-800 font-semibold text-center">
+              Account authorised. Redirecting to your dashboard...
+            </p>
+          </div>
+        )}
 
         {invitationChecking && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
