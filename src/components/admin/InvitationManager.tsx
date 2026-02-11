@@ -117,27 +117,51 @@ export default function InvitationManager() {
     });
     setCreating(true);
     try {
+      // Refresh auth session to ensure super_admin role is recognised
+      console.log('🔄 Refreshing auth session...');
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
+
+      if (sessionError) {
+        console.error('Session refresh error:', sessionError);
+        throw new Error('Failed to refresh authentication session');
+      }
+
+      console.log('✅ Session refreshed successfully');
+      console.log('👤 Current session:', sessionData?.session?.user?.email);
+
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + newInvitation.daysValid);
 
+      // Generate a unique token for the invitation
+      const token = crypto.randomUUID();
+
+      console.log('📝 Inserting invitation into database...');
       const { data, error } = await supabase
         .from('invitations')
-        .insert({
+        .insert([{
           brokerage_id: targetBrokerageId,
           role: newInvitation.role,
+          token: token,
           expires_at: expiresAt.toISOString(),
           max_uses: newInvitation.maxUses,
-        })
+          is_active: true,
+          used_count: 0
+        }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Insert error:', error);
+        throw error;
+      }
 
       const generatedUrl = getInvitationUrl(data.token, targetBrokerageId);
-      console.log('✅ Invitation created successfully!');
+      console.log('✅ Invitation authorised successfully!');
       console.log('🔗 Invitation URL:', generatedUrl);
       console.log('📊 Token:', data.token);
       console.log('🏢 Brokerage ID:', targetBrokerageId);
+
+      alert('✅ Invitation authorised successfully!');
 
       setInvitations([data, ...invitations]);
       setShowCreateForm(false);
@@ -148,7 +172,8 @@ export default function InvitationManager() {
         maxUses: null
       });
     } catch (error: any) {
-      alert('Failed to create invitation: ' + error.message);
+      console.error('❌ Error creating invitation:', error);
+      alert('Failed to authorise invitation: ' + error.message);
     } finally {
       setCreating(false);
     }
@@ -168,8 +193,10 @@ export default function InvitationManager() {
           inv.id === id ? { ...inv, is_active: false } : inv
         )
       );
+
+      alert('✅ Invitation deauthorised successfully');
     } catch (error: any) {
-      alert('Failed to deactivate invitation: ' + error.message);
+      alert('Failed to deauthorise invitation: ' + error.message);
     }
   };
 
@@ -321,10 +348,10 @@ export default function InvitationManager() {
               <button
                 onClick={createInvitation}
                 disabled={creating}
-                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold"
               >
                 {creating && <Loader className="w-4 h-4 animate-spin" />}
-                Generate Link
+                {creating ? 'Authorising...' : 'Authorise & Generate Link'}
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
@@ -435,7 +462,7 @@ export default function InvitationManager() {
                       <button
                         onClick={() => deactivateInvitation(invitation.id)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Deactivate"
+                        title="Deauthorise invitation"
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
