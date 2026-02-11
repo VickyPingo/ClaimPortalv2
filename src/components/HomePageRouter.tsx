@@ -4,16 +4,9 @@ import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import BrokerDashboard from './BrokerDashboard';
 import ClientPortal from './ClientPortal';
 import { LogOut } from 'lucide-react';
-import { isMasterAdmin } from '../utils/adminBypass';
 
 export default function HomePageRouter() {
   const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut } = useAuth();
-
-  // MASTER KEY BYPASS - Check at the very top
-  if (user && (user.email?.includes('admin') || user.email === 'vickypingo@gmail.com')) {
-    console.log('🔓 MASTER KEY BYPASS ACTIVATED FOR:', user.email);
-    return <BrokerAdminDashboard />;
-  }
 
   // Create a unified profile object for easier debugging
   const profile = brokerProfile || clientProfile;
@@ -79,20 +72,12 @@ export default function HomePageRouter() {
     </button>
   );
 
-  // STRICT ROUTING HIERARCHY - Check role FIRST, then user_type
+  // ROUTER STABILITY - Check role FIRST, prioritize profile?.role
 
-  // SUPER OVERRIDE: Force super_admin for vickypingo@gmail.com
-  let currentRole = profile?.role || userRole;
-  if (user?.email === 'vickypingo@gmail.com') {
-    console.log('🔒 SUPER OVERRIDE: vickypingo@gmail.com detected - forcing super_admin');
-    currentRole = 'super_admin';
-  }
-
-  // STEP 1: Super Admin Check - HIGHEST PRIORITY (check role FIRST)
-  if (currentRole === 'super_admin' || profile?.role === 'super_admin') {
+  // STEP 1: Super Admin Check - HIGHEST PRIORITY (check profile.role FIRST)
+  if (profile?.role === 'super_admin') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🛡️ SUPER ADMIN DETECTED - RENDERING ADMIN DASHBOARD');
-    console.log('📋 Current Role:', currentRole);
     console.log('📋 Profile Role:', profile?.role);
     console.log('📋 User Email:', user?.email);
     console.log('✅ ROUTING TO: BrokerAdminDashboard');
@@ -106,7 +91,7 @@ export default function HomePageRouter() {
   }
 
   // STEP 2: Regular Broker Check (only if NOT super_admin)
-  if ((profile?.user_type === 'broker' || userType === 'broker') && currentRole !== 'super_admin') {
+  if (profile?.user_type === 'broker' || userType === 'broker') {
     console.log('✅ ROUTING TO: BrokerDashboard (Regular Broker)');
     return (
       <>
@@ -116,7 +101,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 4: Client Check (explicit check, not default)
+  // STEP 3: Client Check (explicit check, not default)
   if (profile?.user_type === 'client' || userType === 'client') {
     console.log('✅ ROUTING TO: ClientPortal (Client)');
     return (

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { useBrokerage } from './BrokerageContext';
+import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
 
 export interface BrokerProfile {
   id: string;
@@ -119,10 +120,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('⚠️ NO CACHE - FETCHING FRESH FROM DATABASE');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // Get current user's email for fallback check
+      // Get current user's email for role guard check
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       const userEmail = currentUser?.email;
       console.log('📧 User email:', userEmail);
+
+      // ROLE GUARD: Check if email is in SUPER_ADMINS list
+      const isUserSuperAdmin = isSuperAdmin(userEmail);
+      if (isUserSuperAdmin) {
+        console.log('🛡️ ROLE GUARD ACTIVATED: Email found in SUPER_ADMINS list');
+        console.log('📋 Super Admins List:', SUPER_ADMINS);
+      }
 
       const { data: brokerUser, error: brokerError } = await supabase
         .from('broker_users')
@@ -143,13 +151,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (profileError) console.error('Error fetching broker profile:', profileError);
 
-        // HARD-CODED OVERRIDE - Master Key Bypass
-        if (profile && (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za')) {
-          profile.role = 'super_admin';
-          profile.user_type = 'broker';
-          console.log('🔒 HARD-CODED OVERRIDE APPLIED FOR MASTER ADMIN:', userEmail);
-        }
-
         setUserType('broker');
         setBrokerageId(brokerUser.brokerage_id);
 
@@ -158,25 +159,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('📦 RAW DATABASE RESPONSE:');
           console.log('   Full profile object:', JSON.stringify(profile, null, 2));
           console.log('   profile.role =', profile.role);
-          console.log('   profile.user_type =', profile.user_type);
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-          setBrokerProfile(profile);
-          let roleValue = profile.role || null;
+          // DATABASE SYNCHRONIZATION: If user is super admin but DB doesn't reflect it, update DB
+          if (isUserSuperAdmin && profile.role !== 'super_admin') {
+            console.log('🔄 DATABASE SYNC: Updating profile in database to super_admin');
+            const { error: updateError } = await supabase
+              .from('broker_profiles')
+              .update({ role: 'super_admin', user_type: 'broker' })
+              .eq('id', userId);
 
-          setUserRole(roleValue);
+            if (updateError) {
+              console.error('❌ Error updating profile to super_admin:', updateError);
+            } else {
+              console.log('✅ Successfully synced super_admin role to database');
+              profile.role = 'super_admin';
+            }
+          }
+
+          // ROLE GUARD: Force super_admin if email is in SUPER_ADMINS list
+          if (isUserSuperAdmin) {
+            profile.role = 'super_admin';
+            console.log('🔒 ROLE GUARD APPLIED: Role forced to super_admin');
+          }
+
+          setBrokerProfile(profile);
+          setUserRole(profile.role || null);
 
           console.log('✓ Broker profile loaded and state updated');
-          console.log('📋 Final Role Value:', roleValue);
-          console.log('📋 Role type:', typeof roleValue);
-          console.log('📋 Role === "super_admin":', roleValue === 'super_admin');
-          console.log('👑 Is Super Admin (computed):', roleValue === 'super_admin');
+          console.log('📋 Final Role Value:', profile.role);
+          console.log('👑 Is Super Admin (computed):', profile.role === 'super_admin');
         } else {
           console.warn('⚠️ No broker profile found for user:', userId);
 
-          // FALLBACK: If no profile but email is master admin, force super_admin
-          if (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za') {
-            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is master admin - forcing super_admin');
+          // FALLBACK: If no profile but email is super admin, force super_admin
+          if (isUserSuperAdmin) {
+            console.log('🛡️ FALLBACK ACTIVATED: No profile but email is super admin - forcing super_admin');
             setUserRole('super_admin');
           }
         }
@@ -196,7 +214,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('📦 RAW DATABASE RESPONSE (CLIENT):');
         console.log('   Full profile object:', JSON.stringify(clientProfile, null, 2));
         console.log('   clientProfile.role =', clientProfile.role);
-        console.log('   clientProfile.user_type =', clientProfile.user_type);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         setUserType('client');
@@ -210,9 +227,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.warn('⚠️ No profile found for user:', userId);
 
-      // FALLBACK: If nothing worked but email is master admin, force super_admin
-      if (userEmail === 'vickypingo@gmail.com' || userEmail === 'admin-master@claimsportal.co.za') {
-        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is master admin - forcing super_admin and broker type');
+      // FALLBACK: If nothing worked but email is super admin, force super_admin
+      if (isUserSuperAdmin) {
+        console.log('🛡️ FALLBACK ACTIVATED: No profile found but email is super admin - forcing super_admin and broker type');
         setUserType('broker');
         setUserRole('super_admin');
       }
@@ -221,8 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // FALLBACK: On any error, check email
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser?.email === 'vickypingo@gmail.com' || currentUser?.email === 'admin-master@claimsportal.co.za') {
-        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is master admin - forcing super_admin');
+      if (isSuperAdmin(currentUser?.email)) {
+        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is super admin - forcing super_admin');
         setUserType('broker');
         setUserRole('super_admin');
       }
@@ -251,7 +268,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('✓ Signed out successfully');
   };
 
-  const isSuperAdmin = (): boolean => {
+  const isSuperAdminFunc = (): boolean => {
+    // ROLE GUARD: Check email first, then role
+    if (isSuperAdmin(user?.email)) {
+      return true;
+    }
     return userRole === 'super_admin';
   };
 
@@ -406,7 +427,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userType, userRole, brokerageId, brokerProfile, clientProfile, loading, signOut, signIn, brokerSignUp, brokerSignIn, clientSignUp, clientSignIn, isSuperAdmin }}>
+    <AuthContext.Provider value={{ user, userType, userRole, brokerageId, brokerProfile, clientProfile, loading, signOut, signIn, brokerSignUp, brokerSignIn, clientSignUp, clientSignIn, isSuperAdmin: isSuperAdminFunc }}>
       {children}
     </AuthContext.Provider>
   );
