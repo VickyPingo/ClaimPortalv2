@@ -241,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn('⚠️ No profile found for user, creating default broker profile...');
 
       // CREATE DEFAULT BROKER_USER AND PROFILE
-      const defaultBrokerageId = brokerage?.id || '00000000-0000-0000-0000-000000000000';
+      const defaultBrokerageId = brokerage?.id || 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 
       // Create broker_users entry
       const { error: brokerUserError } = await supabase

@@ -85,11 +85,11 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     }
 
     // Client subdomains (e.g., claims.independi.co.za)
-    return 'Sign in to your organisation\'s portal';
+    return 'Sign-in to your organisation\'s portal';
   };
 
   if (showSignup) {
-    return <Signup onBackToLogin={() => setShowSignup(false)} />;
+    return <Signup />;
   }
 
   return (
@@ -174,7 +174,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
-            Sign In
+            Sign-in
           </button>
         </form>
 
@@ -208,7 +208,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
   );
 }
 
-function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
+function Signup() {
   const { brokerSignUp } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [formData, setFormData] = useState({
@@ -240,7 +240,7 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
     if (broker || brokerId) {
       setHasBrokerParam(true);
       setInvitationBrokerageName('Independi');
-      setInvitationBrokerageId('10000000-0000-0000-0000-000000000001');
+      setInvitationBrokerageId('f67b67c8-086b-4b42-8d27-917a0783e9b0');
     }
 
     if (inviteToken && brokerageId) {

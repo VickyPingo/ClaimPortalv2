@@ -9,7 +9,7 @@
   2. Changes
     - Create/update entry in broker_users for vickypingo@gmail.com
     - Create/update entry in broker_profiles with super_admin role
-    - Linked to Independi brokerage (10000000-0000-0000-0000-000000000001)
+    - Linked to Independi brokerage (f67b67c8-086b-4b42-8d27-917a0783e9b0)
 
   3. Security
     - Only affects vickypingo@gmail.com
@@ -21,7 +21,7 @@ CREATE OR REPLACE FUNCTION ensure_super_admin_setup()
 RETURNS void AS $$
 DECLARE
   v_user_id uuid;
-  v_brokerage_id uuid := '10000000-0000-0000-0000-000000000001';
+  v_brokerage_id uuid := 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 BEGIN
   -- Get user ID from auth.users
   SELECT id INTO v_user_id

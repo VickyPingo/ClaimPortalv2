@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_brokerages_subdomain ON brokerages(subdomain);
 -- Insert Independi as the first client brokerage
 INSERT INTO brokerages (id, name, subdomain, brand_color, notification_email, created_at)
 VALUES (
-  '10000000-0000-0000-0000-000000000001',
+  'f67b67c8-086b-4b42-8d27-917a0783e9b0',
   'Independi',
   'claims.independi.co.za',
   '#0066cc',

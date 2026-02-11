@@ -102,7 +102,7 @@ export default function InvitationManager() {
   };
 
   const createInvitation = async () => {
-    const INDEPENDI_BROKERAGE_ID = '10000000-0000-0000-0000-000000000001';
+    const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 
     console.log('🔐 Creating Independi invitation');
     console.log('📋 Invitation details:', {
@@ -227,7 +227,7 @@ export default function InvitationManager() {
 
   const copyInvitationLink = (token: string, invitationBrokerageId: string) => {
     const baseUrl = window.location.origin;
-    const brokerSlug = invitationBrokerageId === '10000000-0000-0000-0000-000000000001' ? 'independi' : invitationBrokerageId;
+    const brokerSlug = invitationBrokerageId === 'f67b67c8-086b-4b42-8d27-917a0783e9b0' ? 'independi' : invitationBrokerageId;
     const inviteUrl = `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
 
     navigator.clipboard.writeText(inviteUrl);
@@ -237,7 +237,7 @@ export default function InvitationManager() {
 
   const getInvitationUrl = (token: string, invitationBrokerageId: string) => {
     const baseUrl = window.location.origin;
-    const brokerSlug = invitationBrokerageId === '10000000-0000-0000-0000-000000000001' ? 'independi' : invitationBrokerageId;
+    const brokerSlug = invitationBrokerageId === 'f67b67c8-086b-4b42-8d27-917a0783e9b0' ? 'independi' : invitationBrokerageId;
     return `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
   };
 

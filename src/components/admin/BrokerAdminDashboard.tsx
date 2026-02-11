@@ -17,7 +17,7 @@ export default function BrokerAdminDashboard() {
   const { isSuperAdmin } = useAuth();
   const initialView = isSuperAdmin() ? 'brokerages' : 'dashboard';
 
-  console.log('🎯 BrokerAdminDashboard - Initializing');
+  console.log('🎯 BrokerAdminDashboard - Initialising');
   console.log('  Is Super Admin:', isSuperAdmin());
   console.log('  Initial View:', initialView);
 

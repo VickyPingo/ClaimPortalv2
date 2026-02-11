@@ -47,7 +47,7 @@ BEGIN
     -- Extract brokerage_id from metadata, fallback to default
     brokerage_id_val := COALESCE(
       (NEW.raw_user_meta_data->>'brokerage_id')::uuid,
-      '00000000-0000-0000-0000-000000000000'::uuid
+      'f67b67c8-086b-4b42-8d27-917a0783e9b0'::uuid
     );
     
     -- Extract profile data from metadata
@@ -101,7 +101,7 @@ BEGIN
     -- Extract brokerage_id from metadata, fallback to default
     brokerage_id_val := COALESCE(
       (NEW.raw_user_meta_data->>'brokerage_id')::uuid,
-      '00000000-0000-0000-0000-000000000000'::uuid
+      'f67b67c8-086b-4b42-8d27-917a0783e9b0'::uuid
     );
     
     -- Extract profile data from metadata
