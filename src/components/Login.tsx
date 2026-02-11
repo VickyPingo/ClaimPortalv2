@@ -198,12 +198,21 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   const [invitationValid, setInvitationValid] = useState(false);
   const [invitationChecking, setInvitationChecking] = useState(false);
   const [invitationBrokerageName, setInvitationBrokerageName] = useState<string | null>(null);
+  const [hasBrokerParam, setHasBrokerParam] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const inviteToken = params.get('invite');
     const brokerageId = params.get('brokerage');
     const legacyToken = params.get('token');
+    const broker = params.get('broker');
+    const brokerId = params.get('brokerId');
+
+    if (broker || brokerId) {
+      setHasBrokerParam(true);
+      setInvitationBrokerageName('Independi');
+      setInvitationBrokerageId('10000000-0000-0000-0000-000000000001');
+    }
 
     if (inviteToken && brokerageId) {
       validateInvitation(inviteToken, brokerageId);
@@ -259,12 +268,12 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
     e.preventDefault();
     setError('');
 
-    if (isPlatformDomain && !invitationToken) {
+    if (isPlatformDomain && !invitationToken && !hasBrokerParam) {
       setError('Cannot sign up on platform domain without invitation');
       return;
     }
 
-    if (!invitationToken && !brokerage) {
+    if (!invitationToken && !brokerage && !hasBrokerParam) {
       setError('Cannot sign up: No brokerage configuration found for this domain');
       return;
     }
@@ -313,8 +322,8 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-          <p className="text-gray-600 text-sm">Create your account to get started</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Independi Claims Portal</h1>
+          <p className="text-gray-600 text-sm">Create your account to access the portal</p>
         </div>
 
         {invitationChecking && (
@@ -333,7 +342,15 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           </div>
         )}
 
-        {!invitationToken && brokerage && (
+        {hasBrokerParam && !invitationToken && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <span className="font-semibold">Registering with:</span> {invitationBrokerageName}
+            </p>
+          </div>
+        )}
+
+        {!invitationToken && !hasBrokerParam && brokerage && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               <span className="font-semibold">Registering with:</span> {brokerage.name}
@@ -348,7 +365,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           </div>
         )}
 
-        {!invitationToken && !brokerage && (
+        {!invitationToken && !brokerage && !hasBrokerParam && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <p className="text-sm text-red-700">
@@ -457,7 +474,7 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
 
           <button
             type="submit"
-            disabled={loading || (!invitationValid && !brokerage) || invitationChecking}
+            disabled={loading || (!invitationValid && !brokerage && !hasBrokerParam) || invitationChecking}
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
             {loading && <Loader className="w-4 h-4 animate-spin" />}
@@ -465,13 +482,16 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
           </button>
         </form>
 
-        <div className="mt-4">
-          <button
-            onClick={onBackToLogin}
-            className="w-full text-blue-600 font-semibold hover:text-blue-700 py-2"
-          >
-            Back to Login
-          </button>
+        <div className="mt-4 text-center">
+          <p className="text-gray-600 text-sm">
+            Already have an account?{' '}
+            <button
+              onClick={onBackToLogin}
+              className="text-blue-600 font-semibold hover:text-blue-700"
+            >
+              Sign In
+            </button>
+          </p>
         </div>
       </div>
     </div>
