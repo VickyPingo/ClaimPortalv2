@@ -41,11 +41,10 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
 
     try {
       await signIn(email, password);
-      // signIn now waits for profile to load before returning
       console.log('✓ Login successful, profile loaded');
+      // Keep loading state active while redirecting
     } catch (err: any) {
       setError(err.message || 'Login failed');
-    } finally {
       setLoading(false);
     }
   };
@@ -65,7 +64,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     if (isPlatformDomain && roleType === 'broker') {
       return 'Access the platform admin dashboard';
     }
-    return 'Please sign in to your organisation\'s portal';
+    return 'Sign in to your organisation\'s portal';
   };
 
   if (showSignup) {
@@ -83,6 +82,15 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
             {getBrandingDescription()}
           </p>
         </div>
+
+        {loading && !error && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">
+              Initialising your professional dashboard...
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -333,6 +341,15 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           <p className="text-gray-600 text-sm">Create your account to access the portal</p>
         </div>
 
+        {loading && !error && !success && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">
+              Initialising your professional dashboard...
+            </p>
+          </div>
+        )}
+
         {success && (
           <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-sm text-green-800 font-semibold text-center">
@@ -497,17 +514,19 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
           </button>
         </form>
 
-        <div className="mt-4 text-center">
-          <p className="text-gray-600 text-sm">
-            Already have an account?{' '}
-            <button
-              onClick={onBackToLogin}
-              className="text-blue-600 font-semibold hover:text-blue-700"
-            >
-              Sign In
-            </button>
-          </p>
-        </div>
+        {!loading && !success && (
+          <div className="mt-4 text-center">
+            <p className="text-gray-600 text-sm">
+              Already have an account?{' '}
+              <button
+                onClick={onBackToLogin}
+                className="text-blue-600 font-semibold hover:text-blue-700"
+              >
+                Sign In
+              </button>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

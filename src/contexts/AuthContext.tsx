@@ -302,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
-    console.log('🟢 BROKER SIGNUP - Creating broker profile');
+    console.log('🟢 BROKER SIGNUP - Creating broker account');
     console.log('   Brokerage ID:', profile.brokerage_id);
 
     const targetBrokerageId = profile.brokerage_id || brokerage?.id;
@@ -311,12 +311,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Brokerage not loaded. Please refresh the page or use a valid invitation link.');
     }
 
+    // Create auth user with metadata - database trigger will create profiles
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: profile.full_name,
+          id_number: profile.id_number,
+          cell_number: profile.cell_number,
+          policy_number: profile.policy_number || null,
           role: 'broker',
           brokerage_id: targetBrokerageId,
           user_type: 'broker',
@@ -327,43 +331,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    const { error: brokerUserError } = await supabase
-      .from('broker_users')
-      .insert({
-        id: authData.user.id,
-        brokerage_id: targetBrokerageId,
-        name: profile.full_name,
-        phone: profile.cell_number,
-        role: 'broker',
-      });
+    console.log('✅ Auth user created, database trigger will handle profiles');
 
-    if (brokerUserError) {
-      console.error('❌ Error creating broker_users entry:', brokerUserError);
-      throw brokerUserError;
+    // Wait for profile to be created by trigger (with retries)
+    let retries = 0;
+    const maxRetries = 10;
+    const retryDelay = 500; // ms
+
+    while (retries < maxRetries) {
+      const { data: brokerUser } = await supabase
+        .from('broker_users')
+        .select('id')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (brokerUser) {
+        console.log('✅ Broker profile verified in database');
+        setUser(authData.user);
+        await determineUserType(authData.user.id);
+        return;
+      }
+
+      retries++;
+      console.log(`⏳ Waiting for profile creation (attempt ${retries}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
 
-    const { error: profileError } = await supabase
-      .from('broker_profiles')
-      .insert({
-        id: authData.user.id,
-        brokerage_id: targetBrokerageId,
-        full_name: profile.full_name,
-        id_number: profile.id_number,
-        cell_number: profile.cell_number,
-        policy_number: profile.policy_number || null,
-        user_type: 'broker',
-        role: 'broker',
-      });
-
-    if (profileError) {
-      console.error('❌ Error creating broker profile:', profileError);
-      throw profileError;
-    }
-
-    console.log('✅ Broker profile created successfully with role: broker');
-
-    setUser(authData.user);
-    await determineUserType(authData.user.id);
+    // If we reach here, profile wasn't created in time
+    throw new Error('Profile creation timeout. Please try signing in.');
   };
 
   const brokerSignIn = async (email: string, password: string) => {
@@ -392,7 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => {
-    console.log('🔵 CLIENT SIGNUP - Creating client profile');
+    console.log('🔵 CLIENT SIGNUP - Creating client account');
     console.log('   Brokerage ID:', brokerageId);
     console.log('   Profile:', profile);
 
@@ -402,12 +397,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Brokerage not loaded. Please refresh the page.');
     }
 
+    // Create auth user with metadata - database trigger will create profiles
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: profile.full_name,
+          email: profile.email,
+          cell_number: profile.cell_number,
           role: 'client',
           brokerage_id: currentBrokerageId,
           user_type: 'client',
@@ -418,27 +416,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    const { error: profileError } = await supabase
-      .from('client_profiles')
-      .insert({
-        id: authData.user.id,
-        brokerage_id: currentBrokerageId,
-        full_name: profile.full_name,
-        email: profile.email,
-        cell_number: profile.cell_number,
-        role: 'client',
-        user_type: 'client',
-      });
+    console.log('✅ Auth user created, database trigger will handle profiles');
 
-    if (profileError) {
-      console.error('❌ Error creating client profile:', profileError);
-      throw profileError;
+    // Wait for profile to be created by trigger (with retries)
+    let retries = 0;
+    const maxRetries = 10;
+    const retryDelay = 500; // ms
+
+    while (retries < maxRetries) {
+      const { data: clientProfile } = await supabase
+        .from('client_profiles')
+        .select('id')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (clientProfile) {
+        console.log('✅ Client profile verified in database');
+        setUser(authData.user);
+        await determineUserType(authData.user.id);
+        return;
+      }
+
+      retries++;
+      console.log(`⏳ Waiting for profile creation (attempt ${retries}/${maxRetries})...`);
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
     }
 
-    console.log('✅ Client profile created successfully with role: client');
-
-    setUser(authData.user);
-    await determineUserType(authData.user.id);
+    // If we reach here, profile wasn't created in time
+    throw new Error('Profile creation timeout. Please try signing in.');
   };
 
   const clientSignIn = async (email: string, password: string) => {
