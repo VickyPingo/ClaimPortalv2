@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBrokerage } from '../../contexts/BrokerageContext';
 import {
@@ -101,7 +102,6 @@ export default function InvitationManager() {
   };
 
   const createInvitation = async () => {
-    // Hard-coded Independi brokerage ID
     const INDEPENDI_BROKERAGE_ID = '10000000-0000-0000-0000-000000000001';
 
     console.log('🔐 Creating Independi invitation');
@@ -113,24 +113,28 @@ export default function InvitationManager() {
     });
     setCreating(true);
     try {
-      // Refresh auth session to ensure super_admin role is recognised
-      console.log('🔄 Refreshing auth session...');
-      await supabase.auth.refreshSession();
+      // Create a fresh Supabase client to avoid schema cache issues
+      const freshClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL!,
+        import.meta.env.VITE_SUPABASE_ANON_KEY!
+      );
 
-      // Small delay to allow schema cache to refresh
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Get current session and set it on fresh client
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await freshClient.auth.setSession(session);
+      }
 
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + newInvitation.daysValid);
 
-      // Generate a unique token for the invitation
       const token = crypto.randomUUID();
 
-      console.log('📝 Direct insert into invitations table...');
+      console.log('📝 Inserting into invitations table with fresh client...');
       console.log('🎯 Target brokerage: Independi');
       console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
 
-      // Retry logic for schema cache issues
+      // Retry logic for robustness
       let attempt = 0;
       let lastError = null;
       const maxAttempts = 3;
@@ -139,7 +143,7 @@ export default function InvitationManager() {
         attempt++;
         console.log(`🔄 Attempt ${attempt}/${maxAttempts}...`);
 
-        const { data, error } = await supabase
+        const { data, error } = await freshClient
           .from('invitations')
           .insert([{
             email: null,
@@ -155,15 +159,15 @@ export default function InvitationManager() {
           .single();
 
         if (!error && data) {
-          // Success!
-          const generatedUrl = getInvitationUrl(data.token, INDEPENDI_BROKERAGE_ID);
+          const generatedUrl = `${window.location.origin}/signup?token=${data.token}&brokerId=independi`;
           console.log('✅ Independi Invite Authorised!');
           console.log('🔗 Invitation URL:', generatedUrl);
           console.log('📊 Token:', data.token);
           console.log('🏢 Brokerage: Independi');
           console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
 
-          alert('✅ Independi Invite Authorised');
+          const message = `✅ Independi Invite Authorised!\n\n📋 Invitation Link:\n${generatedUrl}\n\nShare this link with the new user to sign up.`;
+          alert(message);
 
           setInvitations([data, ...invitations]);
           setShowCreateForm(false);
@@ -177,9 +181,9 @@ export default function InvitationManager() {
         }
 
         lastError = error;
-        console.warn(`⚠️ Attempt ${attempt} failed:`, error?.message);
+        console.error(`❌ Attempt ${attempt} failed. Full error object:`, error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
 
-        // Wait before retrying (exponential backoff)
         if (attempt < maxAttempts) {
           const delay = 1000 * attempt;
           console.log(`⏳ Waiting ${delay}ms before retry...`);
@@ -187,13 +191,14 @@ export default function InvitationManager() {
         }
       }
 
-      // All attempts failed
-      console.error('❌ All attempts failed. Last error:', lastError);
+      console.error('❌ All attempts failed. Last error object:', lastError);
+      console.error('Last error JSON:', JSON.stringify(lastError, null, 2));
       throw lastError || new Error('Failed to create invitation after multiple attempts');
 
     } catch (error: any) {
-      console.error('❌ Error creating invitation:', error);
-      alert('Failed to authorise Independi invitation: ' + error.message);
+      console.error('❌ Error creating invitation. Full error object:', error);
+      console.error('Error JSON:', JSON.stringify(error, null, 2));
+      alert('Failed to authorise Independi invitation: ' + (error?.message || 'Unknown error'));
     } finally {
       setCreating(false);
     }
@@ -222,7 +227,8 @@ export default function InvitationManager() {
 
   const copyInvitationLink = (token: string, invitationBrokerageId: string) => {
     const baseUrl = window.location.origin;
-    const inviteUrl = `${baseUrl}/signup?token=${token}&brokerId=${invitationBrokerageId}`;
+    const brokerSlug = invitationBrokerageId === '10000000-0000-0000-0000-000000000001' ? 'independi' : invitationBrokerageId;
+    const inviteUrl = `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
 
     navigator.clipboard.writeText(inviteUrl);
     setCopiedToken(token);
@@ -231,7 +237,8 @@ export default function InvitationManager() {
 
   const getInvitationUrl = (token: string, invitationBrokerageId: string) => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/signup?token=${token}&brokerId=${invitationBrokerageId}`;
+    const brokerSlug = invitationBrokerageId === '10000000-0000-0000-0000-000000000001' ? 'independi' : invitationBrokerageId;
+    return `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
   };
 
   const isExpired = (expiresAt: string) => {

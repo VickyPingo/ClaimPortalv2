@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, AlertCircle, Loader, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Loader } from 'lucide-react';
 
 export default function Login({ onBackToRole, roleType }: { onBackToRole?: () => void; roleType?: 'client' | 'broker' | null }) {
   const { signIn, userRole, userType, loading: authLoading } = useAuth();
@@ -73,16 +73,6 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        {onBackToRole && (
-          <button
-            onClick={onBackToRole}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back</span>
-          </button>
-        )}
-
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             {getBrandingTitle()}
@@ -320,16 +310,6 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
-        {onBackToRole && (
-          <button
-            onClick={onBackToRole}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back</span>
-          </button>
-        )}
-
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
           <p className="text-gray-600 text-sm">Create your account to get started</p>
