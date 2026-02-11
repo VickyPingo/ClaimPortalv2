@@ -4,6 +4,9 @@ import type { User } from '@supabase/supabase-js';
 import { useBrokerage } from './BrokerageContext';
 import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
 
+// BROKERAGE ID FOR CLAIMS.INDEPENDI.CO.ZA
+const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
+
 export interface BrokerProfile {
   id: string;
   full_name: string;
@@ -53,37 +56,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    console.log('🚀 AuthContext initializing - fetching session from storage');
-
-    const hangTimeout = setTimeout(() => {
-      console.log('⏰ Session loading timeout - forcing loading state to false');
-      setLoading(false);
-    }, 2000);
+    console.log('🚀 AuthContext initialising');
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(hangTimeout);
       if (session?.user) {
-        console.log('📦 Session found, setting user immediately');
+        console.log('📦 Session found');
         setUser(session.user);
-
-        // IMMEDIATE: Set loading to false to unblock UI
-        setLoading(false);
-
-        // BACKGROUND: Fetch profile data without blocking
-        (async () => {
-          await determineUserType(session.user.id);
-        })();
-      } else {
-        console.log('❌ No session found');
-        setLoading(false);
+        loadUserProfile(session.user.id, session.user.email);
       }
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔄 Auth state changed:', event, session?.user?.id);
+      console.log('🔄 Auth state changed:', event);
 
       if (event === 'SIGNED_OUT') {
-        console.log('🚪 User signed out - clearing state');
         setUser(null);
         setUserType(null);
         setUserRole(null);
@@ -95,231 +82,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         setUser(session.user);
-
-        // BACKGROUND: Fetch profile data without blocking UI
-        (async () => {
-          console.log('🔄 Refreshing profile from database');
-          await determineUserType(session.user.id);
-        })();
+        loadUserProfile(session.user.id, session.user.email);
       }
     });
 
-    return () => {
-      clearTimeout(hangTimeout);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
-  const determineUserType = async (userId: string) => {
+  const loadUserProfile = async (userId: string, userEmail: string | undefined) => {
     try {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🔍 DETERMINING USER TYPE FOR USER ID:', userId);
-      console.log('⚠️ NO CACHE - FETCHING FRESH FROM DATABASE');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 Loading profile for user:', userId);
 
-      // Get current user's email for role guard check
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const userEmail = currentUser?.email;
-      console.log('📧 User email:', userEmail);
-
-      // ROLE GUARD: Check if email is in SUPER_ADMINS list
+      // Check if user is super admin
       const isUserSuperAdmin = isSuperAdmin(userEmail);
-      if (isUserSuperAdmin) {
-        console.log('🛡️ ROLE GUARD ACTIVATED: Email found in SUPER_ADMINS list');
-        console.log('📋 Super Admins List:', SUPER_ADMINS);
-      }
 
-      const { data: brokerUser, error: brokerError } = await supabase
-        .from('broker_users')
-        .select('brokerage_id')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (brokerError) console.error('Error fetching broker user:', brokerError);
-
-      if (brokerUser) {
-        console.log('✓ User is a broker, fetching profile...');
-
-        const { data: profile, error: profileError } = await supabase
-          .from('broker_profiles')
-          .select('role, user_type, *')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (profileError) console.error('Error fetching broker profile:', profileError);
-
-        setUserType('broker');
-        setBrokerageId(brokerUser.brokerage_id);
-
-        if (profile) {
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log('📦 RAW DATABASE RESPONSE:');
-          console.log('   Full profile object:', JSON.stringify(profile, null, 2));
-          console.log('   profile.role =', profile.role);
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-          // DATABASE SYNCHRONIZATION: If user is super admin but DB doesn't reflect it, update DB
-          if (isUserSuperAdmin && profile.role !== 'super_admin') {
-            console.log('🔄 DATABASE SYNC: Updating profile in database to super_admin');
-            const { error: updateError } = await supabase
-              .from('broker_profiles')
-              .update({ role: 'super_admin', user_type: 'broker' })
-              .eq('id', userId);
-
-            if (updateError) {
-              console.error('❌ Error updating profile to super_admin:', updateError);
-            } else {
-              console.log('✅ Successfully synced super_admin role to database');
-              profile.role = 'super_admin';
-            }
-          }
-
-          // ROLE GUARD: Force super_admin if email is in SUPER_ADMINS list
-          if (isUserSuperAdmin) {
-            profile.role = 'super_admin';
-            console.log('🔒 ROLE GUARD APPLIED: Role forced to super_admin');
-          }
-
-          setBrokerProfile(profile);
-          setUserRole(profile.role || null);
-
-          console.log('✓ Broker profile loaded and state updated');
-          console.log('📋 Final Role Value:', profile.role);
-          console.log('👑 Is Super Admin (computed):', profile.role === 'super_admin');
-        } else {
-          console.warn('⚠️ No broker profile found, creating default profile...');
-
-          // CREATE DEFAULT PROFILE
-          const defaultProfile: BrokerProfile = {
-            id: userId,
-            full_name: userEmail || 'User',
-            id_number: '',
-            cell_number: '',
-            brokerage_id: brokerUser.brokerage_id,
-            role: isUserSuperAdmin ? 'super_admin' : 'broker',
-          };
-
-          const { error: insertError } = await supabase
-            .from('broker_profiles')
-            .upsert(defaultProfile, { onConflict: 'id' });
-
-          if (insertError) {
-            console.error('❌ Error creating default broker profile:', insertError);
-          } else {
-            console.log('✅ Created default broker profile');
-            setBrokerProfile(defaultProfile);
-            setUserRole(defaultProfile.role || null);
-          }
-        }
-        return;
-      }
-
-      const { data: clientProfile, error: clientError } = await supabase
-        .from('client_profiles')
-        .select('role, user_type, *')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (clientError) console.error('Error fetching client profile:', clientError);
-
-      if (clientProfile) {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📦 RAW DATABASE RESPONSE (CLIENT):');
-        console.log('   Full profile object:', JSON.stringify(clientProfile, null, 2));
-        console.log('   clientProfile.role =', clientProfile.role);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-        setUserType('client');
-        setBrokerageId(clientProfile.brokerage_id);
-        setClientProfile(clientProfile);
-        setUserRole(clientProfile.role || null);
-
-        console.log('✓ Client profile loaded and state updated');
-        return;
-      }
-
-      console.warn('⚠️ No profile found for user, creating default broker profile...');
-
-      // CREATE DEFAULT BROKER_USER AND PROFILE
-      const defaultBrokerageId = brokerage?.id || 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
-
-      // Create broker_users entry
-      const { error: brokerUserError } = await supabase
-        .from('broker_users')
-        .upsert({ id: userId, brokerage_id: defaultBrokerageId }, { onConflict: 'id' });
-
-      if (brokerUserError) {
-        console.error('❌ Error creating broker_users entry:', brokerUserError);
-      }
-
-      // Create broker_profiles entry
-      const defaultProfile: BrokerProfile = {
-        id: userId,
-        full_name: userEmail || 'User',
-        id_number: '',
-        cell_number: '',
-        brokerage_id: defaultBrokerageId,
-        role: isUserSuperAdmin ? 'super_admin' : 'broker',
-      };
-
-      const { error: profileError } = await supabase
+      // Try to load broker profile first
+      const { data: brokerProfileData } = await supabase
         .from('broker_profiles')
-        .upsert(defaultProfile, { onConflict: 'id' });
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
-      if (profileError) {
-        console.error('❌ Error creating default broker profile:', profileError);
-      } else {
-        console.log('✅ Created default broker profile');
+      if (brokerProfileData) {
+        console.log('✓ Broker profile found');
+
+        // Force super_admin role if email is in SUPER_ADMINS list
+        if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
+          await supabase
+            .from('broker_profiles')
+            .update({ role: 'super_admin' })
+            .eq('id', userId);
+          brokerProfileData.role = 'super_admin';
+        }
+
         setUserType('broker');
-        setBrokerageId(defaultBrokerageId);
-        setBrokerProfile(defaultProfile);
-        setUserRole(defaultProfile.role || null);
+        setBrokerageId(brokerProfileData.brokerage_id);
+        setBrokerProfile(brokerProfileData);
+        setUserRole(brokerProfileData.role || 'broker');
+        return;
       }
+
+      // Try to load client profile
+      const { data: clientProfileData } = await supabase
+        .from('client_profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (clientProfileData) {
+        console.log('✓ Client profile found');
+        setUserType('client');
+        setBrokerageId(clientProfileData.brokerage_id);
+        setClientProfile(clientProfileData);
+        setUserRole(clientProfileData.role || 'client');
+        return;
+      }
+
+      console.warn('⚠️ No profile found');
     } catch (error) {
-      console.error('❌ Error determining user type:', error);
-
-      // FALLBACK: On any error, check email
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (isSuperAdmin(currentUser?.email)) {
-        console.log('🛡️ FALLBACK ACTIVATED: Error occurred but email is super admin - forcing super_admin');
-        setUserType('broker');
-        setUserRole('super_admin');
-      }
+      console.error('Error loading profile:', error);
     }
   };
 
   const signOut = async () => {
-    console.log('🚪 Signing out and clearing all cached data...');
-
-    // Clear ALL browser storage - use window.localStorage explicitly
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-    console.log('🧹 Cleared localStorage and sessionStorage');
-
-    // Sign out from Supabase
+    console.log('🚪 Signing out');
     await supabase.auth.signOut();
 
-    // Clear all state
     setUser(null);
     setUserType(null);
     setUserRole(null);
     setBrokerageId(null);
     setBrokerProfile(null);
     setClientProfile(null);
-
-    console.log('✓ Signed out successfully');
   };
 
   const isSuperAdminFunc = (): boolean => {
-    // ROLE GUARD: Check email first, then role
-    if (isSuperAdmin(user?.email)) {
-      return true;
-    }
+    if (isSuperAdmin(user?.email)) return true;
     return userRole === 'super_admin';
   };
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 Starting sign in process...');
+    console.log('🔐 Signing in');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -327,64 +170,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed');
 
-    console.log('✓ Authentication successful, fetching fresh profile from database...');
-
-    // Explicitly fetch and set user profile before returning
     setUser(data.user);
-    await determineUserType(data.user.id);
-
-    console.log('✓ Sign in complete, profile loaded');
+    await loadUserProfile(data.user.id, data.user.email);
   };
 
-  const brokerSignUp = async (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => {
-    console.log('🔵 BROKER SIGNUP - Creating broker account with manual profile creation');
+  const brokerSignUp = async (
+    email: string,
+    password: string,
+    profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }
+  ) => {
+    console.log('🔵 BROKER SIGNUP - Manual profile creation');
 
-    // Fixed brokerage_id for Independi subdomain
-    const brokerageId = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
-
-    const metadata: Record<string, any> = {
-      role: 'broker',
-      user_type: 'broker',
-      brokerage_id: brokerageId,
-    };
-
-    // Include profile fields if provided
-    if (profile.full_name?.trim()) metadata.full_name = profile.full_name.trim();
-    if (profile.id_number?.trim()) metadata.id_number = profile.id_number.trim();
-    if (profile.cell_number?.trim()) metadata.cell_number = profile.cell_number.trim();
-    if (profile.policy_number?.trim()) metadata.policy_number = profile.policy_number.trim();
-
+    // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: metadata },
     });
 
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
     console.log('✅ Auth user created:', authData.user.id);
-    console.log('🔨 Manually creating profile in database...');
 
-    // FORCE PROFILE CREATION: Manually insert into broker_users
-    const { error: brokerUserError } = await supabase
-      .from('broker_users')
-      .insert({
-        id: authData.user.id,
-        brokerage_id: brokerageId,
-      });
+    // MANUAL PROFILE CREATION
+    const brokerageId = profile.brokerage_id || INDEPENDI_BROKERAGE_ID;
 
-    if (brokerUserError) {
-      console.error('❌ Failed to create broker_users entry:', brokerUserError);
-      throw new Error(`Failed to create broker user: ${brokerUserError.message}`);
-    }
-
-    console.log('✅ broker_users entry created');
-
-    // FORCE PROFILE CREATION: Manually insert into broker_profiles
-    const { error: brokerProfileError } = await supabase
+    // Insert into broker_profiles
+    const { error: profileError } = await supabase
       .from('broker_profiles')
       .insert({
         id: authData.user.id,
@@ -397,19 +211,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user_type: 'broker',
       });
 
-    if (brokerProfileError) {
-      console.error('❌ Failed to create broker_profiles entry:', brokerProfileError);
-      throw new Error(`Failed to create broker profile: ${brokerProfileError.message}`);
+    if (profileError) {
+      console.error('❌ Failed to create profile:', profileError);
+      throw new Error(`Failed to create profile: ${profileError.message}`);
     }
 
-    console.log('✅ broker_profiles entry created with role=broker');
-    console.log('✅ Profile creation complete - user should now appear in Users Management');
-
+    console.log('✅ Profile created successfully');
     return authData.user;
   };
 
   const brokerSignIn = async (email: string, password: string) => {
-    console.log('🔐 Starting broker sign in process...');
+    console.log('🔐 Broker signing in');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -417,21 +229,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed');
 
-    console.log('✓ Broker authentication successful, fetching fresh profile from database...');
-
-    // Explicitly fetch and set user profile before returning
     setUser(data.user);
-    await determineUserType(data.user.id);
-
-    console.log('✓ Broker sign in complete, profile loaded');
+    await loadUserProfile(data.user.id, data.user.email);
   };
 
-  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => {
-    console.log('🔵 CLIENT SIGNUP - Creating client account');
-    console.log('   Brokerage ID:', brokerageId);
-    console.log('   Profile:', profile);
+  const clientSignUp = async (
+    email: string,
+    password: string,
+    profile: Omit<ClientProfile, 'id' | 'brokerage_id'>,
+    brokerageId?: string
+  ) => {
+    console.log('🔵 CLIENT SIGNUP - Manual profile creation');
 
     const currentBrokerageId = brokerageId || brokerage?.id;
 
@@ -439,32 +249,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Brokerage not loaded. Please refresh the page.');
     }
 
-    // Create auth user with metadata - database trigger will auto-create profiles
+    // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          full_name: profile.full_name,
-          email: profile.email,
-          cell_number: profile.cell_number,
-          role: 'client',
-          brokerage_id: currentBrokerageId,
-          user_type: 'client',
-        },
-      },
     });
 
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created - database trigger will auto-create profile');
+    console.log('✅ Auth user created:', authData.user.id);
 
+    // MANUAL PROFILE CREATION
+    const { error: profileError } = await supabase
+      .from('client_profiles')
+      .insert({
+        id: authData.user.id,
+        full_name: profile.full_name,
+        email: profile.email,
+        cell_number: profile.cell_number,
+        brokerage_id: currentBrokerageId,
+        role: 'client',
+        user_type: 'client',
+      });
+
+    if (profileError) {
+      console.error('❌ Failed to create client profile:', profileError);
+      throw new Error(`Failed to create client profile: ${profileError.message}`);
+    }
+
+    console.log('✅ Client profile created successfully');
     return authData.user;
   };
 
   const clientSignIn = async (email: string, password: string) => {
-    console.log('🔐 Starting client sign in process...');
+    console.log('🔐 Client signing in');
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -472,28 +291,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (error) throw error;
-    if (!data.user) throw new Error('Sign in failed - no user data');
+    if (!data.user) throw new Error('Sign in failed');
 
-    console.log('✓ Client authentication successful, fetching fresh profile from database...');
-
-    // Explicitly fetch and set user profile before returning
     setUser(data.user);
-    await determineUserType(data.user.id);
-
-    console.log('✓ Client sign in complete, profile loaded');
+    await loadUserProfile(data.user.id, data.user.email);
   };
 
   return (
-    <AuthContext.Provider value={{ user, userType, userRole, brokerageId, brokerProfile, clientProfile, loading, signOut, signIn, brokerSignUp, brokerSignIn, clientSignUp, clientSignIn, isSuperAdmin: isSuperAdminFunc }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userType,
+        userRole,
+        brokerageId,
+        brokerProfile,
+        clientProfile,
+        loading,
+        signOut,
+        signIn,
+        brokerSignUp,
+        brokerSignIn,
+        clientSignUp,
+        clientSignIn,
+        isSuperAdmin: isSuperAdminFunc,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
