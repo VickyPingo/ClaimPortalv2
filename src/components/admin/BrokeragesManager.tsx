@@ -220,7 +220,7 @@ export default function BrokeragesManager() {
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading brokerages...</p>
+          <p className="text-gray-600">Connecting to server...</p>
         </div>
       </div>
     );
