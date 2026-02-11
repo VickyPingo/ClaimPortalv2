@@ -17,7 +17,9 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
-    if (token || window.location.pathname === '/join') {
+    const broker = params.get('broker');
+    const brokerId = params.get('brokerId');
+    if (token || broker || brokerId || window.location.pathname === '/join') {
       setShowSignup(true);
     }
   }, []);
