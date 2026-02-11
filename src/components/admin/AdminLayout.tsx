@@ -23,11 +23,16 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'clients' as const, icon: Users, label: 'Clients' },
     ];
 
+    // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin menu items
+    const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
+
     // CRITICAL: On Independi subdomain, NEVER show super admin menu items
+    // EXCEPT for vickypingo@gmail.com who always has full access
     // Only show super admin items if on super admin domain AND role is super_admin
-    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain && !onIndependiSubdomain;
+    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
     console.log('AdminLayout - Menu Items Calculation:');
     console.log('  Is Actual Super Admin:', isActualSuperAdmin);
+    console.log('  Is Super Admin Email:', isSuperAdminEmail);
     console.log('  User Email:', user?.email);
     console.log('  User Role:', userRole);
     console.log('  On Independi Subdomain:', onIndependiSubdomain);

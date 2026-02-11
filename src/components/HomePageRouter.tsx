@@ -26,11 +26,14 @@ export default function HomePageRouter() {
   useEffect(() => {
     if (!user) return;
 
+    // ADMIN OVERRIDE: vickypingo@gmail.com bypasses all subdomain restrictions
+    const isSuperAdminEmail = user.email === 'vickypingo@gmail.com';
+
     // CRITICAL: On Independi subdomain (claims.independi.co.za), FORCE broker dashboard
-    if (onIndependiSubdomain) {
+    // EXCEPT for vickypingo@gmail.com who always has full super admin access
+    if (onIndependiSubdomain && !isSuperAdminEmail) {
       console.log('🔒 INDEPENDI SUBDOMAIN - FORCING BROKER ACCESS ONLY');
 
-      // Even super_admin must use broker dashboard on this subdomain
       if (currentPath !== '/broker-dashboard' && currentPath !== '/') {
         console.log('  Redirecting to broker dashboard');
         window.history.replaceState(null, '', '/broker-dashboard');
@@ -54,7 +57,10 @@ export default function HomePageRouter() {
     // Determine the correct path based on role
     let targetPath = '/';
 
-    if (isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain) {
+    // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin access
+    if (isSuperAdminEmail && userRole === 'super_admin') {
+      targetPath = '/admin-dashboard';
+    } else if (isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain) {
       targetPath = '/admin-dashboard';
     } else if (userType === 'broker' || userRole === 'broker') {
       targetPath = '/broker-dashboard';
@@ -128,7 +134,22 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard
+  // STEP 3: ADMIN OVERRIDE - vickypingo@gmail.com gets super admin access everywhere
+  if (user.email === 'vickypingo@gmail.com' && userRole === 'super_admin') {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
+    console.log('✅ FULL SUPER ADMIN ACCESS GRANTED');
+    console.log('   Subdomain:', window.location.hostname);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
+  }
+
+  // STEP 4: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard (for non-super-admins)
   if (onIndependiSubdomain) {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🏢 INDEPENDI SUBDOMAIN - BROKER ONLY ACCESS');
@@ -142,7 +163,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 4: SUPER ADMIN ROUTING (only on super admin domain)
+  // STEP 5: SUPER ADMIN ROUTING (only on super admin domain)
   if ((isSuperAdmin() || userRole === 'super_admin') && onSuperAdminDomain) {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('👑 SUPER ADMIN DETECTED ON ADMIN DOMAIN');
@@ -156,7 +177,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 5: BROKER ROUTING
+  // STEP 6: BROKER ROUTING
   if (userType === 'broker' || userRole === 'broker') {
     console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
@@ -167,7 +188,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 6: CLIENT ROUTING
+  // STEP 7: CLIENT ROUTING
   if (userType === 'client' || userRole === 'client') {
     console.log('✅ ROUTING TO: /claims-portal (userType: client)');
     return (
