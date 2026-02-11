@@ -27,6 +27,8 @@ export default function BrokeragesManager() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBrokerage, setEditingBrokerage] = useState<Brokerage | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -137,6 +139,66 @@ export default function BrokeragesManager() {
       setFormError(error.message || 'Failed to create brokerage');
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleEditBrokerage = (brokerage: Brokerage) => {
+    setEditingBrokerage(brokerage);
+    setFormData({
+      name: brokerage.name,
+      subdomain: brokerage.subdomain,
+      notification_email: brokerage.notification_email || ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateBrokerage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBrokerage) return;
+
+    setFormError('');
+    setFormLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('brokerages')
+        .update({
+          name: formData.name.trim(),
+          notification_email: formData.notification_email.trim() || null,
+        })
+        .eq('id', editingBrokerage.id);
+
+      if (error) throw error;
+
+      await fetchBrokerages();
+      setShowEditModal(false);
+      setEditingBrokerage(null);
+      setFormData({ name: '', subdomain: '', notification_email: '' });
+    } catch (error: any) {
+      console.error('Error updating brokerage:', error);
+      setFormError(error.message || 'Failed to update brokerage');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDeleteBrokerage = async (brokerageId: string, brokerageName: string) => {
+    if (!confirm(`Are you sure you want to delete "${brokerageName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('brokerages')
+        .delete()
+        .eq('id', brokerageId);
+
+      if (error) throw error;
+
+      await fetchBrokerages();
+    } catch (error: any) {
+      console.error('Error deleting brokerage:', error);
+      alert(`Failed to delete brokerage: ${error.message}`);
     }
   };
 
@@ -301,12 +363,14 @@ export default function BrokeragesManager() {
 
                 <div className="flex gap-2 pt-4 border-t border-gray-200">
                   <button
+                    onClick={() => handleEditBrokerage(brokerage)}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <Edit className="w-4 h-4" />
                     Edit
                   </button>
                   <button
+                    onClick={() => handleDeleteBrokerage(brokerage.id, brokerage.name)}
                     className="px-4 py-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -328,6 +392,109 @@ export default function BrokeragesManager() {
           </p>
         </div>
       </div>
+
+      {showEditModal && editingBrokerage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Building2 className="w-6 h-6 text-blue-700" />
+                Edit Brokerage
+              </h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingBrokerage(null);
+                  setFormData({ name: '', subdomain: '', notification_email: '' });
+                  setFormError('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateBrokerage} className="p-6 space-y-6">
+              {formError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  {formError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Brokerage Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Independi Insurance Brokers"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Subdomain
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    disabled
+                    value={formData.subdomain}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                  />
+                  <span className="text-gray-600 font-medium">.claimsportal.co.za</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Subdomain cannot be changed after creation
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Contact Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={formData.notification_email}
+                  onChange={(e) => setFormData({ ...formData, notification_email: e.target.value })}
+                  placeholder="e.g., admin@independi.co.za"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This email will receive claim notifications
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingBrokerage(null);
+                    setFormData({ name: '', subdomain: '', notification_email: '' });
+                    setFormError('');
+                  }}
+                  className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="flex-1 px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {formLoading ? 'Updating...' : 'Update Brokerage'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
