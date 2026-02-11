@@ -54,19 +54,31 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
 
   // Detect branding based on subdomain
   const getBrandingTitle = () => {
-    if (brokerage?.name === 'Independi' || window.location.hostname.includes('independi')) {
+    const hostname = window.location.hostname;
+
+    // Check for Independi subdomain
+    if (hostname.includes('independi') || brokerage?.name === 'Independi') {
       return 'Independi Claims Portal';
     }
-    if (brokerage?.name) {
+
+    // Check for other brokerage subdomains
+    if (brokerage?.name && !isPlatformDomain) {
       return `${brokerage.name} Claims Portal`;
     }
+
+    // Main platform domain (claimsportal.co.za)
     return 'Claims Portal';
   };
 
   const getBrandingDescription = () => {
-    if (isPlatformDomain && roleType === 'broker') {
-      return 'Access the platform admin dashboard';
+    const hostname = window.location.hostname;
+
+    // Platform domain (claimsportal.co.za)
+    if (isPlatformDomain || hostname === 'claimsportal.co.za') {
+      return 'Multi-tenant claims management platform';
     }
+
+    // Client subdomains (e.g., claims.independi.co.za)
     return 'Sign in to your organisation\'s portal';
   };
 
@@ -349,12 +361,42 @@ function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
     }
   };
 
+  // Detect branding based on subdomain
+  const getBrandingTitle = () => {
+    const hostname = window.location.hostname;
+
+    // Check for Independi subdomain
+    if (hostname.includes('independi') || brokerage?.name === 'Independi') {
+      return 'Independi Claims Portal';
+    }
+
+    // Check for other brokerage subdomains
+    if (brokerage?.name && !isPlatformDomain) {
+      return `${brokerage.name} Claims Portal`;
+    }
+
+    // Main platform domain (claimsportal.co.za)
+    return 'Claims Portal';
+  };
+
+  const getBrandingDescription = () => {
+    const hostname = window.location.hostname;
+
+    // Platform domain (claimsportal.co.za)
+    if (isPlatformDomain || hostname === 'claimsportal.co.za') {
+      return 'Create your account to access the platform';
+    }
+
+    // Client subdomains (e.g., claims.independi.co.za)
+    return 'Create your account to access the portal';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Independi Claims Portal</h1>
-          <p className="text-gray-600 text-sm">Create your account to access the portal</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">{getBrandingTitle()}</h1>
+          <p className="text-gray-600 text-sm">{getBrandingDescription()}</p>
         </div>
 
         {loading && !error && (

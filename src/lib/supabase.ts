@@ -15,6 +15,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
     storageKey: 'supabase-auth',
-    storage: window.localStorage
+    storage: window.localStorage,
+    redirectTo: `${window.location.origin}/auth/callback`
   }
 });
