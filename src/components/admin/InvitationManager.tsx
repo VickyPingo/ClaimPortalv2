@@ -104,11 +104,17 @@ export default function InvitationManager() {
     const targetBrokerageId = newInvitation.brokerage_id || brokerageId;
 
     if (!targetBrokerageId) {
-      alert('Please select a brokerage first');
+      alert('⚠️ Please select an organisation first before generating the invitation link');
       return;
     }
 
-    console.log('Creating invitation for brokerage:', targetBrokerageId);
+    console.log('🔐 Creating invitation for brokerage:', targetBrokerageId);
+    console.log('📋 Invitation details:', {
+      brokerage_id: targetBrokerageId,
+      role: newInvitation.role,
+      daysValid: newInvitation.daysValid,
+      maxUses: newInvitation.maxUses
+    });
     setCreating(true);
     try {
       const expiresAt = new Date();
@@ -126,6 +132,12 @@ export default function InvitationManager() {
         .single();
 
       if (error) throw error;
+
+      const generatedUrl = getInvitationUrl(data.token, targetBrokerageId);
+      console.log('✅ Invitation created successfully!');
+      console.log('🔗 Invitation URL:', generatedUrl);
+      console.log('📊 Token:', data.token);
+      console.log('🏢 Brokerage ID:', targetBrokerageId);
 
       setInvitations([data, ...invitations]);
       setShowCreateForm(false);
@@ -202,7 +214,7 @@ export default function InvitationManager() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Invitation Links</h2>
           <p className="text-gray-600 mt-1">
-            Generate secure invite links to onboard new team members
+            Generate secure invitation links to authorise and onboard new team members
           </p>
         </div>
         <button
@@ -220,27 +232,28 @@ export default function InvitationManager() {
 
           <div className="space-y-4">
             {isSuperAdmin() && brokerages.length > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <label className="block text-sm font-semibold text-blue-900 mb-2">
-                  Select Brokerage <span className="text-red-600">*</span>
+              <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                <label className="block text-sm font-bold text-blue-900 mb-2">
+                  Select Organisation <span className="text-red-600">*</span>
                 </label>
                 <select
                   value={newInvitation.brokerage_id}
-                  onChange={(e) =>
-                    setNewInvitation({ ...newInvitation, brokerage_id: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                  onChange={(e) => {
+                    console.log('Brokerage selected:', e.target.value);
+                    setNewInvitation({ ...newInvitation, brokerage_id: e.target.value });
+                  }}
+                  className="w-full px-4 py-3 border-2 border-blue-400 rounded-lg focus:ring-2 focus:ring-blue-600 bg-white font-medium text-gray-900"
                   required
                 >
-                  <option value="">Choose a brokerage...</option>
+                  <option value="">Choose a brokerage organisation...</option>
                   {brokerages.map((broker) => (
                     <option key={broker.id} value={broker.id}>
-                      {broker.name} ({broker.subdomain})
+                      {broker.name} ({broker.subdomain}.claimsportal.co.za)
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-blue-700 mt-2">
-                  The invitation link will be specific to the selected brokerage
+                <p className="text-xs text-blue-800 mt-2 font-medium">
+                  ℹ️ The invitation link will be specific to the selected organisation and include its brokerage ID
                 </p>
               </div>
             )}
@@ -330,7 +343,7 @@ export default function InvitationManager() {
             <LinkIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
             <p className="text-gray-600">No invitations created yet</p>
             <p className="text-sm text-gray-500 mt-1">
-              Create your first invitation to start onboarding team members
+              Create your first invitation to authorise and onboard team members
             </p>
           </div>
         ) : (

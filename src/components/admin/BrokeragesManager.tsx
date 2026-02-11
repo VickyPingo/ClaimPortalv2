@@ -237,7 +237,7 @@ export default function BrokeragesManager() {
                 Brokerages Management
               </h1>
               <p className="text-gray-600 mt-2">
-                Manage all brokerage accounts and configurations
+                Manage all brokerage accounts and organisation configurations
               </p>
             </div>
             <button
@@ -286,7 +286,7 @@ export default function BrokeragesManager() {
             {filteredBrokerages.map((brokerage) => (
               <div
                 key={brokerage.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200"
+                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200 relative"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -362,26 +362,31 @@ export default function BrokeragesManager() {
                   </div>
                 )}
 
-                <div className="flex gap-2 pt-4 border-t border-gray-200">
+                <div className="flex gap-2 pt-4 border-t border-gray-200 relative z-20">
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      console.log('Edit button clicked for:', brokerage.name);
+                      console.log('✏️ Edit button clicked for:', brokerage.name);
                       handleEditBrokerage(brokerage);
                     }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors relative z-10 cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer font-medium"
+                    style={{ position: 'relative', zIndex: 30 }}
                   >
                     <Edit className="w-4 h-4" />
                     Edit
                   </button>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      console.log('🗑️ Delete button clicked for:', brokerage.name);
                       handleDeleteBrokerage(brokerage.id, brokerage.name);
                     }}
-                    className="px-4 py-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors relative z-10 cursor-pointer"
+                    className="px-4 py-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors cursor-pointer font-medium"
+                    style={{ position: 'relative', zIndex: 30 }}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -590,10 +595,10 @@ export default function BrokeragesManager() {
                   What happens next?
                 </h3>
                 <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• A unique invite link will be generated automatically</li>
-                  <li>• Share the link with brokerage staff to sign up</li>
-                  <li>• They'll be automatically assigned to this brokerage</li>
-                  <li>• Their user_type will be set to "broker"</li>
+                  <li>• A unique invitation link will be generated automatically</li>
+                  <li>• Share the link with organisation staff to sign up</li>
+                  <li>• They'll be automatically assigned to this organisation</li>
+                  <li>• They will be authorised as broker users</li>
                 </ul>
               </div>
 
