@@ -17,10 +17,21 @@ export default function HomePageRouter() {
   useEffect(() => {
     if (!user) return;
 
+    // CRITICAL: Brokers should never access super admin routes
+    const restrictedPaths = ['/organisations', '/users-management', '/invitations', '/admin-settings'];
+    const isRestrictedPath = restrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
+
+    if (isRestrictedPath && userRole === 'broker') {
+      console.log('❌ BROKER ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
+      console.log('  Redirecting to broker dashboard');
+      window.history.replaceState(null, '', '/broker-dashboard');
+      return;
+    }
+
     // Determine the correct path based on role
     let targetPath = '/';
 
-    if (isSuperAdmin() || userRole === 'super_admin') {
+    if (isSuperAdmin() && userRole === 'super_admin') {
       targetPath = '/admin-dashboard';
     } else if (userType === 'broker' || userRole === 'broker') {
       targetPath = '/broker-dashboard';

@@ -9,7 +9,7 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
-  const { signOut, isSuperAdmin } = useAuth();
+  const { signOut, isSuperAdmin, userRole, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = useMemo(() => {
@@ -19,7 +19,13 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'clients' as const, icon: Users, label: 'Clients' },
     ];
 
-    if (isSuperAdmin()) {
+    // CRITICAL: Only show super admin menu items if role is 'super_admin'
+    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin';
+    console.log('AdminLayout - Is Actual Super Admin:', isActualSuperAdmin);
+    console.log('  User Email:', user?.email);
+    console.log('  User Role:', userRole);
+
+    if (isActualSuperAdmin) {
       baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Organisations' });
       baseItems.push({ id: 'users' as const, icon: UserCog, label: 'Users' });
       baseItems.push({ id: 'invitations' as const, icon: Link, label: 'Invitations' });
@@ -27,7 +33,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     }
 
     return baseItems;
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, userRole, user]);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     onNavigate(view);

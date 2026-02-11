@@ -14,11 +14,17 @@ import { AlertCircle, ShieldAlert } from 'lucide-react';
 type View = 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
-  const { isSuperAdmin } = useAuth();
-  const initialView = isSuperAdmin() ? 'brokerages' : 'dashboard';
+  const { isSuperAdmin, userRole, user } = useAuth();
+
+  // CRITICAL: Only super_admin role should see Organisations view
+  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin';
+  const initialView = isActualSuperAdmin ? 'brokerages' : 'dashboard';
 
   console.log('🎯 BrokerAdminDashboard - Initialising');
+  console.log('  User Email:', user?.email);
+  console.log('  User Role:', userRole);
   console.log('  Is Super Admin:', isSuperAdmin());
+  console.log('  Is Actual Super Admin:', isActualSuperAdmin);
   console.log('  Initial View:', initialView);
 
   const [currentView, setCurrentView] = useState<View>(initialView);
@@ -28,12 +34,20 @@ export default function BrokerAdminDashboard() {
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'settings' | 'brokerages' | 'users' | 'invitations') => {
     console.log('🧭 Navigation requested to:', view);
+    console.log('  User Role:', userRole);
+    console.log('  Is Super Admin:', isSuperAdmin());
 
-    if ((view === 'settings' || view === 'brokerages' || view === 'users' || view === 'invitations') && !isSuperAdmin()) {
-      console.log('❌ Access denied - user is not super admin');
-      setAccessDeniedMessage('Access Denied: Only super administrators can access this section.');
-      setTimeout(() => setAccessDeniedMessage(null), 5000);
-      return;
+    // CRITICAL: Only super_admin role can access these sections
+    if ((view === 'settings' || view === 'brokerages' || view === 'users' || view === 'invitations')) {
+      if (!isSuperAdmin() || userRole !== 'super_admin') {
+        console.log('❌ Access denied - user is not super_admin');
+        console.log('  Email:', user?.email);
+        console.log('  Role:', userRole);
+        setAccessDeniedMessage('Access Denied: Only super administrators can access this section.');
+        setTimeout(() => setAccessDeniedMessage(null), 5000);
+        setCurrentView('dashboard');
+        return;
+      }
     }
 
     console.log('✓ Navigation allowed, switching to:', view);
@@ -44,14 +58,21 @@ export default function BrokerAdminDashboard() {
 
   useEffect(() => {
     console.log('📺 Current View Changed:', currentView);
+    console.log('  User Role:', userRole);
+    console.log('  Is Super Admin:', isSuperAdmin());
 
-    if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations') && !isSuperAdmin()) {
-      console.log('❌ Unauthorised view access detected, redirecting to dashboard');
-      setCurrentView('dashboard');
-      setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
-      setTimeout(() => setAccessDeniedMessage(null), 5000);
+    // CRITICAL: Check if user is trying to access super admin sections without proper role
+    if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
+      if (!isSuperAdmin() || userRole !== 'super_admin') {
+        console.log('❌ Unauthorised view access detected, redirecting to dashboard');
+        console.log('  Blocked view:', currentView);
+        console.log('  User email:', user?.email);
+        setCurrentView('dashboard');
+        setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
+        setTimeout(() => setAccessDeniedMessage(null), 5000);
+      }
     }
-  }, [currentView, isSuperAdmin]);
+  }, [currentView, isSuperAdmin, userRole, user]);
 
   const handleViewClient = (clientId: string) => {
     setSelectedClientId(clientId);
@@ -118,18 +139,19 @@ export default function BrokerAdminDashboard() {
         ) : null;
 
       case 'brokerages':
-        if (isSuperAdmin()) {
+        if (isSuperAdmin() && userRole === 'super_admin') {
           console.log('✓ Rendering BrokeragesManager for super admin');
           return <BrokeragesManager />;
         } else {
           console.log('❌ Rendering access denied for brokerages');
+          console.log('  User Role:', userRole);
           return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
               <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
                 <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
                 <p className="text-gray-600 mb-6">
-                  You do not have permission to access brokerages management. Only super administrators can view this section.
+                  You do not have permission to access organisations management. Only super administrators can view this section.
                 </p>
                 <button
                   onClick={() => handleNavigate('dashboard')}
@@ -143,11 +165,12 @@ export default function BrokerAdminDashboard() {
         }
 
       case 'users':
-        if (isSuperAdmin()) {
+        if (isSuperAdmin() && userRole === 'super_admin') {
           console.log('✓ Rendering UsersManager for super admin');
           return <UsersManager />;
         } else {
           console.log('❌ Rendering access denied for users');
+          console.log('  User Role:', userRole);
           return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
               <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -168,11 +191,12 @@ export default function BrokerAdminDashboard() {
         }
 
       case 'invitations':
-        if (isSuperAdmin()) {
+        if (isSuperAdmin() && userRole === 'super_admin') {
           console.log('✓ Rendering InvitationManager for super admin');
           return <InvitationManager />;
         } else {
           console.log('❌ Rendering access denied for invitations');
+          console.log('  User Role:', userRole);
           return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
               <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
@@ -193,25 +217,30 @@ export default function BrokerAdminDashboard() {
         }
 
       case 'settings':
-        return isSuperAdmin() ? (
-          <SettingsPanel />
-        ) : (
-          <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-              <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-              <p className="text-gray-600 mb-6">
-                You do not have permission to access admin settings. Only super administrators can view this section.
-              </p>
-              <button
-                onClick={() => handleNavigate('dashboard')}
-                className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
-              >
-                Return to Dashboard
-              </button>
+        if (isSuperAdmin() && userRole === 'super_admin') {
+          console.log('✓ Rendering SettingsPanel for super admin');
+          return <SettingsPanel />;
+        } else {
+          console.log('❌ Rendering access denied for settings');
+          console.log('  User Role:', userRole);
+          return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+              <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
+                <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+                <p className="text-gray-600 mb-6">
+                  You do not have permission to access admin settings. Only super administrators can view this section.
+                </p>
+                <button
+                  onClick={() => handleNavigate('dashboard')}
+                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
             </div>
-          </div>
-        );
+          );
+        }
 
       default:
         return null;
