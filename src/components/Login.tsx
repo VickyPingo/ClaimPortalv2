@@ -180,7 +180,7 @@ export default function Login({ onBackToRole, roleType }: { onBackToRole?: () =>
 }
 
 function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; onBackToRole?: () => void }) {
-  const { brokerSignUp, clientSignUp } = useAuth();
+  const { brokerSignUp } = useAuth();
   const { brokerage, isPlatformDomain } = useBrokerage();
   const [formData, setFormData] = useState({
     email: '',
@@ -291,23 +291,16 @@ function Signup({ onBackToLogin, onBackToRole }: { onBackToLogin: () => void; on
     setLoading(true);
 
     try {
-      if (hasBrokerParam) {
-        console.log('🔵 Signing up as CLIENT via broker parameter');
-        await clientSignUp(formData.email, formData.password, {
-          full_name: formData.fullName,
-          email: formData.email,
-          cell_number: formData.cellNumber,
-          role: 'client',
-        }, invitationBrokerageId || undefined);
-      } else {
-        console.log('🟢 Signing up as BROKER');
-        await brokerSignUp(formData.email, formData.password, {
-          full_name: formData.fullName,
-          id_number: formData.idNumber,
-          cell_number: formData.cellNumber,
-          brokerage_id: invitationBrokerageId || undefined,
-        });
-      }
+      console.log('🟢 Signing up as BROKER');
+      console.log('   Brokerage ID:', invitationBrokerageId);
+      console.log('   Has broker param:', hasBrokerParam);
+
+      await brokerSignUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        id_number: formData.idNumber,
+        cell_number: formData.cellNumber,
+        brokerage_id: invitationBrokerageId || undefined,
+      });
 
       if (invitationToken) {
         const { error: updateError } = await supabase

@@ -343,7 +343,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id_number: profile.id_number,
         cell_number: profile.cell_number,
         policy_number: profile.policy_number || null,
-        role: 'broker',
         user_type: 'broker',
       });
 
