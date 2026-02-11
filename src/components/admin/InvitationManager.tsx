@@ -104,10 +104,11 @@ export default function InvitationManager() {
     const targetBrokerageId = newInvitation.brokerage_id || brokerageId;
 
     if (!targetBrokerageId) {
-      alert('Please select a brokerage');
+      alert('Please select a brokerage first');
       return;
     }
 
+    console.log('Creating invitation for brokerage:', targetBrokerageId);
     setCreating(true);
     try {
       const expiresAt = new Date();
@@ -161,7 +162,8 @@ export default function InvitationManager() {
   };
 
   const copyInvitationLink = (token: string, invitationBrokerageId: string) => {
-    const inviteUrl = `https://claimsportal.co.za/signup?token=${token}&brokerId=${invitationBrokerageId}`;
+    const baseUrl = window.location.origin;
+    const inviteUrl = `${baseUrl}/signup?token=${token}&brokerId=${invitationBrokerageId}`;
 
     navigator.clipboard.writeText(inviteUrl);
     setCopiedToken(token);
@@ -169,7 +171,8 @@ export default function InvitationManager() {
   };
 
   const getInvitationUrl = (token: string, invitationBrokerageId: string) => {
-    return `https://claimsportal.co.za/signup?token=${token}&brokerId=${invitationBrokerageId}`;
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/signup?token=${token}&brokerId=${invitationBrokerageId}`;
   };
 
   const isExpired = (expiresAt: string) => {
@@ -217,25 +220,28 @@ export default function InvitationManager() {
 
           <div className="space-y-4">
             {isSuperAdmin() && brokerages.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Brokerage
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <label className="block text-sm font-semibold text-blue-900 mb-2">
+                  Select Brokerage <span className="text-red-600">*</span>
                 </label>
                 <select
                   value={newInvitation.brokerage_id}
                   onChange={(e) =>
                     setNewInvitation({ ...newInvitation, brokerage_id: e.target.value })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
                   required
                 >
-                  <option value="">Select a brokerage</option>
+                  <option value="">Choose a brokerage...</option>
                   {brokerages.map((broker) => (
                     <option key={broker.id} value={broker.id}>
                       {broker.name} ({broker.subdomain})
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-blue-700 mt-2">
+                  The invitation link will be specific to the selected brokerage
+                </p>
               </div>
             )}
 
