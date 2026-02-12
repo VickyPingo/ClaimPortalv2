@@ -25,9 +25,22 @@ export default function HomePageRouter() {
 
   const currentPath = window.location.pathname;
 
+  // EMERGENCY: Force session page
   if (currentPath === '/admin/force-session') {
     console.log('🚨 EMERGENCY: Force session page accessed');
     return <ForceSession />;
+  }
+
+  // EMERGENCY: Direct /admin access for super admins
+  const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
+  if ((currentPath === '/admin' || currentPath === '/dashboard/admin') && isSuperAdminEmail && userRole === 'super_admin') {
+    console.log('🔓 EMERGENCY ADMIN ACCESS: Super admin accessing /admin directly');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
   }
 
   useEffect(() => {
@@ -120,7 +133,22 @@ export default function HomePageRouter() {
     return <Login roleType={null} />;
   }
 
-  // STEP 1.5: If user is invited and needs to set password
+  // STEP 1.5: SUPER ADMIN BYPASS - Super admins skip password setup and go straight to dashboard
+  if (user.email === 'vickypingo@gmail.com' && userRole === 'super_admin') {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
+    console.log('✅ BYPASSING PASSWORD SETUP - FULL SUPER ADMIN ACCESS GRANTED');
+    console.log('   Subdomain:', window.location.hostname);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
+  }
+
+  // STEP 1.6: If user is invited and needs to set password (non-super-admins only)
   if (needsPasswordSetup) {
     console.log('🔐 User needs to set password - showing SetPassword component');
     return <SetPassword />;
@@ -147,20 +175,7 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: ADMIN OVERRIDE - vickypingo@gmail.com gets super admin access everywhere
-  if (user.email === 'vickypingo@gmail.com' && userRole === 'super_admin') {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
-    console.log('✅ FULL SUPER ADMIN ACCESS GRANTED');
-    console.log('   Subdomain:', window.location.hostname);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return (
-      <>
-        <EmergencyLogoutButton />
-        <BrokerAdminDashboard />
-      </>
-    );
-  }
+  // STEP 3: ADMIN OVERRIDE - Already handled in STEP 1.5 (moved up for priority)
 
   // STEP 4: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard (for non-super-admins)
   if (onIndependiSubdomain) {

@@ -91,11 +91,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('📦 Session found');
         setUser(session.user);
 
-        if (isInviteFlow) {
+        // CRITICAL: Super admins bypass password setup entirely
+        const userIsSuperAdmin = isSuperAdmin(session.user.email);
+
+        if (isInviteFlow && !userIsSuperAdmin) {
           console.log('🔐 Invite/Recovery flow detected on init - showing password setup');
           setNeedsPasswordSetup(true);
           setLoading(false);
         } else {
+          if (userIsSuperAdmin && isInviteFlow) {
+            console.log('👑 Super admin detected - bypassing password setup');
+          }
           loadUserProfile(session.user.id, session.user.email);
         }
       } else {
@@ -121,8 +127,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🔐 PASSWORD_RECOVERY event detected - user from invite link');
         if (session?.user) {
           setUser(session.user);
-          setNeedsPasswordSetup(true);
-          setLoading(false);
+
+          // CRITICAL: Super admins bypass password setup
+          const userIsSuperAdmin = isSuperAdmin(session.user.email);
+          if (!userIsSuperAdmin) {
+            setNeedsPasswordSetup(true);
+            setLoading(false);
+          } else {
+            console.log('👑 Super admin detected - bypassing password recovery setup');
+            loadUserProfile(session.user.id, session.user.email);
+          }
         }
         return;
       }
@@ -137,11 +151,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const type = hashParams.get('type') || queryParams.get('type');
           const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
 
-          if (isInviteFlow) {
+          // CRITICAL: Super admins bypass password setup
+          const userIsSuperAdmin = isSuperAdmin(session.user.email);
+
+          if (isInviteFlow && !userIsSuperAdmin) {
             console.log('🔐 SIGNED_IN via invite/recovery link - showing password setup');
             setUser(session.user);
             setNeedsPasswordSetup(true);
             setLoading(false);
+            return;
+          } else if (isInviteFlow && userIsSuperAdmin) {
+            console.log('👑 Super admin SIGNED_IN via invite - bypassing password setup');
+            setUser(session.user);
+            loadUserProfile(session.user.id, session.user.email);
             return;
           }
         }
@@ -157,11 +179,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const type = hashParams.get('type') || queryParams.get('type');
         const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
 
-        if (isInviteFlow) {
+        // CRITICAL: Super admins bypass password setup
+        const userIsSuperAdmin = isSuperAdmin(session.user.email);
+
+        if (isInviteFlow && !userIsSuperAdmin) {
           console.log('🔐 Invite flow detected via hash/params - showing password setup');
           setNeedsPasswordSetup(true);
           setLoading(false);
         } else {
+          if (userIsSuperAdmin && isInviteFlow) {
+            console.log('👑 Super admin invite flow detected - bypassing password setup');
+          }
           loadUserProfile(session.user.id, session.user.email);
         }
       }
