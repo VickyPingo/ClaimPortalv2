@@ -300,7 +300,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
-      // ALWAYS use signInWithPassword for email/password auth
+      // CRITICAL: ONLY use signInWithPassword - NO OAuth or social providers
+      // This prevents "Auth session missing" and OAuth-related errors
       const response = await supabase.auth.signInWithPassword({
         email,
         password,
