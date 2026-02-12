@@ -213,6 +213,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setBrokerProfile(brokerProfileData);
+
+        // EMERGENCY REDIRECT: Force brokers to claimsportal.co.za broker dashboard
+        if (brokerProfileData.role === 'broker' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+          const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
+          if (window.location.href !== targetUrl) {
+            console.log('🚨 EMERGENCY REDIRECT: Broker login detected, forcing redirect to:', targetUrl);
+            setTimeout(() => {
+              window.location.href = targetUrl;
+            }, 500);
+          }
+        }
+
         return;
       }
 
