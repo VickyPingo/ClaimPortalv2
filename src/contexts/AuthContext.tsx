@@ -201,9 +201,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
 
-        // Provide helpful error message for invalid credentials
+        // Handle OAuth conflict by linking email identity
         if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
+          console.log('🔗 Attempting to link email identity for OAuth user...');
+
+          try {
+            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
+            const linkResponse = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email, password }),
+            });
+
+            const linkResult = await linkResponse.json();
+
+            if (linkResult.success) {
+              console.log('✓ Email identity linked successfully, retrying login...');
+
+              // Retry login after linking identity
+              const retryResponse = await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
+
+              if (retryResponse.error) {
+                throw new Error('Login failed after linking identity. Please try again.');
+              }
+
+              if (!retryResponse.data || !retryResponse.data.user) {
+                throw new Error('Sign in failed - no user data returned');
+              }
+
+              console.log('✓ Password login successful after identity linking');
+              setUser(retryResponse.data.user);
+              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
+              return;
+            } else {
+              throw new Error(linkResult.error || 'Failed to enable password login');
+            }
+          } catch (linkError) {
+            console.error('❌ Identity linking failed:', linkError);
+            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
+          }
         }
 
         throw error;
@@ -311,9 +352,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
 
-        // Provide helpful error message for invalid credentials
+        // Handle OAuth conflict by linking email identity
         if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
+          console.log('🔗 Attempting to link email identity for OAuth user...');
+
+          try {
+            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
+            const linkResponse = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email, password }),
+            });
+
+            const linkResult = await linkResponse.json();
+
+            if (linkResult.success) {
+              console.log('✓ Email identity linked successfully, retrying login...');
+
+              // Retry login after linking identity
+              const retryResponse = await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
+
+              if (retryResponse.error) {
+                throw new Error('Login failed after linking identity. Please try again.');
+              }
+
+              if (!retryResponse.data || !retryResponse.data.user) {
+                throw new Error('Sign in failed - no user data returned');
+              }
+
+              console.log('✓ Broker password login successful after identity linking');
+              setUser(retryResponse.data.user);
+              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
+              return;
+            } else {
+              throw new Error(linkResult.error || 'Failed to enable password login');
+            }
+          } catch (linkError) {
+            console.error('❌ Identity linking failed:', linkError);
+            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
+          }
         }
 
         throw error;
@@ -406,6 +488,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // SESSION RESET: Immediately sign out to prevent session conflicts
         console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
+
+        // Handle OAuth conflict by linking email identity
+        if (error.message.includes('Invalid login credentials')) {
+          console.log('🔗 Attempting to link email identity for OAuth user...');
+
+          try {
+            const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
+            const linkResponse = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ email, password }),
+            });
+
+            const linkResult = await linkResponse.json();
+
+            if (linkResult.success) {
+              console.log('✓ Email identity linked successfully, retrying login...');
+
+              // Retry login after linking identity
+              const retryResponse = await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
+
+              if (retryResponse.error) {
+                throw new Error('Login failed after linking identity. Please try again.');
+              }
+
+              if (!retryResponse.data || !retryResponse.data.user) {
+                throw new Error('Sign in failed - no user data returned');
+              }
+
+              console.log('✓ Client password login successful after identity linking');
+              setUser(retryResponse.data.user);
+              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
+              return;
+            } else {
+              throw new Error(linkResult.error || 'Failed to enable password login');
+            }
+          } catch (linkError) {
+            console.error('❌ Identity linking failed:', linkError);
+            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
+          }
+        }
 
         throw error;
       }
