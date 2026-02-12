@@ -60,6 +60,8 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        console.log('🔍 Looking up brokerage by full domain:', hostname);
+
         const { data, error: fetchError } = await supabase
           .rpc('get_brokerage_by_subdomain', { subdomain_param: hostname });
 
@@ -79,8 +81,10 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
             document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
           }
           console.log('✓ Brokerage configuration loaded:', brokerageData.name);
+          console.log('  Subdomain:', brokerageData.subdomain);
         } else {
-          console.log('⚠️ No brokerage found for domain, treating as platform domain');
+          console.log('⚠️ No brokerage found for domain:', hostname);
+          console.log('  Treating as platform domain');
           setIsPlatformDomain(true);
           setError(null);
         }

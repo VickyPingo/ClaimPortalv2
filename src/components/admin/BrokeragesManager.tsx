@@ -105,10 +105,17 @@ export default function BrokeragesManager() {
     setFormLoading(true);
 
     try {
-      const cleanSubdomain = formData.subdomain.toLowerCase().trim().replace(/[^a-z0-9-]/g, '');
+      const cleanDomain = formData.subdomain.toLowerCase().trim();
 
-      if (!cleanSubdomain) {
-        setFormError('Subdomain can only contain letters, numbers, and hyphens');
+      if (!cleanDomain) {
+        setFormError('Custom domain is required');
+        setFormLoading(false);
+        return;
+      }
+
+      const domainPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+      if (!domainPattern.test(cleanDomain)) {
+        setFormError('Invalid domain format. Use lowercase letters, numbers, dots, and hyphens only');
         setFormLoading(false);
         return;
       }
@@ -116,11 +123,11 @@ export default function BrokeragesManager() {
       const { data: existingBrokerage } = await supabase
         .from('brokerages')
         .select('id')
-        .eq('subdomain', cleanSubdomain)
+        .eq('subdomain', cleanDomain)
         .maybeSingle();
 
       if (existingBrokerage) {
-        setFormError('This subdomain is already taken');
+        setFormError('This domain is already taken');
         setFormLoading(false);
         return;
       }
@@ -129,7 +136,7 @@ export default function BrokeragesManager() {
         .from('brokerages')
         .insert({
           name: formData.name.trim(),
-          subdomain: cleanSubdomain,
+          subdomain: cleanDomain,
           notification_email: formData.notification_email.trim() || null,
           brand_color: '#1e40af'
         })
@@ -274,7 +281,7 @@ export default function BrokeragesManager() {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search brokerages by name or subdomain..."
+              placeholder="Search brokerages by name or domain..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
@@ -331,7 +338,7 @@ export default function BrokeragesManager() {
                       </h3>
                       <div className="flex items-center gap-1 text-sm text-gray-500">
                         <Globe className="w-3 h-3" />
-                        {brokerage.subdomain}.claimsportal.co.za
+                        {brokerage.subdomain}
                       </div>
                     </div>
                   </div>
@@ -473,19 +480,16 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subdomain
+                  Custom Domain
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    disabled
-                    value={formData.subdomain}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                  />
-                  <span className="text-gray-600 font-medium">.claimsportal.co.za</span>
-                </div>
+                <input
+                  type="text"
+                  disabled
+                  value={formData.subdomain}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                />
                 <p className="text-xs text-gray-500 mt-1">
-                  Subdomain cannot be changed after creation
+                  Custom domain cannot be changed after creation
                 </p>
               </div>
 
@@ -575,21 +579,18 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subdomain
+                  Custom Domain
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={formData.subdomain}
-                    onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase() })}
-                    placeholder="e.g., independi"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                  />
-                  <span className="text-gray-600 font-medium">.claimsportal.co.za</span>
-                </div>
+                <input
+                  type="text"
+                  required
+                  value={formData.subdomain}
+                  onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase() })}
+                  placeholder="e.g., claims.independi.co.za or independi.claimsportal.co.za"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+                />
                 <p className="text-xs text-gray-500 mt-1">
-                  Only lowercase letters, numbers, and hyphens allowed
+                  Enter the full domain (e.g., claims.independi.co.za) or subdomain (e.g., independi.claimsportal.co.za)
                 </p>
               </div>
 

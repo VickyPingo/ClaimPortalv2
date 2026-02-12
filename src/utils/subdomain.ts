@@ -8,20 +8,36 @@ export function getSubdomain(): string | null {
     return null;
   }
 
-  // Extract subdomain from hostname
+  // For full custom domains like claims.independi.co.za, return the full domain
+  // For subdomains like independi.claimsportal.co.za, return just the subdomain part
   const parts = hostname.split('.');
 
-  // claims.independi.co.za -> subdomain is 'claims'
-  if (parts.length >= 3) {
+  // Check if it's a subdomain of claimsportal.co.za
+  if (hostname.endsWith('.claimsportal.co.za') && parts.length >= 4) {
     return parts[0];
+  }
+
+  // For full custom domains, return the entire hostname
+  if (parts.length >= 2) {
+    return hostname;
   }
 
   return null;
 }
 
 export function isIndependiSubdomain(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const hostname = window.location.hostname;
+
+  // Check if it's claims.independi.co.za (full custom domain)
+  if (hostname === 'claims.independi.co.za') {
+    return true;
+  }
+
+  // Or if it's using the old subdomain pattern
   const subdomain = getSubdomain();
-  return subdomain === 'claims';
+  return subdomain === 'independi' || subdomain === 'claims';
 }
 
 export function isSuperAdminDomain(): boolean {
