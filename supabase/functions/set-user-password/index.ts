@@ -57,7 +57,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: callingProfile, error: profileError } = await supabaseClient
-      .from("broker_profiles")
+      .from("profiles")
       .select("role")
       .eq("id", callingUser.id)
       .maybeSingle();

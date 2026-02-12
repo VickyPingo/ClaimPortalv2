@@ -60,13 +60,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: callingProfile, error: profileError } = await supabaseClient
-      .from("broker_profiles")
+      .from("profiles")
       .select("brokerage_id, role")
       .eq("id", callingUser.id)
       .maybeSingle();
 
     if (profileError || !callingProfile) {
-      throw new Error("Broker profile not found");
+      throw new Error("Profile not found");
     }
 
     if (callingProfile.role !== "broker" && callingProfile.role !== "super_admin") {
@@ -109,7 +109,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const { error: profileInsertError } = await supabaseAdmin
-      .from("broker_profiles")
+      .from("profiles")
       .insert({
         id: newUser.user.id,
         brokerage_id: callingProfile.brokerage_id,
