@@ -214,9 +214,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setBrokerProfile(brokerProfileData);
 
-        // DIETRICH PRIORITY: Immediate redirect for dietrich@independi.co.za
-        if (userEmail === 'dietrich@independi.co.za') {
-          console.log('🎯 DIETRICH LOGIN DETECTED - Immediate redirect to broker dashboard');
+        // INDEPENDI BROKER PRIORITY: Immediate redirect for independi.co.za brokers
+        const independiBrokers = ['dietrich@independi.co.za', 'vicky@independi.co.za'];
+        if (independiBrokers.includes(userEmail || '')) {
+          console.log('🎯 INDEPENDI BROKER LOGIN DETECTED - Immediate redirect to broker dashboard');
+          console.log('   Broker:', userEmail);
           const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
           if (window.location.href !== targetUrl) {
             console.log('   Forcing redirect to:', targetUrl);
