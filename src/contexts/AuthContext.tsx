@@ -61,23 +61,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('🚀 AuthContext initialising');
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasRecoveryToken = urlParams.has('token') || urlParams.has('type');
-    const isRecoveryFlow = hasRecoveryToken && (urlParams.get('type') === 'recovery' || urlParams.get('type') === 'invite');
+    const detectInviteFlow = () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const queryParams = new URLSearchParams(window.location.search);
+
+      const hasAccessToken = hashParams.has('access_token');
+      const hasType = hashParams.has('type') || queryParams.has('type');
+      const type = hashParams.get('type') || queryParams.get('type');
+
+      const isInviteOrRecovery = type === 'recovery' || type === 'invite' || type === 'magiclink';
+
+      console.log('🔍 Checking for invite/recovery flow:', {
+        hasAccessToken,
+        hasType,
+        type,
+        isInviteOrRecovery,
+        hash: window.location.hash,
+        search: window.location.search
+      });
+
+      return hasAccessToken || isInviteOrRecovery;
+    };
+
+    const isInviteFlow = detectInviteFlow();
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         console.log('📦 Session found');
         setUser(session.user);
 
-        if (isRecoveryFlow) {
-          console.log('🔐 Recovery/Invite flow detected on init');
+        if (isInviteFlow) {
+          console.log('🔐 Invite/Recovery flow detected on init - showing password setup');
           setNeedsPasswordSetup(true);
+          setLoading(false);
         } else {
           loadUserProfile(session.user.id, session.user.email);
         }
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -107,11 +129,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         setUser(session.user);
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const isInviteFlow = urlParams.has('type') && urlParams.get('type') === 'invite';
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const queryParams = new URLSearchParams(window.location.search);
+
+        const hasAccessToken = hashParams.has('access_token');
+        const type = hashParams.get('type') || queryParams.get('type');
+        const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
 
         if (isInviteFlow) {
-          console.log('🔐 Invite flow detected via URL params');
+          console.log('🔐 Invite flow detected via hash/params - showing password setup');
           setNeedsPasswordSetup(true);
           setLoading(false);
         } else {

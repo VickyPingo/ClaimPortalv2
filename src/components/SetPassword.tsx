@@ -10,6 +10,7 @@ export function SetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -17,6 +18,11 @@ export function SetPassword() {
         setUserEmail(user.email);
       }
     });
+
+    if (window.location.hash) {
+      console.log('🧹 Clearing URL hash');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
   const validatePassword = () => {
@@ -76,7 +82,7 @@ export function SetPassword() {
 
       if (profile) {
         console.log('✓ Profile found:', { role: profile.role, userType: profile.user_type });
-        console.log('🚀 Password set successfully - reloading to complete setup');
+        console.log('🚀 Password set successfully - showing confirmation');
       } else {
         console.log('⚠️ No broker profile found, checking client profile...');
 
@@ -87,13 +93,19 @@ export function SetPassword() {
           .maybeSingle();
 
         if (clientProfile) {
-          console.log('🚀 Password set successfully - reloading to complete setup');
+          console.log('🚀 Password set successfully - showing confirmation');
         } else {
           console.log('⚠️ No profile found');
         }
       }
 
-      window.location.href = window.location.origin;
+      setSuccess(true);
+      setLoading(false);
+
+      setTimeout(() => {
+        console.log('🚀 Redirecting to dashboard');
+        window.location.href = window.location.origin;
+      }, 2000);
     } catch (err) {
       console.error('❌ Set password error:', err);
       setError(err instanceof Error ? err.message : 'Failed to set password');
@@ -110,6 +122,32 @@ export function SetPassword() {
   };
 
   const strength = passwordStrength();
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-green-600 p-3 rounded-full">
+              <CheckCircle className="w-8 h-8 text-white" />
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">
+            Organisation Account Activated
+          </h1>
+
+          <p className="text-center text-slate-600 mb-6">
+            Your password has been set successfully. Redirecting to your dashboard...
+          </p>
+
+          <div className="flex justify-center">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
