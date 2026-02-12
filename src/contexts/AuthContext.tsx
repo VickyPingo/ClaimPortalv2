@@ -214,6 +214,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setBrokerProfile(brokerProfileData);
 
+        // DIETRICH PRIORITY: Immediate redirect for dietrich@independi.co.za
+        if (userEmail === 'dietrich@independi.co.za') {
+          console.log('🎯 DIETRICH LOGIN DETECTED - Immediate redirect to broker dashboard');
+          const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
+          if (window.location.href !== targetUrl) {
+            console.log('   Forcing redirect to:', targetUrl);
+            window.location.href = targetUrl;
+          }
+          return;
+        }
+
         // EMERGENCY REDIRECT: Force brokers to claimsportal.co.za broker dashboard
         if (brokerProfileData.role === 'broker' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
           const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
@@ -279,6 +290,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     console.log('🔐 Signing in with password');
+    console.log('   Email:', email);
+    console.log('   Clearing any existing session first...');
+
+    // CRITICAL: Clear any existing session before attempting login
+    await supabase.auth.signOut();
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
@@ -430,6 +447,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const brokerSignIn = async (email: string, password: string) => {
     console.log('🔐 Broker signing in with password');
+    console.log('   Email:', email);
+    console.log('   Clearing any existing session first...');
+
+    // CRITICAL: Clear any existing session before attempting login
+    await supabase.auth.signOut();
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
@@ -567,6 +590,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clientSignIn = async (email: string, password: string) => {
     console.log('🔐 Client signing in with password');
+    console.log('   Email:', email);
+    console.log('   Clearing any existing session first...');
+
+    // CRITICAL: Clear any existing session before attempting login
+    await supabase.auth.signOut();
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
