@@ -228,7 +228,18 @@ export default function HomePageRouter() {
   }
 
   // FALLBACK: Profile not found after 3 seconds - show welcome page
+  // CRITICAL: Super admins bypass this and get direct access to admin dashboard
   if (profileWaitTime >= 3) {
+    if (isSuperAdminEmail) {
+      console.log('👑 SUPER ADMIN BYPASS: Profile not found but granting admin access anyway');
+      return (
+        <>
+          <EmergencyLogoutButton />
+          <BrokerAdminDashboard />
+        </>
+      );
+    }
+
     console.log('⚠️ Profile not found after 3 seconds - showing welcome page');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -260,6 +271,17 @@ export default function HomePageRouter() {
   }
 
   // FALLBACK: Still loading or no role detected
+  // CRITICAL: Super admins get access even without profile after 2 seconds
+  if (isSuperAdminEmail && profileWaitTime >= 2) {
+    console.log('👑 SUPER ADMIN BYPASS: Role not determined but granting admin access anyway');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <BrokerAdminDashboard />
+      </>
+    );
+  }
+
   console.log('⚠️ UserType/Role not determined yet, showing loading state');
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
