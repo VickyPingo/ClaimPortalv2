@@ -4,6 +4,7 @@ import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import ClientPortal from './ClientPortal';
 import { SetPassword } from './SetPassword';
+import ForceSession from './ForceSession';
 import { LogOut, AlertCircle, Building2 } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../utils/subdomain';
 
@@ -23,6 +24,11 @@ export default function HomePageRouter() {
   console.log('  Client Profile:', clientProfile);
 
   const currentPath = window.location.pathname;
+
+  if (currentPath === '/admin/force-session') {
+    console.log('🚨 EMERGENCY: Force session page accessed');
+    return <ForceSession />;
+  }
 
   useEffect(() => {
     if (!user) return;
