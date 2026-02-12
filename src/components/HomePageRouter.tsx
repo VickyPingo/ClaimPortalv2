@@ -3,11 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import ClientPortal from './ClientPortal';
+import { SetPassword } from './SetPassword';
 import { LogOut, AlertCircle, Building2 } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../utils/subdomain';
 
 export default function HomePageRouter() {
-  const { user, userType, userRole, loading, brokerProfile, clientProfile, signOut, isSuperAdmin } = useAuth();
+  const { user, userType, userRole, loading, needsPasswordSetup, brokerProfile, clientProfile, signOut, isSuperAdmin } = useAuth();
   const [profileWaitTime, setProfileWaitTime] = useState(0);
 
   const onIndependiSubdomain = isIndependiSubdomain();
@@ -111,6 +112,12 @@ export default function HomePageRouter() {
   // STEP 1: If not logged in, show login
   if (!user) {
     return <Login roleType={null} />;
+  }
+
+  // STEP 1.5: If user is invited and needs to set password
+  if (needsPasswordSetup) {
+    console.log('🔐 User needs to set password - showing SetPassword component');
+    return <SetPassword />;
   }
 
   // STEP 2: Check if client is trying to access broker/admin routes

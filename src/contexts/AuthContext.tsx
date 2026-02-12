@@ -35,6 +35,7 @@ interface AuthContextType {
   brokerProfile: BrokerProfile | null;
   clientProfile: ClientProfile | null;
   loading: boolean;
+  needsPasswordSetup: boolean;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<User>;
@@ -55,15 +56,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [brokerProfile, setBrokerProfile] = useState<BrokerProfile | null>(null);
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
 
   useEffect(() => {
     console.log('🚀 AuthContext initialising');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasRecoveryToken = urlParams.has('token') || urlParams.has('type');
+    const isRecoveryFlow = hasRecoveryToken && (urlParams.get('type') === 'recovery' || urlParams.get('type') === 'invite');
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         console.log('📦 Session found');
         setUser(session.user);
-        loadUserProfile(session.user.id, session.user.email);
+
+        if (isRecoveryFlow) {
+          console.log('🔐 Recovery/Invite flow detected on init');
+          setNeedsPasswordSetup(true);
+        } else {
+          loadUserProfile(session.user.id, session.user.email);
+        }
       }
       setLoading(false);
     });
@@ -78,12 +90,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(null);
         setBrokerProfile(null);
         setClientProfile(null);
+        setNeedsPasswordSetup(false);
+        return;
+      }
+
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('🔐 PASSWORD_RECOVERY event detected - user from invite link');
+        if (session?.user) {
+          setUser(session.user);
+          setNeedsPasswordSetup(true);
+          setLoading(false);
+        }
         return;
       }
 
       if (session?.user) {
         setUser(session.user);
-        loadUserProfile(session.user.id, session.user.email);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const isInviteFlow = urlParams.has('type') && urlParams.get('type') === 'invite';
+
+        if (isInviteFlow) {
+          console.log('🔐 Invite flow detected via URL params');
+          setNeedsPasswordSetup(true);
+          setLoading(false);
+        } else {
+          loadUserProfile(session.user.id, session.user.email);
+        }
       }
     });
 
@@ -563,6 +596,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         brokerProfile,
         clientProfile,
         loading,
+        needsPasswordSetup,
         signOut,
         signIn,
         brokerSignUp,
