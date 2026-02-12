@@ -134,11 +134,13 @@ export default function HomePageRouter() {
   }
 
   // STEP 1.5: SUPER ADMIN BYPASS - Super admins skip password setup and go straight to dashboard
-  if (user.email === 'vickypingo@gmail.com' && userRole === 'super_admin') {
+  // CRITICAL: Check email ONLY - role may not be set yet in database
+  if (user.email === 'vickypingo@gmail.com') {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
     console.log('✅ BYPASSING PASSWORD SETUP - FULL SUPER ADMIN ACCESS GRANTED');
     console.log('   Subdomain:', window.location.hostname);
+    console.log('   User Role:', userRole);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return (
       <>
@@ -206,7 +208,8 @@ export default function HomePageRouter() {
   }
 
   // STEP 6: BROKER ROUTING
-  if (userType === 'broker' || userRole === 'broker') {
+  // CRITICAL: Super admins should NEVER be treated as brokers
+  if ((userType === 'broker' || userRole === 'broker') && !isSuperAdminEmail) {
     console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
       <>

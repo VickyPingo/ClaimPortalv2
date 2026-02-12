@@ -16,6 +16,14 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
   const onIndependiSubdomain = isIndependiSubdomain();
   const onSuperAdminDomain = isSuperAdminDomain();
 
+  // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin menu items
+  const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
+
+  // CRITICAL: On Independi subdomain, NEVER show super admin menu items
+  // EXCEPT for vickypingo@gmail.com who always has full access
+  // Only show super admin items if on super admin domain AND role is super_admin
+  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
+
   const navItems = useMemo(() => {
     const baseItems = [
       { id: 'dashboard' as const, icon: LayoutDashboard, label: 'Dashboard' },
@@ -24,13 +32,6 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'team' as const, icon: UsersRound, label: 'Team' },
     ];
 
-    // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin menu items
-    const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
-
-    // CRITICAL: On Independi subdomain, NEVER show super admin menu items
-    // EXCEPT for vickypingo@gmail.com who always has full access
-    // Only show super admin items if on super admin domain AND role is super_admin
-    const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
     console.log('AdminLayout - Menu Items Calculation:');
     console.log('  Is Actual Super Admin:', isActualSuperAdmin);
     console.log('  Is Super Admin Email:', isSuperAdminEmail);
@@ -60,8 +61,12 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       <header className="md:hidden bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Broker Admin</h1>
-            <p className="text-xs text-gray-600">Claims Management</p>
+            <h1 className="text-lg font-bold text-gray-900">
+              {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+            </h1>
+            <p className="text-xs text-gray-600">
+              {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
+            </p>
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -84,8 +89,12 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-screen">
           <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">Broker Admin</h1>
-            <p className="text-sm text-gray-600 mt-1">Claims Management</p>
+            <h1 className="text-xl font-bold text-gray-900">
+              {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+            </h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
+            </p>
           </div>
 
           <nav className="flex-1 p-4 space-y-2">
@@ -129,8 +138,12 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
         >
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Broker Admin</h1>
-              <p className="text-sm text-gray-600 mt-1">Claims Management</p>
+              <h1 className="text-xl font-bold text-gray-900">
+                {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
+              </p>
             </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
