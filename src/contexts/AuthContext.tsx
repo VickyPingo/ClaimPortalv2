@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Update database in background
         const { data: profileCheck } = await supabase
-          .from('broker_profiles')
+          .from('profiles')
           .select('*')
           .eq('id', userId)
           .maybeSingle();
@@ -225,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setBrokerProfile(profileCheck);
           if (profileCheck.role !== 'super_admin') {
             await supabase
-              .from('broker_profiles')
+              .from('profiles')
               .update({ role: 'super_admin', user_type: 'super_admin' })
               .eq('id', userId);
           }
@@ -238,9 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Try to load broker profile first
       const { data: brokerProfileData } = await supabase
-        .from('broker_profiles')
+        .from('profiles')
         .select('*')
         .eq('id', userId)
+        .eq('role', 'broker')
         .maybeSingle();
 
       if (brokerProfileData) {
@@ -251,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Force super_admin role if email is in SUPER_ADMINS list
         if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
           await supabase
-            .from('broker_profiles')
+            .from('profiles')
             .update({ role: 'super_admin' })
             .eq('id', userId);
           brokerProfileData.role = 'super_admin';
@@ -302,9 +303,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Try to load client profile
       const { data: clientProfileData } = await supabase
-        .from('client_profiles')
+        .from('profiles')
         .select('*')
         .eq('id', userId)
+        .eq('role', 'client')
         .maybeSingle();
 
       if (clientProfileData) {
@@ -488,18 +490,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // MANUAL PROFILE CREATION
     const brokerageId = profile.brokerage_id || INDEPENDI_BROKERAGE_ID;
 
-    // Insert into broker_profiles
+    // Insert into profiles
     const { error: profileError } = await supabase
-      .from('broker_profiles')
+      .from('profiles')
       .insert({
         id: authData.user.id,
+        brokerage_id: brokerageId,
         full_name: profile.full_name || email,
+        email: email,
         id_number: profile.id_number || '',
         cell_number: profile.cell_number || '',
         policy_number: profile.policy_number || null,
-        brokerage_id: brokerageId,
         role: assignedRole,
-        user_type: assignedRole === 'super_admin' ? 'super_admin' : 'broker',
       });
 
     if (profileError) {

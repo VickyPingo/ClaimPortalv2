@@ -48,7 +48,7 @@ export default function TeamManagement() {
       setLoading(true);
 
       const { data: currentProfile } = await supabase
-        .from('broker_profiles')
+        .from('profiles')
         .select('brokerage_id')
         .eq('id', user.id)
         .maybeSingle();
@@ -68,8 +68,8 @@ export default function TeamManagement() {
         console.warn('Falling back to basic profile query');
 
         const { data: profiles, error: fallbackError } = await supabase
-          .from('broker_profiles')
-          .select('id, full_name, role, user_type, phone_number, created_at')
+          .from('profiles')
+          .select('id, full_name, email, role, cell_number, created_at')
           .eq('brokerage_id', currentProfile.brokerage_id)
           .order('created_at', { ascending: false });
 

@@ -586,11 +586,11 @@ export default function BrokeragesManager() {
                   required
                   value={formData.subdomain}
                   onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase() })}
-                  placeholder="e.g., claims.independi.co.za or independi.claimsportal.co.za"
+                  placeholder="e.g., claims.yourdomain.co.za"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Enter the full domain (e.g., claims.independi.co.za) or subdomain (e.g., independi.claimsportal.co.za)
+                  Enter the full custom domain (e.g., claims.yourdomain.co.za)
                 </p>
               </div>
 
@@ -641,7 +641,7 @@ export default function BrokeragesManager() {
                   disabled={formLoading}
                   className="flex-1 px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {formLoading ? 'Creating...' : 'Create Brokerage'}
+                  {formLoading ? 'Authorising...' : 'Authorise Organisation'}
                 </button>
               </div>
             </form>

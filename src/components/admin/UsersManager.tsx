@@ -33,25 +33,27 @@ export default function UsersManager() {
       console.log('📊 Loading users with access control');
 
       // Build queries with access control
-      let brokerQuery = supabase.from('broker_profiles').select(`
+      let brokerQuery = supabase.from('profiles').select(`
         id,
         full_name,
+        email,
         cell_number,
         role,
         brokerage_id,
         created_at,
         brokerages (name)
-      `);
+      `).eq('role', 'broker');
 
-      let clientQuery = supabase.from('client_profiles').select(`
+      let clientQuery = supabase.from('profiles').select(`
         id,
         full_name,
+        email,
         cell_number,
         role,
         brokerage_id,
         created_at,
         brokerages (name)
-      `);
+      `).eq('role', 'client');
 
       // ACCESS CONTROL:
       // - Super Admin (role: 'super_admin'): See ALL users from ALL brokerages
@@ -145,34 +147,15 @@ export default function UsersManager() {
     }
 
     try {
-      // Delete from broker_profiles
+      // Delete from profiles
       const { error: profileError } = await supabase
-        .from('broker_profiles')
+        .from('profiles')
         .delete()
         .eq('id', userId);
 
       if (profileError) {
-        console.error('Error deleting broker_profiles:', profileError);
-      }
-
-      // Delete from broker_users
-      const { error: brokerUserError } = await supabase
-        .from('broker_users')
-        .delete()
-        .eq('id', userId);
-
-      if (brokerUserError) {
-        console.error('Error deleting broker_users:', brokerUserError);
-      }
-
-      // Delete from client_profiles (in case it's a client)
-      const { error: clientError } = await supabase
-        .from('client_profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (clientError) {
-        console.error('Error deleting client_profiles:', clientError);
+        console.error('Error deleting profile:', profileError);
+        throw profileError;
       }
 
       console.log('✓ User deleted successfully');

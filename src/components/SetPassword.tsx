@@ -73,8 +73,8 @@ export function SetPassword() {
       console.log('🔍 Fetching user profile and role...');
 
       const { data: profile, error: profileError } = await supabase
-        .from('broker_profiles')
-        .select('role, brokerage_id, user_type')
+        .from('profiles')
+        .select('role, brokerage_id')
         .eq('id', userId)
         .maybeSingle();
 
@@ -83,20 +83,11 @@ export function SetPassword() {
       }
 
       if (profile) {
-        console.log('✓ Profile found:', { role: profile.role, userType: profile.user_type });
+        console.log('✓ Profile found:', { role: profile.role });
         console.log('🚀 Password set successfully - showing confirmation');
       } else {
-        console.log('⚠️ No broker profile found, checking client profile...');
-
-        const { data: clientProfile } = await supabase
-          .from('client_profiles')
-          .select('brokerage_id')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (clientProfile) {
-          console.log('🚀 Password set successfully - showing confirmation');
-        } else {
+        console.log('⚠️ No profile found');
+        if (true) {
           console.log('⚠️ No profile found');
         }
       }
