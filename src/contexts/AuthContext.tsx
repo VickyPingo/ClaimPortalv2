@@ -42,6 +42,7 @@ interface AuthContextType {
   brokerSignIn: (email: string, password: string) => Promise<void>;
   clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<User>;
   clientSignIn: (email: string, password: string) => Promise<void>;
+  completePasswordSetup: () => Promise<void>;
   isSuperAdmin: () => boolean;
 }
 
@@ -103,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔄 Auth state changed:', event);
+      console.log('🔄 Auth state changed:', event, session?.user ? 'with user' : 'no user');
 
       if (event === 'SIGNED_OUT') {
         setUser(null);
@@ -124,6 +125,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         }
         return;
+      }
+
+      if (event === 'SIGNED_IN') {
+        console.log('✅ SIGNED_IN event detected');
+        if (session?.user) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const queryParams = new URLSearchParams(window.location.search);
+
+          const hasAccessToken = hashParams.has('access_token');
+          const type = hashParams.get('type') || queryParams.get('type');
+          const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
+
+          if (isInviteFlow) {
+            console.log('🔐 SIGNED_IN via invite/recovery link - showing password setup');
+            setUser(session.user);
+            setNeedsPasswordSetup(true);
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       if (session?.user) {
@@ -227,6 +248,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setBrokerageId(null);
     setBrokerProfile(null);
     setClientProfile(null);
+  };
+
+  const completePasswordSetup = async () => {
+    console.log('✅ Completing password setup flow');
+    setNeedsPasswordSetup(false);
+
+    if (user) {
+      console.log('🔄 Reloading user profile after password setup');
+      await loadUserProfile(user.id, user.email);
+    }
   };
 
   const isSuperAdminFunc = (): boolean => {
@@ -629,6 +660,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         brokerSignIn,
         clientSignUp,
         clientSignIn,
+        completePasswordSetup,
         isSuperAdmin: isSuperAdminFunc,
       }}
     >

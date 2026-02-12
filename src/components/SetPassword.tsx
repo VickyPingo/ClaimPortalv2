@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 export function SetPassword() {
+  const { completePasswordSetup } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -102,9 +104,9 @@ export function SetPassword() {
       setSuccess(true);
       setLoading(false);
 
-      setTimeout(() => {
-        console.log('🚀 Redirecting to dashboard');
-        window.location.href = window.location.origin;
+      setTimeout(async () => {
+        console.log('🚀 Completing password setup and routing to dashboard');
+        await completePasswordSetup();
       }, 2000);
     } catch (err) {
       console.error('❌ Set password error:', err);
