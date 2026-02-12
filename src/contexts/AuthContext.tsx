@@ -202,6 +202,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Loading profile for user:', userId);
 
+      // CRITICAL: Force super_admin role for vickypingo@gmail.com regardless of database
+      if (userEmail === 'vickypingo@gmail.com') {
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('👑 SUPER ADMIN OVERRIDE: vickypingo@gmail.com detected');
+        console.log('✅ FORCING super_admin ROLE - BYPASSING DATABASE CHECK');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+        setUserType('broker');
+        setUserRole('super_admin');
+        setBrokerageId(null);
+        setLoading(false);
+
+        // Update database in background
+        const { data: profileCheck } = await supabase
+          .from('broker_profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (profileCheck) {
+          setBrokerProfile(profileCheck);
+          if (profileCheck.role !== 'super_admin') {
+            await supabase
+              .from('broker_profiles')
+              .update({ role: 'super_admin', user_type: 'super_admin' })
+              .eq('id', userId);
+          }
+        }
+        return;
+      }
+
       // Check if user is super admin by email
       const isUserSuperAdmin = isSuperAdmin(userEmail);
 
@@ -322,6 +353,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Signing in with password');
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
+
+    // CRITICAL: Clear localStorage to remove any cached data
+    console.log('🧹 Clearing localStorage to remove cached session data');
+    localStorage.clear();
 
     // CRITICAL: Clear any existing session before attempting login
     await supabase.auth.signOut();
@@ -481,6 +516,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
 
+    // CRITICAL: Clear localStorage to remove any cached data
+    console.log('🧹 Clearing localStorage to remove cached session data');
+    localStorage.clear();
+
     // CRITICAL: Clear any existing session before attempting login
     await supabase.auth.signOut();
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -623,6 +662,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Client signing in with password');
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
+
+    // CRITICAL: Clear localStorage to remove any cached data
+    console.log('🧹 Clearing localStorage to remove cached session data');
+    localStorage.clear();
 
     // CRITICAL: Clear any existing session before attempting login
     await supabase.auth.signOut();
