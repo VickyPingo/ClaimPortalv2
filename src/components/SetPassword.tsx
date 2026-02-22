@@ -56,7 +56,7 @@ export function SetPassword() {
 
       const { data: invitation, error } = await supabase
         .from('invitations')
-        .select('*, brokerages(name, subdomain)')
+        .select('*,brokerages(name,subdomain)')
         .eq('token', token)
         .eq('is_active', true)
         .maybeSingle();
