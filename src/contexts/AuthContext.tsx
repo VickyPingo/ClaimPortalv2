@@ -273,6 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setBrokerProfile(brokerProfileData);
+        setLoading(false);
 
         // INDEPENDI BROKER PRIORITY: Immediate redirect for independi.co.za brokers
         const independiBrokers = ['dietrich@independi.co.za', 'vicky@independi.co.za'];
@@ -301,12 +302,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Try to load client profile
+      // Try to load client profile from client_profiles table
       const { data: clientProfileData } = await supabase
-        .from('profiles')
+        .from('client_profiles')
         .select('*')
         .eq('id', userId)
-        .eq('role', 'client')
         .maybeSingle();
 
       if (clientProfileData) {
@@ -315,12 +315,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerageId(clientProfileData.brokerage_id);
         setClientProfile(clientProfileData);
         setUserRole(clientProfileData.role || 'client');
+        setLoading(false);
         return;
       }
 
       console.warn('⚠️ No profile found');
+      setLoading(false);
     } catch (error) {
       console.error('Error loading profile:', error);
+      setLoading(false);
     }
   };
 
