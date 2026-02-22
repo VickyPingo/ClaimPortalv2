@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function SetPassword() {
   const { completePasswordSetup } = useAuth();
@@ -13,19 +13,95 @@ export function SetPassword() {
   const [error, setError] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [success, setSuccess] = useState(false);
+  const [invitationToken, setInvitationToken] = useState('');
+  const [brokerId, setBrokerId] = useState('');
+  const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
+  const [invitationRole, setInvitationRole] = useState('');
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email) {
-        setUserEmail(user.email);
+    // Check for invitation token in URL
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const brokerIdParam = params.get('brokerId');
+
+    if (token) {
+      console.log('🔗 Invitation token found:', token);
+      setInvitationToken(token);
+      if (brokerIdParam) {
+        setBrokerId(brokerIdParam);
       }
-    });
+      validateInvitationToken(token);
+    } else {
+      // No token - check if user is already authenticated
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) {
+          setUserEmail(user.email);
+          setInvitationValid(true); // Already authenticated user
+        } else {
+          setInvitationValid(false); // No token and not authenticated
+        }
+      });
+    }
 
     if (window.location.hash) {
       console.log('🧹 Clearing URL hash');
-      window.history.replaceState(null, '', window.location.pathname);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
   }, []);
+
+  const validateInvitationToken = async (token: string) => {
+    try {
+      console.log('🔍 Validating invitation token...');
+
+      const { data: invitation, error } = await supabase
+        .from('invitations')
+        .select('*, brokerages(name, subdomain)')
+        .eq('token', token)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error validating invitation:', error);
+        setInvitationValid(false);
+        setError('Failed to validate invitation');
+        return;
+      }
+
+      if (!invitation) {
+        console.log('❌ Invitation not found or inactive');
+        setInvitationValid(false);
+        setError('Invalid or expired invitation link');
+        return;
+      }
+
+      // Check if expired
+      if (new Date(invitation.expires_at) < new Date()) {
+        console.log('❌ Invitation expired');
+        setInvitationValid(false);
+        setError('This invitation has expired');
+        return;
+      }
+
+      // Check if maxed out
+      if (invitation.max_uses && invitation.used_count >= invitation.max_uses) {
+        console.log('❌ Invitation max uses reached');
+        setInvitationValid(false);
+        setError('This invitation has reached its maximum uses');
+        return;
+      }
+
+      console.log('✅ Invitation is valid');
+      setInvitationValid(true);
+      setInvitationRole(invitation.role);
+      if (invitation.email) {
+        setUserEmail(invitation.email);
+      }
+    } catch (err) {
+      console.error('❌ Error validating invitation:', err);
+      setInvitationValid(false);
+      setError('Failed to validate invitation');
+    }
+  };
 
   const validatePassword = () => {
     if (password.length < 6) {
@@ -52,30 +128,85 @@ export function SetPassword() {
     try {
       console.log('🔐 Setting password for invited user');
 
-      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-        password: password,
-      });
+      // If we have an invitation token, create a new user account
+      if (invitationToken) {
+        console.log('📝 Creating new user account with invitation');
 
-      if (updateError) {
-        console.error('❌ Failed to set password:', updateError);
-        throw updateError;
+        if (!userEmail) {
+          throw new Error('Email is required for signup');
+        }
+
+        // Sign up the new user
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: userEmail,
+          password: password,
+          options: {
+            data: {
+              invitation_token: invitationToken,
+              role: invitationRole,
+            },
+          },
+        });
+
+        if (signUpError) {
+          console.error('❌ Failed to sign up:', signUpError);
+          throw signUpError;
+        }
+
+        if (!signUpData.user) {
+          throw new Error('Failed to create user');
+        }
+
+        console.log('✅ User created successfully');
+
+        // Mark invitation as used - increment the counter
+        const { data: invitationData, error: fetchError } = await supabase
+          .from('invitations')
+          .select('used_count')
+          .eq('token', invitationToken)
+          .maybeSingle();
+
+        if (!fetchError && invitationData) {
+          const { error: updateError } = await supabase
+            .from('invitations')
+            .update({ used_count: invitationData.used_count + 1 })
+            .eq('token', invitationToken);
+
+          if (updateError) {
+            console.warn('⚠️ Failed to update invitation count:', updateError);
+          }
+        }
+      } else {
+        // Existing user setting password
+        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+          password: password,
+        });
+
+        if (updateError) {
+          console.error('❌ Failed to set password:', updateError);
+          throw updateError;
+        }
+
+        if (!updateData.user) {
+          throw new Error('Failed to update user');
+        }
+
+        console.log('✓ Password set successfully');
       }
 
-      if (!updateData.user) {
-        throw new Error('Failed to update user');
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('Failed to get user after password set');
       }
-
-      console.log('✓ Password set successfully');
-
-      const userId = updateData.user.id;
-      const userEmailValue = updateData.user.email;
 
       console.log('🔍 Fetching user profile and role...');
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role, brokerage_id')
-        .eq('id', userId)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (profileError) {
@@ -86,10 +217,7 @@ export function SetPassword() {
         console.log('✓ Profile found:', { role: profile.role });
         console.log('🚀 Password set successfully - showing confirmation');
       } else {
-        console.log('⚠️ No profile found');
-        if (true) {
-          console.log('⚠️ No profile found');
-        }
+        console.log('⚠️ No profile found yet - will be created by trigger');
       }
 
       setSuccess(true);
@@ -97,7 +225,21 @@ export function SetPassword() {
 
       setTimeout(async () => {
         console.log('🚀 Completing password setup and routing to dashboard');
-        await completePasswordSetup();
+
+        // Redirect based on role
+        if (profile) {
+          if (profile.role === 'super_admin') {
+            window.location.href = '/admin-dashboard';
+          } else if (profile.role === 'broker' || profile.role === 'admin') {
+            window.location.href = '/broker-dashboard';
+          } else if (profile.role === 'client') {
+            window.location.href = '/claims-portal';
+          } else {
+            await completePasswordSetup();
+          }
+        } else {
+          await completePasswordSetup();
+        }
       }, 2000);
     } catch (err) {
       console.error('❌ Set password error:', err);
@@ -115,6 +257,50 @@ export function SetPassword() {
   };
 
   const strength = passwordStrength();
+
+  // Show error if invitation is invalid
+  if (invitationValid === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="flex items-center justify-center mb-6">
+            <div className="bg-red-600 p-3 rounded-full">
+              <AlertCircle className="w-8 h-8 text-white" />
+            </div>
+          </div>
+
+          <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">
+            Invalid Invitation Link
+          </h1>
+
+          <p className="text-center text-slate-600 mb-6">
+            {error || 'This invitation link is invalid, expired, or has already been used.'}
+          </p>
+
+          <button
+            onClick={() => window.location.href = '/'}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Return to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while validating invitation
+  if (invitationValid === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="flex justify-center mb-4">
+            <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+          <p className="text-center text-slate-600">Validating invitation...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (

@@ -25,6 +25,12 @@ export default function HomePageRouter() {
 
   const currentPath = window.location.pathname;
 
+  // SIGNUP ROUTE: Show SetPassword component for invitation flow
+  if (currentPath === '/signup') {
+    console.log('📝 Signup route - showing SetPassword for invitation');
+    return <SetPassword />;
+  }
+
   // EMERGENCY: Force session page
   if (currentPath === '/admin/force-session') {
     console.log('🚨 EMERGENCY: Force session page accessed');
