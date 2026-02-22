@@ -12,12 +12,14 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
-  Loader
+  Loader,
+  Mail
 } from 'lucide-react';
 
 interface Invitation {
   id: string;
   token: string;
+  email: string | null;
   role: string;
   brokerage_id: string;
   expires_at: string;
@@ -42,10 +44,12 @@ export default function InvitationManager() {
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState<string | null>(null);
 
   const [newInvitation, setNewInvitation] = useState({
     brokerage_id: brokerageId || '',
     role: 'broker',
+    email: '',
     daysValid: 7,
     maxUses: null as number | null,
   });
@@ -102,15 +106,18 @@ export default function InvitationManager() {
   };
 
   const createInvitation = async () => {
-    const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
+    // Validate email
+    if (!newInvitation.email || !newInvitation.email.includes('@')) {
+      alert('Please enter a valid email address');
+      return;
+    }
 
-    console.log('🔐 Creating Independi invitation');
-    console.log('📋 Invitation details:', {
-      brokerage_id: INDEPENDI_BROKERAGE_ID,
-      role: newInvitation.role,
-      daysValid: newInvitation.daysValid,
-      maxUses: newInvitation.maxUses
-    });
+    // Validate brokerage selection
+    if (!newInvitation.brokerage_id) {
+      alert('Please select an organisation');
+      return;
+    }
+
     setCreating(true);
     try {
       // Create a fresh Supabase client to avoid schema cache issues
@@ -130,75 +137,80 @@ export default function InvitationManager() {
 
       const token = crypto.randomUUID();
 
-      console.log('📝 Inserting into invitations table with fresh client...');
-      console.log('🎯 Target brokerage: Independi');
-      console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
+      console.log('📝 Creating invitation...');
+      console.log('📧 Email:', newInvitation.email);
+      console.log('🆔 Brokerage ID:', newInvitation.brokerage_id);
 
-      // Retry logic for robustness
-      let attempt = 0;
-      let lastError = null;
-      const maxAttempts = 3;
+      // Create invitation in database
+      const { data, error } = await freshClient
+        .from('invitations')
+        .insert([{
+          email: newInvitation.email,
+          brokerage_id: newInvitation.brokerage_id,
+          role: newInvitation.role,
+          token: token,
+          expires_at: expiresAt.toISOString(),
+          max_uses: newInvitation.maxUses,
+          is_active: true,
+          used_count: 0
+        }])
+        .select()
+        .single();
 
-      while (attempt < maxAttempts) {
-        attempt++;
-        console.log(`🔄 Attempt ${attempt}/${maxAttempts}...`);
-
-        const { data, error } = await freshClient
-          .from('invitations')
-          .insert([{
-            email: null,
-            brokerage_id: INDEPENDI_BROKERAGE_ID,
-            role: 'broker',
-            token: token,
-            expires_at: expiresAt.toISOString(),
-            max_uses: newInvitation.maxUses,
-            is_active: true,
-            used_count: 0
-          }])
-          .select()
-          .single();
-
-        if (!error && data) {
-          const generatedUrl = `${window.location.origin}/signup?token=${data.token}&brokerId=independi`;
-          console.log('✅ Independi Invite Authorised!');
-          console.log('🔗 Invitation URL:', generatedUrl);
-          console.log('📊 Token:', data.token);
-          console.log('🏢 Brokerage: Independi');
-          console.log('🆔 Brokerage ID:', INDEPENDI_BROKERAGE_ID);
-
-          const message = `✅ Independi Invite Authorised!\n\n📋 Invitation Link:\n${generatedUrl}\n\nShare this link with the new user to sign up.`;
-          alert(message);
-
-          setInvitations([data, ...invitations]);
-          setShowCreateForm(false);
-          setNewInvitation({
-            brokerage_id: brokerageId || '',
-            role: 'broker',
-            daysValid: 7,
-            maxUses: null
-          });
-          return;
-        }
-
-        lastError = error;
-        console.error(`❌ Attempt ${attempt} failed. Full error object:`, error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-
-        if (attempt < maxAttempts) {
-          const delay = 1000 * attempt;
-          console.log(`⏳ Waiting ${delay}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+      if (error) {
+        console.error('❌ Failed to create invitation:', error);
+        throw error;
       }
 
-      console.error('❌ All attempts failed. Last error object:', lastError);
-      console.error('Last error JSON:', JSON.stringify(lastError, null, 2));
-      throw lastError || new Error('Failed to create invitation after multiple attempts');
+      console.log('✅ Invitation created successfully');
+
+      // Generate invitation URL
+      const selectedBrokerage = brokerages.find(b => b.id === newInvitation.brokerage_id);
+      const brokerSlug = selectedBrokerage?.subdomain || newInvitation.brokerage_id;
+      const invitationUrl = `${window.location.origin}/signup?token=${data.token}&brokerId=${brokerSlug}`;
+
+      console.log('📧 Sending invitation email...');
+
+      // Send invitation email via edge function
+      const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
+      const emailResponse = await fetch(emailApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: newInvitation.email,
+          invitationUrl: invitationUrl,
+          brokerageName: selectedBrokerage?.name || 'Unknown Brokerage',
+          role: newInvitation.role,
+          expiresAt: expiresAt.toISOString(),
+        }),
+      });
+
+      const emailResult = await emailResponse.json();
+
+      if (!emailResult.success) {
+        console.error('❌ Failed to send email:', emailResult.error);
+        alert(`⚠️ Invitation created but email failed to send: ${emailResult.error}\n\nYou can manually share the invitation link.`);
+      } else {
+        console.log('✅ Email sent successfully');
+        alert(`✅ Invitation sent to ${newInvitation.email}!\n\nThe recipient will receive an email with instructions to sign up.`);
+      }
+
+      // Update invitations list
+      setInvitations([data, ...invitations]);
+      setShowCreateForm(false);
+      setNewInvitation({
+        brokerage_id: brokerageId || '',
+        role: 'broker',
+        email: '',
+        daysValid: 7,
+        maxUses: null
+      });
 
     } catch (error: any) {
-      console.error('❌ Error creating invitation. Full error object:', error);
-      console.error('Error JSON:', JSON.stringify(error, null, 2));
-      alert('Failed to authorise Independi invitation: ' + (error?.message || 'Unknown error'));
+      console.error('❌ Error creating invitation:', error);
+      alert('Failed to create invitation: ' + (error?.message || 'Unknown error'));
     } finally {
       setCreating(false);
     }
@@ -254,6 +266,50 @@ export default function InvitationManager() {
     return broker ? broker.name : 'Unknown';
   };
 
+  const resendInvitationEmail = async (invitation: Invitation) => {
+    if (!invitation.email) {
+      alert('No email address associated with this invitation');
+      return;
+    }
+
+    setSendingEmail(invitation.id);
+    try {
+      const selectedBrokerage = brokerages.find(b => b.id === invitation.brokerage_id);
+      const brokerSlug = selectedBrokerage?.subdomain || invitation.brokerage_id;
+      const invitationUrl = `${window.location.origin}/signup?token=${invitation.token}&brokerId=${brokerSlug}`;
+
+      console.log('📧 Resending invitation email to:', invitation.email);
+
+      const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
+      const emailResponse = await fetch(emailApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: invitation.email,
+          invitationUrl: invitationUrl,
+          brokerageName: selectedBrokerage?.name || 'Unknown Brokerage',
+          role: invitation.role,
+          expiresAt: invitation.expires_at,
+        }),
+      });
+
+      const emailResult = await emailResponse.json();
+
+      if (!emailResult.success) {
+        throw new Error(emailResult.error || 'Failed to send email');
+      }
+
+      alert(`✅ Invitation email resent to ${invitation.email}`);
+    } catch (error: any) {
+      console.error('❌ Error resending email:', error);
+      alert('Failed to resend email: ' + (error?.message || 'Unknown error'));
+    } finally {
+      setSendingEmail(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -285,6 +341,25 @@ export default function InvitationManager() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">New Invitation</h3>
 
           <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-900 mb-2">
+                Broker Email Address <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="email"
+                value={newInvitation.email}
+                onChange={(e) =>
+                  setNewInvitation({ ...newInvitation, email: e.target.value })
+                }
+                placeholder="broker@example.com"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                required
+              />
+              <p className="text-xs text-gray-600 mt-1">
+                An invitation email will be sent to this address
+              </p>
+            </div>
+
             {isSuperAdmin() && brokerages.length > 0 && (
               <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
                 <label className="block text-sm font-bold text-blue-900 mb-2">
@@ -307,7 +382,7 @@ export default function InvitationManager() {
                   ))}
                 </select>
                 <p className="text-xs text-blue-800 mt-2 font-medium">
-                  ℹ️ The invitation link will be specific to the selected organisation and include its brokerage ID
+                  The invitation will be sent to the selected organisation
                 </p>
               </div>
             )}
@@ -372,11 +447,11 @@ export default function InvitationManager() {
             <div className="flex gap-3">
               <button
                 onClick={createInvitation}
-                disabled={creating}
-                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold"
+                disabled={creating || !newInvitation.email || !newInvitation.brokerage_id}
+                className="flex-1 bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-semibold"
               >
                 {creating && <Loader className="w-4 h-4 animate-spin" />}
-                {creating ? 'Authorising...' : 'Authorise & Generate Link'}
+                {creating ? 'Sending Invitation...' : 'Send Invitation Email'}
               </button>
               <button
                 onClick={() => setShowCreateForm(false)}
@@ -434,6 +509,14 @@ export default function InvitationManager() {
                       )}
                     </div>
 
+                    {invitation.email && (
+                      <div className="mb-2">
+                        <span className="text-sm text-gray-700">
+                          📧 {invitation.email}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
                       <div className="flex items-center gap-1">
                         <Users className="w-4 h-4" />
@@ -470,6 +553,21 @@ export default function InvitationManager() {
                   </div>
 
                   <div className="flex gap-2 ml-4">
+                    {invitation.email && invitation.is_active && !expired && !maxedOut && (
+                      <button
+                        onClick={() => resendInvitationEmail(invitation)}
+                        disabled={sendingEmail === invitation.id}
+                        className="p-2 text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Resend email"
+                      >
+                        {sendingEmail === invitation.id ? (
+                          <Loader className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Mail className="w-5 h-5" />
+                        )}
+                      </button>
+                    )}
+
                     <button
                       onClick={() => copyInvitationLink(invitation.token, invitation.brokerage_id)}
                       disabled={inactive}
