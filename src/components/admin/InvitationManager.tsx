@@ -172,29 +172,45 @@ export default function InvitationManager() {
       console.log('📧 Sending invitation email...');
 
       // Send invitation email via edge function
-      const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
-      const emailResponse = await fetch(emailApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: newInvitation.email,
-          invitationUrl: invitationUrl,
-          brokerageName: selectedBrokerage?.name || 'Unknown Brokerage',
-          role: newInvitation.role,
-          expiresAt: expiresAt.toISOString(),
-        }),
-      });
+      try {
+        const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
+        console.log('Email API URL:', emailApiUrl);
 
-      const emailResult = await emailResponse.json();
+        const emailResponse = await fetch(emailApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newInvitation.email,
+            invitationUrl: invitationUrl,
+            brokerageName: selectedBrokerage?.name || 'Unknown Brokerage',
+            role: newInvitation.role,
+            expiresAt: expiresAt.toISOString(),
+          }),
+        });
 
-      if (!emailResult.success) {
-        console.error('❌ Failed to send email:', emailResult.error);
-        alert(`⚠️ Invitation created but email failed to send: ${emailResult.error}\n\nYou can manually share the invitation link.`);
-      } else {
-        console.log('✅ Email sent successfully');
-        alert(`✅ Invitation sent to ${newInvitation.email}!\n\nThe recipient will receive an email with instructions to sign up.`);
+        console.log('Email response status:', emailResponse.status);
+
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text();
+          console.error('❌ Email API error response:', errorText);
+          throw new Error(`Email API returned ${emailResponse.status}: ${errorText}`);
+        }
+
+        const emailResult = await emailResponse.json();
+        console.log('Email result:', emailResult);
+
+        if (!emailResult.success) {
+          console.error('❌ Failed to send email:', emailResult.error);
+          alert(`⚠️ Invitation created but email failed to send: ${emailResult.error}\n\nInvitation link: ${invitationUrl}`);
+        } else {
+          console.log('✅ Email sent successfully');
+          alert(`✅ Invitation sent to ${newInvitation.email}!\n\nThe recipient will receive an email with instructions to sign up.`);
+        }
+      } catch (emailError: any) {
+        console.error('❌ Error sending email:', emailError);
+        alert(`⚠️ Invitation created but email service is unavailable: ${emailError.message}\n\nInvitation link: ${invitationUrl}\n\nYou can manually share this link with the user.`);
       }
 
       // Update invitations list
@@ -281,6 +297,8 @@ export default function InvitationManager() {
       console.log('📧 Resending invitation email to:', invitation.email);
 
       const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
+      console.log('Email API URL:', emailApiUrl);
+
       const emailResponse = await fetch(emailApiUrl, {
         method: 'POST',
         headers: {
@@ -295,7 +313,16 @@ export default function InvitationManager() {
         }),
       });
 
+      console.log('Email response status:', emailResponse.status);
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        console.error('❌ Email API error response:', errorText);
+        throw new Error(`Email API returned ${emailResponse.status}: ${errorText}`);
+      }
+
       const emailResult = await emailResponse.json();
+      console.log('Email result:', emailResult);
 
       if (!emailResult.success) {
         throw new Error(emailResult.error || 'Failed to send email');
@@ -304,7 +331,7 @@ export default function InvitationManager() {
       alert(`✅ Invitation email resent to ${invitation.email}`);
     } catch (error: any) {
       console.error('❌ Error resending email:', error);
-      alert('Failed to resend email: ' + (error?.message || 'Unknown error'));
+      alert(`Failed to resend email: ${error?.message || 'Unknown error'}\n\nInvitation link can be copied from the list.`);
     } finally {
       setSendingEmail(null);
     }
