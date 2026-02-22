@@ -51,7 +51,8 @@ export function SetPassword() {
 
   const validateInvitationToken = async (token: string) => {
     try {
-      console.log('🔍 Validating invitation token...');
+      console.log('🔍 Validating invitation token:', token);
+      console.log('🔍 Making Supabase query...');
 
       const { data: invitation, error } = await supabase
         .from('invitations')
@@ -60,8 +61,16 @@ export function SetPassword() {
         .eq('is_active', true)
         .maybeSingle();
 
+      console.log('📊 Query response:', { invitation, error });
+      console.log('📊 Error details:', error);
+      console.log('📊 Invitation data:', invitation);
+
       if (error) {
         console.error('❌ Error validating invitation:', error);
+        console.error('❌ Error code:', error.code);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error details:', error.details);
+        console.error('❌ Error hint:', error.hint);
         setInvitationValid(false);
         setError('Failed to validate invitation');
         return;
@@ -69,6 +78,7 @@ export function SetPassword() {
 
       if (!invitation) {
         console.log('❌ Invitation not found or inactive');
+        console.log('❌ Token searched:', token);
         setInvitationValid(false);
         setError('Invalid or expired invitation link');
         return;
