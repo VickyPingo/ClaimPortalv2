@@ -236,16 +236,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Check if user is super admin by email
       const isUserSuperAdmin = isSuperAdmin(userEmail);
 
-      // Try to load broker profile first
+      // Try to load profile from profiles table (without role filter to catch all users)
       const { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .eq('role', 'broker')
         .maybeSingle();
 
       if (brokerProfileData) {
-        console.log('✓ Broker profile found');
+        console.log('✓ Profile found');
         console.log('  Role:', brokerProfileData.role);
         console.log('  Brokerage ID:', brokerProfileData.brokerage_id);
 
@@ -253,18 +252,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
           await supabase
             .from('profiles')
-            .update({ role: 'super_admin' })
+            .update({ role: 'super_admin', user_type: 'super_admin' })
             .eq('id', userId);
           brokerProfileData.role = 'super_admin';
         }
 
-        setUserType('broker');
-        setUserRole(brokerProfileData.role || 'broker');
-
-        // SUPER ADMIN NEUTRALITY: Super admins see ALL data regardless of brokerage_id
-        // Even if brokerage_id is NULL, they have full system access
+        // ═══════════════════════════════════════════════════════════════
+        // SUPER ADMIN LOGIC - HIGHEST PRIORITY
+        // ═══════════════════════════════════════════════════════════════
         if (brokerProfileData.role === 'super_admin') {
-          console.log('  ⭐ SUPER ADMIN: Full system access granted');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          console.log('👑 SUPER ADMIN DETECTED');
+          console.log('  ⭐ Full system access granted');
+          console.log('  🚫 NO tenant subdomain redirect');
+          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          setUserType('broker');
+          setUserRole('super_admin');
           setBrokerageId(null);
           setBrokerProfile(brokerProfileData);
           setLoading(false);
@@ -287,50 +291,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Regular brokers are restricted to their brokerage
-        console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
+        // ═══════════════════════════════════════════════════════════════
+        // BROKER/MAIN BROKER LOGIC - NORMAL PRIORITY
+        // ═══════════════════════════════════════════════════════════════
+        if (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker') {
+          console.log('✓ Broker/Main Broker profile found');
+          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
+
+          setUserType('broker');
+          setUserRole(brokerProfileData.role);
+          setBrokerageId(brokerProfileData.brokerage_id);
+          setBrokerProfile(brokerProfileData);
+          setLoading(false);
+
+          // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
+          if (brokerProfileData.brokerage_id) {
+            console.log('🔍 Fetching brokerage subdomain for redirect...');
+
+            const { data: brokerageData, error: brokerageError } = await supabase
+              .from('brokerages')
+              .select('subdomain, slug')
+              .eq('id', brokerProfileData.brokerage_id)
+              .maybeSingle();
+
+            if (!brokerageError && brokerageData) {
+              const brokerageSubdomain = brokerageData.subdomain || brokerageData.slug;
+              console.log('  Found subdomain:', brokerageSubdomain);
+
+              if (brokerageSubdomain) {
+                const currentHostname = window.location.hostname;
+                const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
+
+                // Only redirect if not on localhost and not already on the correct subdomain
+                if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1' && currentHostname !== expectedHostname) {
+                  const targetUrl = `https://${expectedHostname}/dashboard/broker`;
+                  console.log('🚀 BROKER SUBDOMAIN REDIRECT:', targetUrl);
+                  console.log('  Current hostname:', currentHostname);
+                  console.log('  Expected hostname:', expectedHostname);
+                  window.location.href = targetUrl;
+                  return;
+                } else {
+                  console.log('✓ Already on correct subdomain or localhost');
+                }
+              }
+            } else {
+              console.warn('⚠️ Could not fetch brokerage subdomain:', brokerageError);
+            }
+          }
+
+          return;
+        }
+
+        // If profile exists but role is not recognized, set basic info
+        setUserType('broker');
+        setUserRole(brokerProfileData.role || 'broker');
         setBrokerageId(brokerProfileData.brokerage_id);
         setBrokerProfile(brokerProfileData);
         setLoading(false);
-
-        // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
-        // CRITICAL: Never redirect super admins - they should have already returned above
-        if (brokerProfileData.brokerage_id &&
-            (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker') &&
-            brokerProfileData.role !== 'super_admin') {
-          console.log('🔍 Fetching brokerage subdomain for redirect...');
-
-          const { data: brokerageData, error: brokerageError } = await supabase
-            .from('brokerages')
-            .select('subdomain, slug')
-            .eq('id', brokerProfileData.brokerage_id)
-            .maybeSingle();
-
-          if (!brokerageError && brokerageData) {
-            const brokerageSubdomain = brokerageData.subdomain || brokerageData.slug;
-            console.log('  Found subdomain:', brokerageSubdomain);
-
-            if (brokerageSubdomain) {
-              const currentHostname = window.location.hostname;
-              const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
-
-              // Only redirect if not on localhost and not already on the correct subdomain
-              if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1' && currentHostname !== expectedHostname) {
-                const targetUrl = `https://${expectedHostname}/dashboard/broker`;
-                console.log('🚀 BROKER SUBDOMAIN REDIRECT:', targetUrl);
-                console.log('  Current hostname:', currentHostname);
-                console.log('  Expected hostname:', expectedHostname);
-                window.location.href = targetUrl;
-                return;
-              } else {
-                console.log('✓ Already on correct subdomain or localhost');
-              }
-            }
-          } else {
-            console.warn('⚠️ Could not fetch brokerage subdomain:', brokerageError);
-          }
-        }
-
         return;
       }
 

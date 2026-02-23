@@ -83,14 +83,25 @@ export default function HomePageRouter() {
     // Determine the correct path based on role
     let targetPath = '/';
 
-    // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin access
-    if (isSuperAdminEmail && userRole === 'super_admin') {
+    // ═══════════════════════════════════════════════════════════════
+    // SUPER ADMIN ROUTING - HIGHEST PRIORITY
+    // ═══════════════════════════════════════════════════════════════
+    if (userRole === 'super_admin' || isSuperAdmin()) {
+      console.log('👑 SUPER ADMIN ROUTING: /admin-dashboard');
       targetPath = '/admin-dashboard';
-    } else if (isSuperAdmin() && userRole === 'super_admin' && onSuperAdminDomain) {
-      targetPath = '/admin-dashboard';
-    } else if (userType === 'broker' || userRole === 'broker') {
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // BROKER ROUTING - ONLY IF NOT SUPER ADMIN
+    // ═══════════════════════════════════════════════════════════════
+    else if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') && userRole !== 'super_admin') {
+      console.log('🏢 BROKER ROUTING: /broker-dashboard');
       targetPath = '/broker-dashboard';
-    } else if (userType === 'client' || userRole === 'client') {
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // CLIENT ROUTING
+    // ═══════════════════════════════════════════════════════════════
+    else if (userType === 'client' || userRole === 'client') {
+      console.log('👤 CLIENT ROUTING: /claims-portal');
       targetPath = '/claims-portal';
     }
 
@@ -215,7 +226,9 @@ export default function HomePageRouter() {
 
   // STEP 6: BROKER ROUTING
   // CRITICAL: Super admins should NEVER be treated as brokers
-  if ((userType === 'broker' || userRole === 'broker') && !isSuperAdminEmail) {
+  if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') &&
+      userRole !== 'super_admin' &&
+      !isSuperAdmin()) {
     console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
       <>
