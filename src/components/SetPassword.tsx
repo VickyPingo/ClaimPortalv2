@@ -209,6 +209,20 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             console.warn('⚠️ Failed to update invitation count:', updateError);
           }
         }
+
+        // Explicitly sign in the user after signup
+        console.log('🔐 Signing in user after signup...');
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: userEmail,
+          password: password,
+        });
+
+        if (signInError) {
+          console.error('❌ Failed to sign in after signup:', signInError);
+          throw signInError;
+        }
+
+        console.log('✅ User signed in successfully');
       } else {
         // Existing user setting password
         const { data: updateData, error: updateError } = await supabase.auth.updateUser({
@@ -227,51 +241,19 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         console.log('✓ Password set successfully');
       }
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error('Failed to get user after password set');
-      }
-
-      console.log('🔍 Fetching user profile and role...');
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, brokerage_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('⚠️ Profile fetch error:', profileError);
-      }
-
-      if (profile) {
-        console.log('✓ Profile found:', { role: profile.role });
-        console.log('🚀 Password set successfully - showing confirmation');
-      } else {
-        console.log('⚠️ No profile found yet - will be created by trigger');
-      }
-
       setSuccess(true);
       setLoading(false);
 
-      setTimeout(async () => {
-        console.log('🚀 Completing password setup and routing to dashboard');
+      // Redirect immediately based on invitation role
+      setTimeout(() => {
+        console.log('🚀 Redirecting user based on role:', invitationRole || 'client');
 
-        // Redirect based on role
-        if (profile) {
-          if (profile.role === 'super_admin') {
-            window.location.href = '/admin-dashboard';
-          } else if (profile.role === 'broker' || profile.role === 'admin') {
-            window.location.href = '/broker-dashboard';
-          } else if (profile.role === 'client') {
-            window.location.href = '/claims-portal';
-          } else {
-            await completePasswordSetup();
-          }
+        if (invitationRole === 'super_admin') {
+          window.location.href = '/admin-dashboard';
+        } else if (invitationRole === 'broker' || invitationRole === 'admin') {
+          window.location.href = '/dashboard/broker';
         } else {
-          await completePasswordSetup();
+          window.location.href = '/dashboard/client';
         }
       }, 2000);
     } catch (err) {
