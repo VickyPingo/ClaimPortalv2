@@ -164,12 +164,16 @@ export default function InvitationManager() {
 
       console.log('✅ Invitation created successfully');
 
-      // Generate invitation URL
+      // Generate invitation URL using brokerage subdomain
       const selectedBrokerage = brokerages.find(b => b.id === newInvitation.brokerage_id);
       const brokerSlug = selectedBrokerage?.subdomain || newInvitation.brokerage_id;
-      const invitationUrl = `${window.location.origin}/signup?token=${data.token}&brokerId=${brokerSlug}`;
+
+      // CRITICAL: Build invite URL on brokerage subdomain, not window.location.origin
+      // This ensures invited users land on the correct subdomain from the start
+      const invitationUrl = `https://${brokerSlug}.claimsportal.co.za/signup?token=${data.token}&brokerId=${brokerSlug}`;
 
       console.log('📧 Sending invitation email...');
+      console.log('🔗 Invitation URL (on brokerage subdomain):', invitationUrl);
 
       // Send invitation email via edge function
       try {
@@ -255,9 +259,10 @@ export default function InvitationManager() {
   };
 
   const copyInvitationLink = (token: string, invitationBrokerageId: string) => {
-    const baseUrl = window.location.origin;
-    const brokerSlug = invitationBrokerageId === 'f67b67c8-086b-4b42-8d27-917a0783e9b0' ? 'independi' : invitationBrokerageId;
-    const inviteUrl = `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
+    const selectedBrokerage = brokerages.find(b => b.id === invitationBrokerageId);
+    const brokerSlug = selectedBrokerage?.subdomain || invitationBrokerageId;
+    // Use brokerage subdomain in the invite URL
+    const inviteUrl = `https://${brokerSlug}.claimsportal.co.za/signup?token=${token}&brokerId=${brokerSlug}`;
 
     navigator.clipboard.writeText(inviteUrl);
     setCopiedToken(token);
@@ -265,9 +270,10 @@ export default function InvitationManager() {
   };
 
   const getInvitationUrl = (token: string, invitationBrokerageId: string) => {
-    const baseUrl = window.location.origin;
-    const brokerSlug = invitationBrokerageId === 'f67b67c8-086b-4b42-8d27-917a0783e9b0' ? 'independi' : invitationBrokerageId;
-    return `${baseUrl}/signup?token=${token}&brokerId=${brokerSlug}`;
+    const selectedBrokerage = brokerages.find(b => b.id === invitationBrokerageId);
+    const brokerSlug = selectedBrokerage?.subdomain || invitationBrokerageId;
+    // Use brokerage subdomain in the invite URL
+    return `https://${brokerSlug}.claimsportal.co.za/signup?token=${token}&brokerId=${brokerSlug}`;
   };
 
   const isExpired = (expiresAt: string) => {
@@ -293,9 +299,11 @@ export default function InvitationManager() {
     try {
       const selectedBrokerage = brokerages.find(b => b.id === invitation.brokerage_id);
       const brokerSlug = selectedBrokerage?.subdomain || invitation.brokerage_id;
-      const invitationUrl = `${window.location.origin}/signup?token=${invitation.token}&brokerId=${brokerSlug}`;
+      // Use brokerage subdomain in the invite URL
+      const invitationUrl = `https://${brokerSlug}.claimsportal.co.za/signup?token=${invitation.token}&brokerId=${brokerSlug}`;
 
       console.log('📧 Resending invitation email to:', invitation.email);
+      console.log('🔗 Invitation URL (on brokerage subdomain):', invitationUrl);
 
       const emailApiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation-email`;
       console.log('Email API URL:', emailApiUrl);
