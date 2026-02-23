@@ -34,7 +34,7 @@ export default function BrokeragesManager() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    subdomain: '',
+    slug: '',
     notification_email: ''
   });
   const [formError, setFormError] = useState('');
@@ -105,17 +105,27 @@ export default function BrokeragesManager() {
     setFormLoading(true);
 
     try {
-      const cleanDomain = formData.subdomain.toLowerCase().trim();
+      // Auto-generate slug from name if empty
+      let slug = formData.slug.trim();
+      if (!slug && formData.name) {
+        slug = formData.name
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+          .replace(/\s+/g, '-') // Replace spaces with hyphens
+          .replace(/-+/g, '-') // Replace multiple hyphens with single
+          .trim();
+      }
 
-      if (!cleanDomain) {
-        setFormError('Custom domain is required');
+      if (!slug) {
+        setFormError('Subdomain is required');
         setFormLoading(false);
         return;
       }
 
-      const domainPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
-      if (!domainPattern.test(cleanDomain)) {
-        setFormError('Invalid domain format. Use lowercase letters, numbers, dots, and hyphens only');
+      // Validate slug format
+      const slugPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+      if (!slugPattern.test(slug)) {
+        setFormError('Invalid subdomain format. Use lowercase letters, numbers, and hyphens only');
         setFormLoading(false);
         return;
       }
@@ -123,11 +133,11 @@ export default function BrokeragesManager() {
       const { data: existingBrokerage } = await supabase
         .from('brokerages')
         .select('id')
-        .eq('subdomain', cleanDomain)
+        .eq('slug', slug)
         .maybeSingle();
 
       if (existingBrokerage) {
-        setFormError('This domain is already taken');
+        setFormError('This subdomain is already taken');
         setFormLoading(false);
         return;
       }
@@ -136,7 +146,9 @@ export default function BrokeragesManager() {
         .from('brokerages')
         .insert({
           name: formData.name.trim(),
-          subdomain: cleanDomain,
+          slug: slug,
+          signup_code: slug,
+          subdomain: slug, // Keep for backward compatibility
           notification_email: formData.notification_email.trim() || null,
           brand_color: '#1e40af'
         })
@@ -161,7 +173,7 @@ export default function BrokeragesManager() {
 
       await fetchBrokerages();
       setShowCreateModal(false);
-      setFormData({ name: '', subdomain: '', notification_email: '' });
+      setFormData({ name: '', slug: '', notification_email: '' });
     } catch (error: any) {
       console.error('Error creating brokerage:', error);
       setFormError(error.message || 'Failed to create brokerage');
@@ -174,7 +186,7 @@ export default function BrokeragesManager() {
     setEditingBrokerage(brokerage);
     setFormData({
       name: brokerage.name,
-      subdomain: brokerage.subdomain,
+      slug: brokerage.subdomain,
       notification_email: brokerage.notification_email || ''
     });
     setShowEditModal(true);
@@ -201,7 +213,7 @@ export default function BrokeragesManager() {
       await fetchBrokerages();
       setShowEditModal(false);
       setEditingBrokerage(null);
-      setFormData({ name: '', subdomain: '', notification_email: '' });
+      setFormData({ name: '', slug: '', notification_email: '' });
     } catch (error: any) {
       console.error('Error updating brokerage:', error);
       setFormError(error.message || 'Failed to update brokerage');
@@ -448,7 +460,7 @@ export default function BrokeragesManager() {
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingBrokerage(null);
-                  setFormData({ name: '', subdomain: '', notification_email: '' });
+                  setFormData({ name: '', slug: '', notification_email: '' });
                   setFormError('');
                 }}
                 className="text-gray-400 hover:text-gray-600"
@@ -480,16 +492,19 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Custom Domain
+                  Subdomain (slug)
                 </label>
-                <input
-                  type="text"
-                  disabled
-                  value={formData.subdomain}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    disabled
+                    value={formData.slug}
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                  />
+                  <span className="text-gray-500 text-sm whitespace-nowrap">.claimsportal.co.za</span>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Custom domain cannot be changed after creation
+                  Subdomain cannot be changed after creation
                 </p>
               </div>
 
@@ -516,7 +531,7 @@ export default function BrokeragesManager() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingBrokerage(null);
-                    setFormData({ name: '', subdomain: '', notification_email: '' });
+                    setFormData({ name: '', slug: '', notification_email: '' });
                     setFormError('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
@@ -547,7 +562,7 @@ export default function BrokeragesManager() {
               <button
                 onClick={() => {
                   setShowCreateModal(false);
-                  setFormData({ name: '', subdomain: '', notification_email: '' });
+                  setFormData({ name: '', slug: '', notification_email: '' });
                   setFormError('');
                 }}
                 className="text-gray-400 hover:text-gray-600"
@@ -571,26 +586,48 @@ export default function BrokeragesManager() {
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Independi Insurance Brokers"
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setFormData({ ...formData, name: newName });
+                    // Auto-generate slug if slug is empty
+                    if (!formData.slug) {
+                      const autoSlug = newName
+                        .toLowerCase()
+                        .replace(/[^a-z0-9\s-]/g, '')
+                        .replace(/\s+/g, '-')
+                        .replace(/-+/g, '-')
+                        .trim();
+                      setFormData({ ...formData, name: newName, slug: autoSlug });
+                    }
+                  }}
+                  placeholder="e.g., Timo Marketing"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Custom Domain
+                  Subdomain (slug)
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.subdomain}
-                  onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase() })}
-                  placeholder="e.g., claims.yourdomain.co.za"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={formData.slug}
+                    onChange={(e) => {
+                      const value = e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, '')
+                        .replace(/-+/g, '-');
+                      setFormData({ ...formData, slug: value });
+                    }}
+                    placeholder="e.g., independi"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+                  />
+                  <span className="text-gray-500 text-sm whitespace-nowrap">.claimsportal.co.za</span>
+                </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Enter the full custom domain (e.g., claims.yourdomain.co.za)
+                  This will create the URL: https://{formData.slug || 'subdomain'}.claimsportal.co.za
                 </p>
               </div>
 
@@ -629,7 +666,7 @@ export default function BrokeragesManager() {
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    setFormData({ name: '', subdomain: '', notification_email: '' });
+                    setFormData({ name: '', slug: '', notification_email: '' });
                     setFormError('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
