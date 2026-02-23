@@ -165,17 +165,21 @@ export function SetPassword() {
           throw new Error('Email is required for signup');
         }
 
-        // Sign up the new user
-        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-          email: userEmail,
-          password: password,
-          options: {
-            data: {
-              invitation_token: invitationToken,
-              role: invitationRole,
-            },
-          },
-        });
+        // Get brokerage code from URL if present (for client signup)
+const params = new URLSearchParams(window.location.search);
+const signupCode = params.get("b");
+
+const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+  email: userEmail,
+  password: password,
+  options: {
+    data: {
+      invitation_token: invitationToken,
+      role: invitationRole || "client",
+      signup_code: signupCode,   // <-- THIS is the important line
+    },
+  },
+});
 
         if (signUpError) {
           console.error('❌ Failed to sign up:', signUpError);
