@@ -157,19 +157,33 @@ export default function BrokeragesManager() {
 
       if (brokerageError) throw brokerageError;
 
+      // Generate token for invitation
+      const invitationToken = crypto.randomUUID();
+
+      console.log('Creating invitation for new brokerage:', {
+        email: formData.notification_email.trim() || 'admin@example.com',
+        brokerage_id: newBrokerage.id
+      });
+
       const { data: newInvitation, error: inviteError } = await supabase
         .from('invitations')
         .insert({
+          email: formData.notification_email.trim() || 'admin@example.com',
           brokerage_id: newBrokerage.id,
           role: 'broker',
+          token: invitationToken,
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           max_uses: null,
-          is_active: true
+          is_active: true,
+          used_count: 0
         })
         .select()
         .single();
 
-      if (inviteError) throw inviteError;
+      if (inviteError) {
+        console.error('Failed to create invitation:', inviteError);
+        throw inviteError;
+      }
 
       await fetchBrokerages();
       setShowCreateModal(false);
