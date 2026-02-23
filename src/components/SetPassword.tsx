@@ -245,12 +245,47 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       setLoading(false);
 
       // Redirect immediately based on invitation role
-      setTimeout(() => {
+      setTimeout(async () => {
         console.log('🚀 Redirecting user based on role:', invitationRole || 'client');
 
         if (invitationRole === 'super_admin') {
           window.location.href = '/admin-dashboard';
-        } else if (invitationRole === 'broker' || invitationRole === 'admin') {
+        } else if (invitationRole === 'broker' || invitationRole === 'main_broker' || invitationRole === 'admin') {
+          // Fetch brokerage subdomain for broker redirect
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+          if (currentUser) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('brokerage_id')
+              .eq('id', currentUser.id)
+              .maybeSingle();
+
+            if (profile?.brokerage_id) {
+              const { data: brokerage } = await supabase
+                .from('brokerages')
+                .select('subdomain, slug')
+                .eq('id', profile.brokerage_id)
+                .maybeSingle();
+
+              if (brokerage) {
+                const brokerageSubdomain = brokerage.subdomain || brokerage.slug;
+
+                if (brokerageSubdomain) {
+                  const currentHostname = window.location.hostname;
+                  const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
+
+                  // Redirect to brokerage subdomain if not on localhost
+                  if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
+                    window.location.href = `https://${expectedHostname}/dashboard/broker`;
+                    return;
+                  }
+                }
+              }
+            }
+          }
+
+          // Fallback if subdomain lookup fails
           window.location.href = '/dashboard/broker';
         } else {
           window.location.href = '/dashboard/client';

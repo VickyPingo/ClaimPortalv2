@@ -266,36 +266,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (brokerProfileData.role === 'super_admin') {
           console.log('  ⭐ SUPER ADMIN: Full system access granted');
           setBrokerageId(null);
-        } else {
-          // Regular brokers are restricted to their brokerage
-          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
-          setBrokerageId(brokerProfileData.brokerage_id);
-        }
-
-        setBrokerProfile(brokerProfileData);
-        setLoading(false);
-
-        // INDEPENDI BROKER PRIORITY: Immediate redirect for independi.co.za brokers
-        const independiBrokers = ['dietrich@independi.co.za', 'vicky@independi.co.za'];
-        if (independiBrokers.includes(userEmail || '')) {
-          console.log('🎯 INDEPENDI BROKER LOGIN DETECTED - Immediate redirect to broker dashboard');
-          console.log('   Broker:', userEmail);
-          const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
-          if (window.location.href !== targetUrl) {
-            console.log('   Forcing redirect to:', targetUrl);
-            window.location.href = targetUrl;
-          }
+          setBrokerProfile(brokerProfileData);
+          setLoading(false);
+          // Super admins stay on main domain - no subdomain redirect
           return;
         }
 
-        // EMERGENCY REDIRECT: Force brokers to claimsportal.co.za broker dashboard
-        if (brokerProfileData.role === 'broker' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-          const targetUrl = 'https://claimsportal.co.za/dashboard/broker';
-          if (window.location.href !== targetUrl) {
-            console.log('🚨 EMERGENCY REDIRECT: Broker login detected, forcing redirect to:', targetUrl);
-            setTimeout(() => {
-              window.location.href = targetUrl;
-            }, 500);
+        // Regular brokers are restricted to their brokerage
+        console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
+        setBrokerageId(brokerProfileData.brokerage_id);
+        setBrokerProfile(brokerProfileData);
+        setLoading(false);
+
+        // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
+        if (brokerProfileData.brokerage_id && (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker')) {
+          console.log('🔍 Fetching brokerage subdomain for redirect...');
+
+          const { data: brokerageData, error: brokerageError } = await supabase
+            .from('brokerages')
+            .select('subdomain, slug')
+            .eq('id', brokerProfileData.brokerage_id)
+            .maybeSingle();
+
+          if (!brokerageError && brokerageData) {
+            const brokerageSubdomain = brokerageData.subdomain || brokerageData.slug;
+            console.log('  Found subdomain:', brokerageSubdomain);
+
+            if (brokerageSubdomain) {
+              const currentHostname = window.location.hostname;
+              const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
+
+              // Only redirect if not on localhost and not already on the correct subdomain
+              if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1' && currentHostname !== expectedHostname) {
+                const targetUrl = `https://${expectedHostname}/dashboard/broker`;
+                console.log('🚀 BROKER SUBDOMAIN REDIRECT:', targetUrl);
+                console.log('  Current hostname:', currentHostname);
+                console.log('  Expected hostname:', expectedHostname);
+                window.location.href = targetUrl;
+                return;
+              } else {
+                console.log('✓ Already on correct subdomain or localhost');
+              }
+            }
+          } else {
+            console.warn('⚠️ Could not fetch brokerage subdomain:', brokerageError);
           }
         }
 
