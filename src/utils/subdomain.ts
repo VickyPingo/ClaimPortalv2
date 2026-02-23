@@ -63,3 +63,24 @@ export function getOrganisationIdFromSubdomain(): string | null {
 
   return null;
 }
+
+export function getBrokerageSlug(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const hostname = window.location.hostname.toLowerCase();
+
+  // Pattern: independi.claimsportal.co.za -> "independi"
+  if (hostname.endsWith('.claimsportal.co.za')) {
+    const parts = hostname.split('.');
+    return parts[0] || null;
+  }
+
+  // Custom domain mapping examples:
+  // claims.independi.co.za -> "independi"
+  if (hostname === 'claims.independi.co.za') return 'independi';
+
+  // Add more custom domains here as you onboard them:
+  // if (hostname === 'claims.somebroker.co.za') return 'somebroker';
+
+  return null;
+}
