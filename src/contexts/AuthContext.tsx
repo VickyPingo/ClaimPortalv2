@@ -40,7 +40,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<User>;
   brokerSignIn: (email: string, password: string) => Promise<void>;
-  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>, brokerageId?: string) => Promise<User>;
+  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>) => Promise<User>;
   clientSignIn: (email: string, password: string) => Promise<void>;
   completePasswordSetup: () => Promise<void>;
   isSuperAdmin: () => boolean;
