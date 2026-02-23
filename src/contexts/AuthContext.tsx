@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { useBrokerage } from './BrokerageContext';
 import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
-import { isIndependiSubdomain } from '../utils/subdomain';
+import { isIndependiSubdomain, getBrokerageSlug } from '../utils/subdomain';
 
 // BROKERAGE ID FOR CLAIMS.INDEPENDI.CO.ZA
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
@@ -616,52 +616,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const clientSignUp = async (
-    email: string,
-    password: string,
-    profile: Omit<ClientProfile, 'id' | 'brokerage_id'>,
-    brokerageId?: string
-  ) => {
-    console.log('🔵 CLIENT SIGNUP - Manual profile creation');
+const clientSignUp = async (
+  email: string,
+  password: string,
+  profile: Omit<ClientProfile, 'id' | 'brokerage_id'>,
+) => {
+  console.log('🔵 CLIENT SIGNUP - Subdomain brokerage linking');
 
-    const currentBrokerageId = brokerageId || brokerage?.id;
+  const brokerageSlug = getBrokerageSlug();
 
-    if (!currentBrokerageId) {
-      throw new Error('Brokerage not loaded. Please refresh the page.');
-    }
+  if (!brokerageSlug) {
+    throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
+  }
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('User creation failed');
-
-    console.log('✅ Auth user created:', authData.user.id);
-
-    // MANUAL PROFILE CREATION
-    const { error: profileError } = await supabase
-      .from('client_profiles')
-      .insert({
-        id: authData.user.id,
-        full_name: profile.full_name,
-        email: profile.email,
-        cell_number: profile.cell_number,
-        brokerage_id: currentBrokerageId,
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
         role: 'client',
-        user_type: 'client',
-      });
+        brokerage_slug: brokerageSlug,
+        full_name: profile.full_name,
+        cell_number: profile.cell_number,
+      },
+    },
+  });
 
-    if (profileError) {
-      console.error('❌ Failed to create client profile:', profileError);
-      throw new Error(`Failed to create client profile: ${profileError.message}`);
-    }
+  if (authError) throw authError;
+  if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Client profile created successfully');
-    return authData.user;
-  };
+  console.log('✅ Client auth user created:', authData.user.id);
+  return authData.user;
+};
 
   const clientSignIn = async (email: string, password: string) => {
     console.log('🔐 Client signing in with password');
