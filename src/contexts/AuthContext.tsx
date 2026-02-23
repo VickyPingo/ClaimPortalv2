@@ -268,7 +268,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setBrokerageId(null);
           setBrokerProfile(brokerProfileData);
           setLoading(false);
-          // Super admins stay on main domain - no subdomain redirect
+
+          // CRITICAL: If super admin is on a tenant subdomain, redirect to root domain
+          const currentHostname = window.location.hostname;
+          const isOnSubdomain = currentHostname.endsWith('.claimsportal.co.za') &&
+                                currentHostname !== 'claimsportal.co.za';
+
+          if (isOnSubdomain && currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
+            const rootUrl = `https://claimsportal.co.za/dashboard/admin`;
+            console.log('🚀 SUPER ADMIN REDIRECT: From subdomain to root domain');
+            console.log('  Current hostname:', currentHostname);
+            console.log('  Target URL:', rootUrl);
+            window.location.href = rootUrl;
+            return;
+          }
+
+          console.log('✓ Super admin on correct domain (root domain or localhost)');
           return;
         }
 
@@ -279,7 +294,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
 
         // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
-        if (brokerProfileData.brokerage_id && (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker')) {
+        // CRITICAL: Never redirect super admins - they should have already returned above
+        if (brokerProfileData.brokerage_id &&
+            (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker') &&
+            brokerProfileData.role !== 'super_admin') {
           console.log('🔍 Fetching brokerage subdomain for redirect...');
 
           const { data: brokerageData, error: brokerageError } = await supabase

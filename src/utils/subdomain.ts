@@ -48,7 +48,7 @@ export function isSuperAdminDomain(): boolean {
   // Super admin can only access from root domain or localhost
   return hostname === 'localhost' ||
          hostname === '127.0.0.1' ||
-         hostname === 'independi.co.za' ||
+         hostname === 'claimsportal.co.za' ||
          hostname.includes('bolt.new');
 }
 
