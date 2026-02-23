@@ -17,6 +17,7 @@ export function SetPassword() {
   const [brokerId, setBrokerId] = useState('');
   const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
   const [invitationRole, setInvitationRole] = useState('');
+  const [validationError, setValidationError] = useState<string>('');
 
   useEffect(() => {
     // Check for invitation token in URL
@@ -72,7 +73,21 @@ export function SetPassword() {
         console.error('❌ Error details:', error.details);
         console.error('❌ Error hint:', error.hint);
         setInvitationValid(false);
+
+        // Build detailed error message for debugging
+        let errorDetails = `Database error: ${error.message}`;
+        if (error.code) {
+          errorDetails += ` (Code: ${error.code})`;
+        }
+        if (error.hint) {
+          errorDetails += ` - Hint: ${error.hint}`;
+        }
+        if (error.details) {
+          errorDetails += ` - Details: ${error.details}`;
+        }
+
         setError('Failed to validate invitation');
+        setValidationError(errorDetails);
         return;
       }
 
@@ -81,6 +96,7 @@ export function SetPassword() {
         console.log('❌ Token searched:', token);
         setInvitationValid(false);
         setError('Invalid or expired invitation link');
+        setValidationError(`No active invitation found with token: ${token.substring(0, 8)}...`);
         return;
       }
 
@@ -89,6 +105,7 @@ export function SetPassword() {
         console.log('❌ Invitation expired');
         setInvitationValid(false);
         setError('This invitation has expired');
+        setValidationError(`Expired on: ${new Date(invitation.expires_at).toLocaleString()}`);
         return;
       }
 
@@ -97,6 +114,7 @@ export function SetPassword() {
         console.log('❌ Invitation max uses reached');
         setInvitationValid(false);
         setError('This invitation has reached its maximum uses');
+        setValidationError(`Used ${invitation.used_count} of ${invitation.max_uses} times`);
         return;
       }
 
@@ -110,6 +128,7 @@ export function SetPassword() {
       console.error('❌ Error validating invitation:', err);
       setInvitationValid(false);
       setError('Failed to validate invitation');
+      setValidationError(err instanceof Error ? err.message : 'Unknown error occurred');
     }
   };
 
@@ -283,9 +302,18 @@ export function SetPassword() {
             Invalid Invitation Link
           </h1>
 
-          <p className="text-center text-slate-600 mb-6">
+          <p className="text-center text-slate-600 mb-4">
             {error || 'This invitation link is invalid, expired, or has already been used.'}
           </p>
+
+          {validationError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-red-900 mb-1">Technical Details:</p>
+              <p className="text-xs text-red-700 font-mono break-words">
+                {validationError}
+              </p>
+            </div>
+          )}
 
           <button
             onClick={() => window.location.href = '/'}
