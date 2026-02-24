@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string, userEmail: string | undefined) => {
     try {
-      console.log('🔍 Loading profile for user:', userId);
+      console.log('Loading profile for userId:', userId);
 
       // CRITICAL: Force super_admin role for vickypingo@gmail.com regardless of database
       if (userEmail === 'vickypingo@gmail.com') {
@@ -222,11 +222,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .maybeSingle();
 
         if (profileCheck) {
-          setBrokerProfile(profileCheck);
+          // Map organization_id to brokerage_id
+          const mappedProfile = { ...profileCheck, brokerage_id: profileCheck.organization_id };
+          setBrokerProfile(mappedProfile);
           if (profileCheck.role !== 'super_admin') {
             await supabase
               .from('profiles')
-              .update({ role: 'super_admin', user_type: 'super_admin' })
+              .update({ role: 'super_admin' })
               .eq('id', userId);
           }
         }
@@ -244,23 +246,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (brokerProfileData) {
-        console.log('✓ Profile found');
-        console.log('  Role:', brokerProfileData.role);
-        console.log('  Brokerage ID:', brokerProfileData.brokerage_id);
+        // Map organization_id to brokerage_id for consistency
+        const brokerageId = brokerProfileData.organization_id;
+        const profileWithBrokerageId = { ...brokerProfileData, brokerage_id: brokerageId };
+
+        console.log('Profile found', brokerageId);
 
         // Force super_admin role if email is in SUPER_ADMINS list
         if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
           await supabase
             .from('profiles')
-            .update({ role: 'super_admin', user_type: 'super_admin' })
+            .update({ role: 'super_admin' })
             .eq('id', userId);
-          brokerProfileData.role = 'super_admin';
+          profileWithBrokerageId.role = 'super_admin';
         }
 
         // ═══════════════════════════════════════════════════════════════
         // SUPER ADMIN LOGIC - HIGHEST PRIORITY
         // ═══════════════════════════════════════════════════════════════
-        if (brokerProfileData.role === 'super_admin') {
+        if (profileWithBrokerageId.role === 'super_admin') {
           console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           console.log('👑 SUPER ADMIN DETECTED');
           console.log('  ⭐ Full system access granted');
@@ -270,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserType('broker');
           setUserRole('super_admin');
           setBrokerageId(null);
-          setBrokerProfile(brokerProfileData);
+          setBrokerProfile(profileWithBrokerageId);
           setLoading(false);
 
           // CRITICAL: If super admin is on a tenant subdomain, redirect to root domain
@@ -294,24 +298,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // ═══════════════════════════════════════════════════════════════
         // BROKER/MAIN BROKER LOGIC - NORMAL PRIORITY
         // ═══════════════════════════════════════════════════════════════
-        if (brokerProfileData.role === 'broker' || brokerProfileData.role === 'main_broker') {
+        if (profileWithBrokerageId.role === 'broker' || profileWithBrokerageId.role === 'main_broker') {
           console.log('✓ Broker/Main Broker profile found');
-          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerProfileData.brokerage_id);
+          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerageId);
 
           setUserType('broker');
-          setUserRole(brokerProfileData.role);
-          setBrokerageId(brokerProfileData.brokerage_id);
-          setBrokerProfile(brokerProfileData);
+          setUserRole(profileWithBrokerageId.role);
+          setBrokerageId(brokerageId);
+          setBrokerProfile(profileWithBrokerageId);
           setLoading(false);
 
           // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
-          if (brokerProfileData.brokerage_id) {
+          if (brokerageId) {
             console.log('🔍 Fetching brokerage subdomain for redirect...');
 
             const { data: brokerageData, error: brokerageError } = await supabase
               .from('brokerages')
               .select('subdomain, slug')
-              .eq('id', brokerProfileData.brokerage_id)
+              .eq('id', brokerageId)
               .maybeSingle();
 
             if (!brokerageError && brokerageData) {
@@ -344,9 +348,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // If profile exists but role is not recognized, set basic info
         setUserType('broker');
-        setUserRole(brokerProfileData.role || 'broker');
-        setBrokerageId(brokerProfileData.brokerage_id);
-        setBrokerProfile(brokerProfileData);
+        setUserRole(profileWithBrokerageId.role || 'broker');
+        setBrokerageId(brokerageId);
+        setBrokerProfile(profileWithBrokerageId);
         setLoading(false);
         return;
       }
@@ -368,7 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.warn('⚠️ No profile found');
+      console.warn('No profile found');
       setLoading(false);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -542,12 +546,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // MANUAL PROFILE CREATION
     const brokerageId = profile.brokerage_id || INDEPENDI_BROKERAGE_ID;
 
-    // Insert into profiles
+    // Insert into profiles (use organization_id instead of brokerage_id)
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
         id: authData.user.id,
-        brokerage_id: brokerageId,
+        organization_id: brokerageId,
         full_name: profile.full_name || email,
         email: email,
         id_number: profile.id_number || '',
