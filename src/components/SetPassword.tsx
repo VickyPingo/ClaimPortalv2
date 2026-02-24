@@ -180,26 +180,97 @@ export function SetPassword() {
         throw new Error('Failed to update user');
       }
 
-      console.log('✅ Password set successfully');
+      console.log('✅ Password set successfully for user:', updateData.user.id);
 
+      // CRITICAL: Process invitation and update profile with correct role and brokerage_id
       if (invitationToken) {
+        console.log('🎫 Processing invitation token:', invitationToken);
+
         try {
-          const { data: invitationData } = await supabase
+          // Step 1: Fetch invitation details
+          const { data: invitation, error: inviteError } = await supabase
             .from('invitations')
-            .select('used_count')
+            .select('role, brokerage_id, email, is_active, used_count, max_uses')
             .eq('token', invitationToken)
             .maybeSingle();
 
-          if (invitationData) {
-            await supabase
-              .from('invitations')
-              .update({ used_count: invitationData.used_count + 1 })
-              .eq('token', invitationToken);
+          if (inviteError) {
+            console.error('❌ Error fetching invitation:', inviteError);
+            throw new Error('Failed to fetch invitation details');
+          }
 
+          if (!invitation) {
+            console.error('❌ Invitation not found for token:', invitationToken);
+            throw new Error('Invitation not found');
+          }
+
+          console.log('📋 Invitation found:', {
+            role: invitation.role,
+            brokerage_id: invitation.brokerage_id,
+            is_active: invitation.is_active,
+            used_count: invitation.used_count,
+            max_uses: invitation.max_uses,
+          });
+
+          // Step 2: Validate invitation
+          if (!invitation.is_active) {
+            console.error('❌ Invitation is not active');
+            throw new Error('This invitation has been deactivated');
+          }
+
+          if (invitation.used_count >= invitation.max_uses) {
+            console.error('❌ Invitation has been fully used');
+            throw new Error('This invitation has already been used');
+          }
+
+          // Step 3: Update profile with correct role and brokerage_id
+          console.log('📝 Updating profile for user:', updateData.user.id);
+          console.log('   Setting role:', invitation.role);
+          console.log('   Setting organization_id:', invitation.brokerage_id);
+
+          const { error: profileUpdateError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: updateData.user.id,
+              user_id: updateData.user.id,
+              organization_id: invitation.brokerage_id,
+              role: invitation.role,
+              email: invitation.email,
+              full_name: invitation.email,
+            }, {
+              onConflict: 'id',
+            });
+
+          if (profileUpdateError) {
+            console.error('❌ Failed to update profile:', profileUpdateError);
+            throw new Error(`Failed to update profile: ${profileUpdateError.message}`);
+          }
+
+          console.log('✅ Profile updated successfully with role:', invitation.role);
+
+          // Step 4: Mark invitation as used
+          console.log('📝 Marking invitation as used');
+
+          const { error: inviteUpdateError } = await supabase
+            .from('invitations')
+            .update({
+              used_count: invitation.used_count + 1,
+              is_active: false,
+            })
+            .eq('token', invitationToken);
+
+          if (inviteUpdateError) {
+            console.error('❌ Failed to update invitation:', inviteUpdateError);
+            // Don't throw - profile is updated, this is not critical
+          } else {
             console.log('✅ Invitation marked as used');
           }
-        } catch (err) {
-          console.warn('⚠️ Failed to mark invitation as used:', err);
+
+        } catch (inviteErr) {
+          console.error('❌ Invitation processing error:', inviteErr);
+          setError(inviteErr instanceof Error ? inviteErr.message : 'Failed to process invitation');
+          setLoading(false);
+          return;
         }
       }
 
@@ -207,7 +278,7 @@ export function SetPassword() {
       setLoading(false);
 
       setTimeout(async () => {
-        console.log('🚀 Redirecting user based on role:', invitationRole || 'unknown');
+        console.log('🚀 Redirecting user based on role');
 
         const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -216,22 +287,31 @@ export function SetPassword() {
           return;
         }
 
+        // Fetch updated profile
         const { data: profile } = await supabase
           .from('profiles')
-          .select('user_type, role, brokerage_id')
+          .select('role, organization_id')
           .eq('user_id', currentUser.id)
           .maybeSingle();
+
+        console.log('👤 User profile loaded:', {
+          role: profile?.role,
+          organization_id: profile?.organization_id,
+        });
 
         const userRole = profile?.role || invitationRole;
 
         if (userRole === 'super_admin') {
-          window.location.href = '/admin-dashboard';
+          console.log('🔀 Redirecting to super admin dashboard');
+          window.location.href = '/dashboard/admin';
         } else if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'admin') {
-          if (profile?.brokerage_id) {
+          console.log('🔀 Redirecting to broker dashboard');
+
+          if (profile?.organization_id) {
             const { data: brokerage } = await supabase
               .from('brokerages')
               .select('subdomain, slug')
-              .eq('id', profile.brokerage_id)
+              .eq('id', profile.organization_id)
               .maybeSingle();
 
             if (brokerage) {
@@ -241,7 +321,9 @@ export function SetPassword() {
                 const currentHostname = window.location.hostname;
 
                 if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
-                  window.location.href = `https://${brokerageSubdomain}.claimsportal.co.za/dashboard/broker`;
+                  const targetUrl = `https://${brokerageSubdomain}.claimsportal.co.za/dashboard/broker`;
+                  console.log('🔀 Redirecting to brokerage subdomain:', targetUrl);
+                  window.location.href = targetUrl;
                   return;
                 }
               }
@@ -250,6 +332,7 @@ export function SetPassword() {
 
           window.location.href = '/dashboard/broker';
         } else {
+          console.log('🔀 Redirecting to client dashboard');
           window.location.href = '/dashboard/client';
         }
       }, 2000);
