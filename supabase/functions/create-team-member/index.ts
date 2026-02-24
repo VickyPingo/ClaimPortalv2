@@ -61,13 +61,16 @@ Deno.serve(async (req: Request) => {
 
     const { data: callingProfile, error: profileError } = await supabaseClient
       .from("profiles")
-      .select("brokerage_id, role")
+      .select("organization_id, role")
       .eq("id", callingUser.id)
       .maybeSingle();
 
     if (profileError || !callingProfile) {
+      console.error("Profile lookup failed:", profileError);
       throw new Error("Profile not found");
     }
+
+    console.log("Calling user profile:", { id: callingUser.id, role: callingProfile.role, organization_id: callingProfile.organization_id });
 
     if (callingProfile.role !== "broker" && callingProfile.role !== "super_admin") {
       throw new Error("Only brokers can create team members");
@@ -93,6 +96,8 @@ Deno.serve(async (req: Request) => {
       throw new Error("A user with this email already exists");
     }
 
+    console.log("Generating invite link for:", email);
+
     const { data: linkData, error: generateError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'invite',
       email,
@@ -104,28 +109,32 @@ Deno.serve(async (req: Request) => {
     });
 
     if (generateError || !linkData) {
+      console.error("Failed to generate invite link:", generateError);
       throw new Error(`Failed to generate invite link: ${generateError?.message || "Unknown error"}`);
     }
 
+    console.log("Invite link generated successfully. User ID:", linkData.user?.id);
+
     if (linkData?.user) {
+      const profileData = {
+        id: linkData.user.id,
+        organization_id: callingProfile.organization_id,
+        role: role ?? "broker",
+        full_name: full_name ?? email,
+      };
+
+      console.log("Upserting profile with data:", profileData);
+
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
-        .upsert(
-          {
-            user_id: linkData.user.id,
-            brokerage_id: callingProfile.brokerage_id,
-            role: role || "broker",
-            full_name: full_name || email,
-            cell_number: phone_number || "",
-            id_number: id_number || "",
-          },
-          { onConflict: "user_id" }
-        );
+        .upsert(profileData, { onConflict: "id" });
 
       if (profileError) {
         console.error("Failed to upsert profile:", profileError);
         throw new Error(`Failed to create profile: ${profileError.message}`);
       }
+
+      console.log("Profile upserted successfully for user:", linkData.user.id);
     }
 
     return new Response(
@@ -136,7 +145,7 @@ Deno.serve(async (req: Request) => {
           email: linkData.user.email,
           full_name,
           role,
-          brokerage_id: callingProfile.brokerage_id,
+          organization_id: callingProfile.organization_id,
         },
         inviteLink: linkData.properties.action_link,
         message: "Team member created successfully. An invitation link has been generated.",
