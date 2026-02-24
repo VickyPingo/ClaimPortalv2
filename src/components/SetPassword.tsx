@@ -223,22 +223,33 @@ export function SetPassword() {
             throw new Error('This invitation has already been used');
           }
 
-          // Step 3: Update profile with correct role and brokerage_id
+          // Step 3: Update profile with correct role and organization_id
           console.log('📝 Updating profile for user:', updateData.user.id);
           console.log('   Setting role:', invitation.role);
-          console.log('   Setting organization_id:', invitation.brokerage_id);
+          console.log('   Setting organization_id (from invitation.brokerage_id):', invitation.brokerage_id);
+
+          // Check if profile already exists
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id, user_id, full_name, email')
+            .eq('user_id', updateData.user.id)
+            .maybeSingle();
+
+          console.log('   Existing profile:', existingProfile ? 'found' : 'not found');
+
+          const profileData = {
+            id: updateData.user.id,
+            user_id: updateData.user.id,
+            organization_id: invitation.brokerage_id,
+            role: invitation.role,
+            email: invitation.email,
+            full_name: existingProfile?.full_name || invitation.email || 'User',
+          };
 
           const { error: profileUpdateError } = await supabase
             .from('profiles')
-            .upsert({
-              id: updateData.user.id,
-              user_id: updateData.user.id,
-              organization_id: invitation.brokerage_id,
-              role: invitation.role,
-              email: invitation.email,
-              full_name: invitation.email,
-            }, {
-              onConflict: 'id',
+            .upsert(profileData, {
+              onConflict: 'user_id',
             });
 
           if (profileUpdateError) {
