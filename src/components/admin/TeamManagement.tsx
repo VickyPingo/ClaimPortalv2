@@ -50,7 +50,7 @@ export default function TeamManagement() {
       const { data: currentProfile } = await supabase
         .from('profiles')
         .select('organization_id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (!currentProfile?.organization_id) {

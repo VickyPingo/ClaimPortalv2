@@ -115,6 +115,7 @@ export const handler: Handler = async (event) => {
         .upsert(
           {
             id: linkData.user.id,
+            user_id: linkData.user.id,
             organization_id: brokerageId,
             role: role,
             full_name: email,
@@ -122,7 +123,7 @@ export const handler: Handler = async (event) => {
             id_number: "",
             cell_number: "",
           },
-          { onConflict: "id" }
+          { onConflict: "user_id" }
         );
 
       if (profileError) {

@@ -151,7 +151,7 @@ export default function UsersManager() {
       const { error: profileError } = await supabase
         .from('profiles')
         .delete()
-        .eq('id', userId);
+        .eq('user_id', userId);
 
       if (profileError) {
         console.error('Error deleting profile:', profileError);

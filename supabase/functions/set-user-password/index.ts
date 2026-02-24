@@ -59,7 +59,7 @@ Deno.serve(async (req: Request) => {
     const { data: callingProfile, error: profileError } = await supabaseClient
       .from("profiles")
       .select("role")
-      .eq("id", callingUser.id)
+      .eq("user_id", callingUser.id)
       .maybeSingle();
 
     if (profileError || !callingProfile) {

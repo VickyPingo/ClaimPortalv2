@@ -219,7 +219,7 @@ export function SetPassword() {
         const { data: profile } = await supabase
           .from('profiles')
           .select('user_type, role, brokerage_id')
-          .eq('id', currentUser.id)
+          .eq('user_id', currentUser.id)
           .maybeSingle();
 
         const userRole = profile?.role || invitationRole;

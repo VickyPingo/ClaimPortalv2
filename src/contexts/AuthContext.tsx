@@ -218,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profileCheck } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('user_id', userId)
           .maybeSingle();
 
         if (profileCheck) {
@@ -229,7 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await supabase
               .from('profiles')
               .update({ role: 'super_admin' })
-              .eq('id', userId);
+              .eq('user_id', userId);
           }
         }
         return;
@@ -242,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (brokerProfileData) {
@@ -257,7 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase
             .from('profiles')
             .update({ role: 'super_admin' })
-            .eq('id', userId);
+            .eq('user_id', userId);
           profileWithBrokerageId.role = 'super_admin';
         }
 
@@ -359,7 +359,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: clientProfileData } = await supabase
         .from('client_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (clientProfileData) {
@@ -551,6 +551,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from('profiles')
       .insert({
         id: authData.user.id,
+        user_id: authData.user.id,
         organization_id: brokerageId,
         full_name: profile.full_name || email,
         email: email,
