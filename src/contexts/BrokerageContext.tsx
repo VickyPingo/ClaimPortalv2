@@ -39,42 +39,39 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
       const hostname = window.location.hostname;
       setCurrentDomain(hostname);
 
-      const platformDomains = ['claimsportal.co.za', 'localhost', '127.0.0.1'];
-      const isDevelopment = hostname.includes('localhost') ||
-                           hostname.includes('127.0.0.1') ||
-                           hostname.includes('webcontainer') ||
-                           hostname.includes('.local');
-
-      const isPlatform = platformDomains.includes(hostname) || isDevelopment;
-      setIsPlatformDomain(isPlatform);
-
       console.log('🌐 Domain Detection:');
       console.log('  Hostname:', hostname);
-      console.log('  Is Development:', isDevelopment);
-      console.log('  Is Platform Domain:', isPlatform);
-
-      if (isPlatform) {
-        console.log('✓ Platform/Development domain detected - skipping brokerage lookup');
-        setLoading(false);
-        return;
-      }
 
       try {
-        console.log('🔍 Looking up brokerage by full domain:', hostname);
+        console.log('🔍 Looking up brokerage from host via Netlify function');
 
-        const { data, error: fetchError } = await supabase
-          .rpc('get_brokerage_by_subdomain', { subdomain_param: hostname });
+        const response = await fetch('/.netlify/functions/get-brokerage-from-host', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
 
-        if (fetchError) {
-          console.error('Error fetching brokerage:', fetchError);
+        if (!response.ok) {
+          console.error('Brokerage lookup failed:', response.status);
           console.log('⚠️ Brokerage lookup failed, treating as platform domain');
           setIsPlatformDomain(true);
           setError(null);
+          setLoading(false);
           return;
         }
 
-        if (data && data.length > 0) {
-          const brokerageData = data[0];
+        const result = await response.json();
+
+        if (result.isPlatform) {
+          console.log('✓ Platform domain detected - skipping brokerage lookup');
+          setIsPlatformDomain(true);
+          setLoading(false);
+          return;
+        }
+
+        if (result.success && result.brokerage) {
+          const brokerageData = result.brokerage;
           setBrokerage(brokerageData);
 
           if (brokerageData.brand_color) {
@@ -82,6 +79,7 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
           }
           console.log('✓ Brokerage configuration loaded:', brokerageData.name);
           console.log('  Subdomain:', brokerageData.subdomain);
+          setIsPlatformDomain(false);
         } else {
           console.log('⚠️ No brokerage found for domain:', hostname);
           console.log('  Treating as platform domain');
