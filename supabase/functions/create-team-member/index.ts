@@ -93,55 +93,53 @@ Deno.serve(async (req: Request) => {
       throw new Error("A user with this email already exists");
     }
 
-    const temporaryPassword = `Temp${Math.random().toString(36).slice(-8)}!`;
-
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: linkData, error: generateError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'invite',
       email,
-      password: temporaryPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name,
+      options: {
+        data: {
+          full_name,
+        },
       },
     });
 
-    if (createError || !newUser.user) {
-      throw new Error(`Failed to create user: ${createError?.message || "Unknown error"}`);
+    if (generateError || !linkData) {
+      throw new Error(`Failed to generate invite link: ${generateError?.message || "Unknown error"}`);
     }
 
-    const { error: profileInsertError } = await supabaseAdmin
-      .from("profiles")
-      .insert({
-        id: newUser.user.id,
-        brokerage_id: callingProfile.brokerage_id,
-        full_name,
-        role,
-        user_type: "broker",
-        phone_number: phone_number || "",
-        id_number: id_number || "",
-      });
+    if (linkData?.user) {
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .upsert(
+          {
+            user_id: linkData.user.id,
+            brokerage_id: callingProfile.brokerage_id,
+            role: role || "broker",
+            full_name: full_name || email,
+            cell_number: phone_number || "",
+            id_number: id_number || "",
+          },
+          { onConflict: "user_id" }
+        );
 
-    if (profileInsertError) {
-      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id);
-      throw new Error(`Failed to create profile: ${profileInsertError.message}`);
-    }
-
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
-
-    if (inviteError) {
-      console.warn("Failed to send invitation email:", inviteError.message);
+      if (profileError) {
+        console.error("Failed to upsert profile:", profileError);
+        throw new Error(`Failed to create profile: ${profileError.message}`);
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         user: {
-          id: newUser.user.id,
-          email: newUser.user.email,
+          id: linkData.user.id,
+          email: linkData.user.email,
           full_name,
           role,
           brokerage_id: callingProfile.brokerage_id,
         },
-        message: "Team member created successfully. An invitation email has been sent.",
+        inviteLink: linkData.properties.action_link,
+        message: "Team member created successfully. An invitation link has been generated.",
       }),
       {
         status: 200,
