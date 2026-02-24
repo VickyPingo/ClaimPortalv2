@@ -108,15 +108,6 @@ export default function TeamManagement() {
       return;
     }
 
-    // Validate brokerageId from AuthContext
-    if (!brokerageId) {
-      setMessage({
-        type: 'error',
-        text: 'No brokerage found for current user. Please contact support.'
-      });
-      return;
-    }
-
     setSubmitting(true);
     setMessage(null);
 
@@ -132,7 +123,6 @@ export default function TeamManagement() {
           role: formData.role,
           phoneNumber: formData.phone_number,
           idNumber: formData.id_number,
-          brokerageId: brokerageId,
         }),
       });
 
