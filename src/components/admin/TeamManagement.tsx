@@ -49,18 +49,18 @@ export default function TeamManagement() {
 
       const { data: currentProfile } = await supabase
         .from('profiles')
-        .select('brokerage_id')
+        .select('organization_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!currentProfile?.brokerage_id) {
-        console.error('No brokerage found for current user');
+      if (!currentProfile?.organization_id) {
+        console.error('No organization found for current user');
         setLoading(false);
         return;
       }
 
       const { data: rawResult, error: profilesError } = await supabase.rpc('get_team_members_with_email', {
-        target_brokerage_id: currentProfile.brokerage_id
+        target_brokerage_id: currentProfile.organization_id
       });
 
       if (profilesError) {
@@ -70,7 +70,7 @@ export default function TeamManagement() {
         const { data: profiles, error: fallbackError } = await supabase
           .from('profiles')
           .select('id, full_name, email, role, cell_number, created_at')
-          .eq('brokerage_id', currentProfile.brokerage_id)
+          .eq('organization_id', currentProfile.organization_id)
           .order('created_at', { ascending: false });
 
         if (fallbackError) {
@@ -127,7 +127,11 @@ export default function TeamManagement() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          ...formData,
+          fullName: formData.full_name,
+          email: formData.email,
+          role: formData.role,
+          phoneNumber: formData.phone_number,
+          idNumber: formData.id_number,
           brokerageId: brokerageId,
         }),
       });
