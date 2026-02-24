@@ -25,6 +25,13 @@ export default function HomePageRouter() {
 
   const currentPath = window.location.pathname;
 
+  // SET PASSWORD ROUTE: Show SetPassword component for Supabase invite flow
+  // This MUST come before any auth checks to allow unauthenticated users to set their password
+  if (currentPath === '/set-password') {
+    console.log('🔐 Set password route - showing SetPassword for invite');
+    return <SetPassword />;
+  }
+
   // SIGNUP ROUTE: Show SetPassword component for invitation flow
   if (currentPath === '/signup') {
     console.log('📝 Signup route - showing SetPassword for invitation');

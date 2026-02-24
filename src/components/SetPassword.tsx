@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function SetPassword() {
-  const { completePasswordSetup } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,120 +13,132 @@ export function SetPassword() {
   const [success, setSuccess] = useState(false);
   const [invitationToken, setInvitationToken] = useState('');
   const [brokerId, setBrokerId] = useState('');
-  const [invitationValid, setInvitationValid] = useState<boolean | null>(null);
+  const [sessionEstablished, setSessionEstablished] = useState(false);
+  const [validatingSession, setValidatingSession] = useState(true);
   const [invitationRole, setInvitationRole] = useState('');
-  const [validationError, setValidationError] = useState<string>('');
 
   useEffect(() => {
-    // Check for invitation token in URL
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    const brokerIdParam = params.get('brokerId');
+    const initializeSession = async () => {
+      try {
+        console.log('🔐 Initializing password setup session');
 
-    if (token) {
-      console.log('🔗 Invitation token found:', token);
-      setInvitationToken(token);
-      if (brokerIdParam) {
-        setBrokerId(brokerIdParam);
-      }
-      validateInvitationToken(token);
-    } else {
-      // No token - check if user is already authenticated
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user?.email) {
-          setUserEmail(user.email);
-          setInvitationValid(true); // Already authenticated user
-        } else {
-          setInvitationValid(false); // No token and not authenticated
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        const brokerIdParam = params.get('brokerId');
+
+        if (token) {
+          setInvitationToken(token);
+          console.log('🎫 Invitation token found:', token);
         }
-      });
-    }
 
-    if (window.location.hash) {
-      console.log('🧹 Clearing URL hash');
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
+        if (brokerIdParam) {
+          setBrokerId(brokerIdParam);
+          console.log('🏢 Broker ID found:', brokerIdParam);
+        }
+
+        const hash = window.location.hash;
+        console.log('📍 Current hash:', hash);
+
+        if (hash && hash.includes('access_token')) {
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+
+          console.log('🔑 Found tokens in hash:', {
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken,
+          });
+
+          if (accessToken && refreshToken) {
+            console.log('🔄 Setting session from invite link tokens...');
+
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              console.error('❌ Failed to set session:', sessionError);
+              setError('Failed to establish session from invite link');
+              setValidatingSession(false);
+              return;
+            }
+
+            console.log('✅ Session established successfully');
+
+            const { data: userData, error: userError } = await supabase.auth.getUser();
+
+            if (userError || !userData.user) {
+              console.error('❌ Failed to get user after session:', userError);
+              setError('Failed to verify user session');
+              setValidatingSession(false);
+              return;
+            }
+
+            console.log('✅ User verified:', userData.user.email);
+            setUserEmail(userData.user.email || '');
+            setSessionEstablished(true);
+
+            if (token) {
+              await loadInvitationRole(token);
+            }
+
+            window.history.replaceState(
+              null,
+              '',
+              window.location.pathname + window.location.search
+            );
+          } else {
+            console.log('⚠️ Incomplete tokens in hash');
+            setError('Invite link is incomplete');
+            setValidatingSession(false);
+            return;
+          }
+        } else {
+          console.log('⚠️ No access token found in URL hash');
+
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            console.log('✅ User already authenticated:', user.email);
+            setUserEmail(user.email || '');
+            setSessionEstablished(true);
+
+            if (token) {
+              await loadInvitationRole(token);
+            }
+          } else {
+            setError('Invite link is invalid or expired. Please request a new invite.');
+            setValidatingSession(false);
+            return;
+          }
+        }
+
+        setValidatingSession(false);
+      } catch (err) {
+        console.error('❌ Error initializing session:', err);
+        setError('Failed to initialize password setup');
+        setValidatingSession(false);
+      }
+    };
+
+    initializeSession();
   }, []);
 
-  const validateInvitationToken = async (token: string) => {
+  const loadInvitationRole = async (token: string) => {
     try {
-      console.log('🔍 Validating invitation token:', token);
-      console.log('🔍 Making Supabase query...');
-
-      const { data: invitation, error } = await supabase
+      const { data: invitation } = await supabase
         .from('invitations')
-        .select('*,brokerages(name,subdomain)')
+        .select('role')
         .eq('token', token)
         .eq('is_active', true)
         .maybeSingle();
 
-      console.log('📊 Query response:', { invitation, error });
-      console.log('📊 Error details:', error);
-      console.log('📊 Invitation data:', invitation);
-
-      if (error) {
-        console.error('❌ Error validating invitation:', error);
-        console.error('❌ Error code:', error.code);
-        console.error('❌ Error message:', error.message);
-        console.error('❌ Error details:', error.details);
-        console.error('❌ Error hint:', error.hint);
-        setInvitationValid(false);
-
-        // Build detailed error message for debugging
-        let errorDetails = `Database error: ${error.message}`;
-        if (error.code) {
-          errorDetails += ` (Code: ${error.code})`;
-        }
-        if (error.hint) {
-          errorDetails += ` - Hint: ${error.hint}`;
-        }
-        if (error.details) {
-          errorDetails += ` - Details: ${error.details}`;
-        }
-
-        setError('Failed to validate invitation');
-        setValidationError(errorDetails);
-        return;
-      }
-
-      if (!invitation) {
-        console.log('❌ Invitation not found or inactive');
-        console.log('❌ Token searched:', token);
-        setInvitationValid(false);
-        setError('Invalid or expired invitation link');
-        setValidationError(`No active invitation found with token: ${token.substring(0, 8)}...`);
-        return;
-      }
-
-      // Check if expired
-      if (new Date(invitation.expires_at) < new Date()) {
-        console.log('❌ Invitation expired');
-        setInvitationValid(false);
-        setError('This invitation has expired');
-        setValidationError(`Expired on: ${new Date(invitation.expires_at).toLocaleString()}`);
-        return;
-      }
-
-      // Check if maxed out
-      if (invitation.max_uses && invitation.used_count >= invitation.max_uses) {
-        console.log('❌ Invitation max uses reached');
-        setInvitationValid(false);
-        setError('This invitation has reached its maximum uses');
-        setValidationError(`Used ${invitation.used_count} of ${invitation.max_uses} times`);
-        return;
-      }
-
-      console.log('✅ Invitation is valid');
-      setInvitationValid(true);
-      setInvitationRole(invitation.role);
-      if (invitation.email) {
-        setUserEmail(invitation.email);
+      if (invitation) {
+        setInvitationRole(invitation.role);
+        console.log('📋 Invitation role loaded:', invitation.role);
       }
     } catch (err) {
-      console.error('❌ Error validating invitation:', err);
-      setInvitationValid(false);
-      setError('Failed to validate invitation');
-      setValidationError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.warn('⚠️ Could not load invitation role:', err);
     }
   };
 
@@ -155,137 +165,89 @@ export function SetPassword() {
     setLoading(true);
 
     try {
-      console.log('🔐 Setting password for invited user');
+      console.log('🔐 Setting password for user');
 
-      // If we have an invitation token, create a new user account
+      const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+        password: password,
+      });
+
+      if (updateError) {
+        console.error('❌ Failed to set password:', updateError);
+        throw updateError;
+      }
+
+      if (!updateData.user) {
+        throw new Error('Failed to update user');
+      }
+
+      console.log('✅ Password set successfully');
+
       if (invitationToken) {
-        console.log('📝 Creating new user account with invitation');
-
-        if (!userEmail) {
-          throw new Error('Email is required for signup');
-        }
-
-        // Get brokerage code from URL if present (for client signup)
-const params = new URLSearchParams(window.location.search);
-const signupCode = params.get("b");
-
-const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-  email: userEmail,
-  password: password,
-  options: {
-    data: {
-      invitation_token: invitationToken,
-      role: invitationRole || "client",
-      signup_code: signupCode,   // <-- THIS is the important line
-    },
-  },
-});
-
-        if (signUpError) {
-          console.error('❌ Failed to sign up:', signUpError);
-          throw signUpError;
-        }
-
-        if (!signUpData.user) {
-          throw new Error('Failed to create user');
-        }
-
-        console.log('✅ User created successfully');
-
-        // Mark invitation as used - increment the counter
-        const { data: invitationData, error: fetchError } = await supabase
-          .from('invitations')
-          .select('used_count')
-          .eq('token', invitationToken)
-          .maybeSingle();
-
-        if (!fetchError && invitationData) {
-          const { error: updateError } = await supabase
+        try {
+          const { data: invitationData } = await supabase
             .from('invitations')
-            .update({ used_count: invitationData.used_count + 1 })
-            .eq('token', invitationToken);
+            .select('used_count')
+            .eq('token', invitationToken)
+            .maybeSingle();
 
-          if (updateError) {
-            console.warn('⚠️ Failed to update invitation count:', updateError);
+          if (invitationData) {
+            await supabase
+              .from('invitations')
+              .update({ used_count: invitationData.used_count + 1 })
+              .eq('token', invitationToken);
+
+            console.log('✅ Invitation marked as used');
           }
+        } catch (err) {
+          console.warn('⚠️ Failed to mark invitation as used:', err);
         }
-
-        // Explicitly sign in the user after signup
-        console.log('🔐 Signing in user after signup...');
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: userEmail,
-          password: password,
-        });
-
-        if (signInError) {
-          console.error('❌ Failed to sign in after signup:', signInError);
-          throw signInError;
-        }
-
-        console.log('✅ User signed in successfully');
-      } else {
-        // Existing user setting password
-        const { data: updateData, error: updateError } = await supabase.auth.updateUser({
-          password: password,
-        });
-
-        if (updateError) {
-          console.error('❌ Failed to set password:', updateError);
-          throw updateError;
-        }
-
-        if (!updateData.user) {
-          throw new Error('Failed to update user');
-        }
-
-        console.log('✓ Password set successfully');
       }
 
       setSuccess(true);
       setLoading(false);
 
-      // Redirect immediately based on invitation role
       setTimeout(async () => {
-        console.log('🚀 Redirecting user based on role:', invitationRole || 'client');
+        console.log('🚀 Redirecting user based on role:', invitationRole || 'unknown');
 
-        if (invitationRole === 'super_admin') {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+        if (!currentUser) {
+          window.location.href = '/';
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_type, role, brokerage_id')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        const userRole = profile?.role || invitationRole;
+
+        if (userRole === 'super_admin') {
           window.location.href = '/admin-dashboard';
-        } else if (invitationRole === 'broker' || invitationRole === 'main_broker' || invitationRole === 'admin') {
-          // Fetch brokerage subdomain for broker redirect
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-          if (currentUser) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('brokerage_id')
-              .eq('id', currentUser.id)
+        } else if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'admin') {
+          if (profile?.brokerage_id) {
+            const { data: brokerage } = await supabase
+              .from('brokerages')
+              .select('subdomain, slug')
+              .eq('id', profile.brokerage_id)
               .maybeSingle();
 
-            if (profile?.brokerage_id) {
-              const { data: brokerage } = await supabase
-                .from('brokerages')
-                .select('subdomain, slug')
-                .eq('id', profile.brokerage_id)
-                .maybeSingle();
+            if (brokerage) {
+              const brokerageSubdomain = brokerage.subdomain || brokerage.slug;
 
-              if (brokerage) {
-                const brokerageSubdomain = brokerage.subdomain || brokerage.slug;
+              if (brokerageSubdomain) {
+                const currentHostname = window.location.hostname;
 
-                if (brokerageSubdomain) {
-                  const currentHostname = window.location.hostname;
-                  const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
-
-                  // Redirect to brokerage subdomain if not on localhost
-                  if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
-                    window.location.href = `https://${expectedHostname}/dashboard/broker`;
-                    return;
-                  }
+                if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
+                  window.location.href = `https://${brokerageSubdomain}.claimsportal.co.za/dashboard/broker`;
+                  return;
                 }
               }
             }
           }
 
-          // Fallback if subdomain lookup fails
           window.location.href = '/dashboard/broker';
         } else {
           window.location.href = '/dashboard/client';
@@ -308,8 +270,20 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
 
   const strength = passwordStrength();
 
-  // Show error if invitation is invalid
-  if (invitationValid === false) {
+  if (validatingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="flex justify-center mb-4">
+            <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          </div>
+          <p className="text-center text-slate-600">Validating invite link...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionEstablished) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
@@ -320,21 +294,12 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           </div>
 
           <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">
-            Invalid Invitation Link
+            Invalid Invite Link
           </h1>
 
-          <p className="text-center text-slate-600 mb-4">
-            {error || 'This invitation link is invalid, expired, or has already been used.'}
+          <p className="text-center text-slate-600 mb-6">
+            {error || 'This invite link is invalid or expired. Please request a new invite.'}
           </p>
-
-          {validationError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-sm font-semibold text-red-900 mb-1">Technical Details:</p>
-              <p className="text-xs text-red-700 font-mono break-words">
-                {validationError}
-              </p>
-            </div>
-          )}
 
           <button
             onClick={() => window.location.href = '/'}
@@ -342,20 +307,6 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           >
             Return to Home
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading while validating invitation
-  if (invitationValid === null) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-          <div className="flex justify-center mb-4">
-            <div className="animate-spin w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-          </div>
-          <p className="text-center text-slate-600">Validating invitation...</p>
         </div>
       </div>
     );
@@ -372,11 +323,11 @@ const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           </div>
 
           <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">
-            Organisation Account Activated
+            Password Set Successfully
           </h1>
 
           <p className="text-center text-slate-600 mb-6">
-            Your password has been set successfully. Redirecting to your dashboard...
+            Your password has been set. Redirecting to your dashboard...
           </p>
 
           <div className="flex justify-center">
