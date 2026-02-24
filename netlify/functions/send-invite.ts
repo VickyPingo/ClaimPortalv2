@@ -8,9 +8,29 @@ const supabaseAdmin = createClient(
 );
 
 export const handler: Handler = async (event) => {
+
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+
+  // Handle CORS preflight
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: "",
+    };
+  }
+
   try {
     if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method not allowed" };
+      return {
+        statusCode: 405,
+        headers: corsHeaders,
+        body: "Method not allowed",
+      };
     }
 
     const { email, role, brokerageId } = JSON.parse(event.body || "{}");
