@@ -1,28 +1,54 @@
-import { Handler } from "@netlify/functions";
+import type { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "crypto";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-export const handler: Handler = async (event) => {
-  console.log("create-team-member called", event.httpMethod);
+function getHost(event: any) {
+  return (
+    event.headers?.["x-forwarded-host"] ||
+    event.headers?.["host"] ||
+    event.headers?.["Host"] ||
+    ""
+  );
+}
 
-  // Handle CORS preflight
+function getSubdomainFromHost(host: string) {
+  // host examples:
+  // - independi.claimsportal.co.za
+  // - claimsportal.co.za
+  // - localhost:5173
+  if (!host) return null;
+
+  const clean = host.split(":")[0].toLowerCase();
+
+  if (clean === "localhost" || clean === "127.0.0.1") return null;
+
+  // If it's a tenant subdomain of claimsportal.co.za
+  if (clean.endsWith(".claimsportal.co.za")) {
+    const parts = clean.split(".");
+    // independi.claimsportal.co.za => ["independi","claimsportal","co","za"]
+    if (parts.length >= 4) return parts[0];
+  }
+
+  return null;
+}
+
+export const handler: Handler = async (event) => {
+  // ✅ CORS preflight
   if (event.httpMethod === "OPTIONS") {
-    console.log("OPTIONS preflight request");
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ success: true }),
+      body: "ok",
     };
   }
 
   if (event.httpMethod !== "POST") {
-    console.log("Invalid method:", event.httpMethod);
     return {
       statusCode: 405,
       headers: corsHeaders,
@@ -32,147 +58,185 @@ export const handler: Handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || "{}");
-    console.log("body", body);
 
     const {
       fullName,
       email,
-      role,
+      role, // "broker" | "staff" | "main_broker" etc.
       phoneNumber,
       idNumber,
-      brokerageId,
+      // NOTE: brokerageId can still be sent, but we no longer REQUIRE it
+      brokerageId: brokerageIdFromUI,
     } = body;
 
-    if (!email || !brokerageId) {
-      console.error("Missing required fields:", { email: !!email, brokerageId: !!brokerageId });
+    if (!email) {
       return {
         statusCode: 400,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Missing required fields: email and brokerageId" }),
+        body: JSON.stringify({ error: "Missing required field: email" }),
       };
     }
 
-    console.log("Creating Supabase client");
-    const supabase = createClient(
+    const supabaseAdmin = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 0) Fetch brokerage subdomain for redirectTo URL
-    console.log("Fetching brokerage subdomain for:", brokerageId);
-    const { data: brokerageData, error: brokerageError } = await supabase
-      .from("brokerages")
-      .select("subdomain, slug")
-      .eq("id", brokerageId)
-      .maybeSingle();
+    // ✅ 1) Detect tenant from the URL subdomain
+    const host = getHost(event);
+    const tenantSubdomain = getSubdomainFromHost(host);
 
-    if (brokerageError) {
-      console.error("Failed to fetch brokerage:", brokerageError);
-      return {
-        statusCode: 500,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: "Failed to fetch brokerage details" }),
-      };
+    // ✅ 2) Find brokerage
+    // Priority:
+    // - If UI sent brokerageId, use it
+    // - Else use tenantSubdomain (independi)
+    let brokerageId = brokerageIdFromUI as string | undefined;
+
+    if (!brokerageId) {
+      if (!tenantSubdomain) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            error:
+              "No brokerageId provided and no tenant subdomain found. You must invite from a tenant URL like independi.claimsportal.co.za",
+            debug: { host },
+          }),
+        };
+      }
+
+      const { data: brokerage, error: brokerageErr } = await supabaseAdmin
+        .from("brokerages")
+        .select("id, subdomain, slug, signup_code")
+        .or(
+          `subdomain.eq.${tenantSubdomain},slug.eq.${tenantSubdomain},signup_code.eq.${tenantSubdomain}`
+        )
+        .maybeSingle();
+
+      if (brokerageErr || !brokerage?.id) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            error: "Could not find brokerage for this subdomain",
+            debug: { host, tenantSubdomain, brokerageErr },
+          }),
+        };
+      }
+
+      brokerageId = brokerage.id;
     }
 
-    if (!brokerageData) {
-      console.error("Brokerage not found:", brokerageId);
-      return {
-        statusCode: 404,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: "Brokerage not found" }),
-      };
-    }
-
-    const tenant = brokerageData.subdomain || brokerageData.slug;
-    if (!tenant) {
-      console.error("Brokerage has no subdomain or slug:", brokerageId);
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: "Brokerage has no subdomain configured" }),
-      };
-    }
-
-    console.log("Brokerage tenant subdomain:", tenant);
-
-    // 1) Create invitation record
-    console.log("Creating invitation for:", email);
+    // ✅ 3) Create invitation row
     const token = randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: invite, error: inviteError } = await supabase
-      .from("invitations")
-      .insert({
-        email,
-        role: role || "broker",
-        brokerage_id: brokerageId,
-        token,
-        expires_at: expiresAt,
-        is_active: true,
-        used_count: 0,
-        max_uses: 1,
-      })
-      .select()
-      .single();
-
-    if (inviteError) {
-      console.error("Invite creation failed:", inviteError);
-      return {
-        statusCode: 500,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: inviteError.message }),
-      };
-    }
-
-    console.log("Invitation created successfully:", invite);
-
-    // 2) Generate Supabase invite link with tenant-specific redirectTo
-    const redirectTo = `https://${tenant}.claimsportal.co.za/set-password?token=${token}&brokerId=${brokerageId}`;
-    console.log("Generating invite link with redirectTo:", redirectTo);
-
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: "invite",
+    const { error: inviteErr } = await supabaseAdmin.from("invitations").insert({
       email,
-      options: {
-        redirectTo,
-      },
+      role: role || "broker",
+      brokerage_id: brokerageId,
+      token,
+      expires_at: expiresAt,
+      is_active: true,
+      used_count: 0,
+      max_uses: 1,
     });
 
-    if (linkError) {
-      console.error("Failed to generate invite link:", linkError);
+    if (inviteErr) {
       return {
         statusCode: 500,
         headers: corsHeaders,
-        body: JSON.stringify({ error: linkError.message }),
+        body: JSON.stringify({ error: inviteErr.message }),
       };
     }
 
-    console.log("Invite link generated successfully");
+    // ✅ 4) Generate Supabase invite link (lets them SET THEIR OWN PASSWORD)
+    // IMPORTANT:
+    // We redirect to the TENANT URL (subdomain) so they stay in the right brokerage portal.
+    const tenant = tenantSubdomain || "claimsportal"; // fallback
 
-    // 3) Auto-populate profiles table with organization_id (mapped from brokerage_id)
-    if (linkData?.user) {
-      console.log("Auto-populating profiles for user:", linkData.user.id);
+    const redirectTo = `https://${tenant}.claimsportal.co.za/set-password?token=${token}&brokerId=${brokerageId}`;
 
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert(
-          {
-            id: linkData.user.id,
-            organization_id: brokerageId,
-            role: role || "broker",
-            full_name: fullName || email,
-            email: email,
-            cell_number: phoneNumber || "",
-            id_number: idNumber || "",
-          },
-          { onConflict: "id" }
-        );
+    const { data: linkData, error: linkErr } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: { redirectTo },
+      });
 
-      if (profileError) {
-        console.error("Failed to create profiles entry:", profileError);
-      } else {
-        console.log("profiles entry created successfully");
+    if (linkErr) {
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: linkErr.message }),
+      };
+    }
+
+    const inviteUrl = linkData?.properties?.action_link;
+
+    // ✅ 5) CRITICAL: Upsert broker profile so your app finds brokerage_id immediately
+    // NOTE: Your DB uses user_id as the primary key (from your screenshot), not "id"
+    if (linkData?.user?.id) {
+      await supabaseAdmin.from("profiles").upsert(
+        {
+          user_id: linkData.user.id,
+          brokerage_id: brokerageId,
+          role: role || "broker",
+          full_name: fullName || email,
+          cell_number: phoneNumber || "",
+          id_number: idNumber || "",
+        },
+        { onConflict: "user_id" }
+      );
+    }
+
+    // ✅ 6) Optional: send email via Resend (if env vars exist)
+    const resendKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM_EMAIL;
+
+    if (resendKey && from && inviteUrl) {
+      const subject = "You're invited to Claims Portal";
+      const html = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.5">
+          <h2>You’re invited</h2>
+          <p>Click below to set your password and get started:</p>
+          <p>
+            <a href="${inviteUrl}"
+              style="display:inline-block;padding:10px 14px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">
+              Accept Invite & Set Password
+            </a>
+          </p>
+          <p style="color:#666;font-size:12px;">This link expires in 7 days.</p>
+        </div>
+      `;
+
+      const resp = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from,
+          to: email,
+          subject,
+          html,
+        }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        // Don’t fail the invite if email fails — return link so you can still use it
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            emailSent: false,
+            resendError: text,
+            inviteUrl,
+          }),
+        };
       }
     }
 
@@ -181,16 +245,15 @@ export const handler: Handler = async (event) => {
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
-        inviteUrl: linkData?.properties?.action_link,
-        invitation: invite,
+        emailSent: !!(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL),
+        inviteUrl,
       }),
     };
-  } catch (error: any) {
-    console.error("Unexpected error in create-team-member:", error);
+  } catch (err: any) {
     return {
       statusCode: 500,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error.message || String(error) }),
+      body: JSON.stringify({ error: err?.message || String(err) }),
     };
   }
 };
