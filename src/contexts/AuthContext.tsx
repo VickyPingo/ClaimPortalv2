@@ -517,6 +517,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('   Email:', email);
     console.log('   Is Independi Subdomain:', isIndependiSubdomain());
 
+    // CRITICAL: Check if user has an existing invitation first
+    const { data: existingInvite } = await supabase
+      .from('invitations')
+      .select('role, brokerage_id, is_active')
+      .eq('email', email)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (existingInvite) {
+      console.log('⚠️ User has pending invitation with role:', existingInvite.role);
+      console.log('❌ BLOCKING broker signup - user should complete invite flow instead');
+      throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
+    }
+
     // CRITICAL: Determine role based on email and subdomain
     let assignedRole = 'broker';
 
@@ -683,12 +697,27 @@ const clientSignUp = async (
     throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
   }
 
+  // CRITICAL: Check if user has an existing invitation first
+  const { data: existingInvite } = await supabase
+    .from('invitations')
+    .select('role, brokerage_id, is_active')
+    .eq('email', email)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (existingInvite) {
+    console.log('⚠️ User has pending invitation with role:', existingInvite.role);
+    console.log('❌ BLOCKING client signup - user should complete invite flow instead');
+    throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
         role: 'client',
+        user_type: 'client',
         brokerage_slug: brokerageSlug,
         full_name: profile.full_name,
         cell_number: profile.cell_number,
