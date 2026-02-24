@@ -22,7 +22,7 @@ interface AddMemberFormData {
 }
 
 export default function TeamManagement() {
-  const { user } = useAuth();
+  const { user, brokerageId } = useAuth();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -108,20 +108,19 @@ export default function TeamManagement() {
       return;
     }
 
+    // Validate brokerageId from AuthContext
+    if (!brokerageId) {
+      setMessage({
+        type: 'error',
+        text: 'No brokerage found for current user. Please contact support.'
+      });
+      return;
+    }
+
     setSubmitting(true);
     setMessage(null);
 
     try {
-      const { data: currentProfile } = await supabase
-        .from('profiles')
-        .select('brokerage_id')
-        .eq('id', user!.id)
-        .maybeSingle();
-
-      if (!currentProfile?.brokerage_id) {
-        throw new Error('No brokerage found');
-      }
-
       const response = await fetch('/.netlify/functions/create-team-member', {
         method: 'POST',
         headers: {
@@ -129,7 +128,7 @@ export default function TeamManagement() {
         },
         body: JSON.stringify({
           ...formData,
-          brokerageId: currentProfile.brokerage_id,
+          brokerageId: brokerageId,
         }),
       });
 
