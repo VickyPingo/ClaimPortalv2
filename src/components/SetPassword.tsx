@@ -24,7 +24,7 @@ export function SetPassword() {
 
         const params = new URLSearchParams(window.location.search);
         const token = params.get('token');
-        const brokerIdParam = params.get('brokerId');
+        const brokerIdParam = params.get('brokerId') || params.get('brokerID') || params.get('brokerageId');
 
         if (token) {
           setInvitationToken(token);
@@ -165,7 +165,8 @@ export function SetPassword() {
     setLoading(true);
 
     try {
-      console.log('🔐 Setting password for user');
+      // Step 1: Set the password
+      console.log('🔐 Step 1: Setting password for user');
 
       const { data: updateData, error: updateError } = await supabase.auth.updateUser({
         password: password,
@@ -173,7 +174,7 @@ export function SetPassword() {
 
       if (updateError) {
         console.error('❌ Failed to set password:', updateError);
-        throw updateError;
+        throw new Error(`Failed to set password: ${updateError.message}`);
       }
 
       if (!updateData.user) {
@@ -182,15 +183,29 @@ export function SetPassword() {
 
       console.log('✅ Password set successfully for user:', updateData.user.id);
 
-      // CRITICAL: Process invitation and update profile with correct role and brokerage_id
+      // Step 2: Get authenticated user
+      console.log('🔐 Step 2: Getting authenticated user');
+      const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+
+      if (getUserError || !user) {
+        console.error('❌ Failed to get authenticated user:', getUserError);
+        throw new Error('Failed to get authenticated user');
+      }
+
+      console.log('✅ Authenticated user retrieved:', user.id);
+
+      // Step 3: Process invitation if token exists
+      let finalRole = 'broker';
+      let finalBrokerageId = brokerId;
+
       if (invitationToken) {
-        console.log('🎫 Processing invitation token:', invitationToken);
+        console.log('🎫 Step 3: Processing invitation token:', invitationToken);
 
         try {
-          // Step 1: Fetch invitation details
+          // Fetch invitation details
           const { data: invitation, error: inviteError } = await supabase
             .from('invitations')
-            .select('role, brokerage_id, email, is_active, used_count, max_uses')
+            .select('role, brokerage_id, is_active, used_count, max_uses')
             .eq('token', invitationToken)
             .maybeSingle();
 
@@ -204,7 +219,7 @@ export function SetPassword() {
             throw new Error('Invitation not found');
           }
 
-          console.log('📋 Invitation found:', {
+          console.log('✅ Invitation loaded:', {
             role: invitation.role,
             brokerage_id: invitation.brokerage_id,
             is_active: invitation.is_active,
@@ -212,70 +227,21 @@ export function SetPassword() {
             max_uses: invitation.max_uses,
           });
 
-          // Step 2: Validate invitation
+          // Validate invitation
           if (!invitation.is_active) {
             console.error('❌ Invitation is not active');
             throw new Error('This invitation has been deactivated');
           }
 
-          if (invitation.used_count >= invitation.max_uses) {
+          if (invitation.max_uses && invitation.used_count >= invitation.max_uses) {
             console.error('❌ Invitation has been fully used');
             throw new Error('This invitation has already been used');
           }
 
-          // Step 3: Update profile with correct role and organization_id
-          console.log('📝 Updating profile for user:', updateData.user.id);
-          console.log('   Setting role:', invitation.role);
-          console.log('   Setting organization_id (from invitation.brokerage_id):', invitation.brokerage_id);
+          finalRole = invitation.role;
+          finalBrokerageId = invitation.brokerage_id || finalBrokerageId;
 
-          // Check if profile already exists
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('id, user_id, full_name, email')
-            .eq('user_id', updateData.user.id)
-            .maybeSingle();
-
-          console.log('   Existing profile:', existingProfile ? 'found' : 'not found');
-
-          const profileData = {
-            id: updateData.user.id,
-            user_id: updateData.user.id,
-            organization_id: invitation.brokerage_id,
-            role: invitation.role,
-            email: invitation.email,
-            full_name: existingProfile?.full_name || invitation.email || 'User',
-          };
-
-          const { error: profileUpdateError } = await supabase
-            .from('profiles')
-            .upsert(profileData, {
-              onConflict: 'user_id',
-            });
-
-          if (profileUpdateError) {
-            console.error('❌ Failed to update profile:', profileUpdateError);
-            throw new Error(`Failed to update profile: ${profileUpdateError.message}`);
-          }
-
-          console.log('✅ Profile updated successfully with role:', invitation.role);
-
-          // Step 4: Mark invitation as used
-          console.log('📝 Marking invitation as used');
-
-          const { error: inviteUpdateError } = await supabase
-            .from('invitations')
-            .update({
-              used_count: invitation.used_count + 1,
-              is_active: false,
-            })
-            .eq('token', invitationToken);
-
-          if (inviteUpdateError) {
-            console.error('❌ Failed to update invitation:', inviteUpdateError);
-            // Don't throw - profile is updated, this is not critical
-          } else {
-            console.log('✅ Invitation marked as used');
-          }
+          console.log('✅ Using invitation data - role:', finalRole, 'brokerage_id:', finalBrokerageId);
 
         } catch (inviteErr) {
           console.error('❌ Invitation processing error:', inviteErr);
@@ -283,13 +249,83 @@ export function SetPassword() {
           setLoading(false);
           return;
         }
+      } else {
+        console.log('ℹ️ No invitation token - using defaults');
+      }
+
+      // Step 4: Upsert profile
+      console.log('📝 Step 4: Upserting profile for user:', user.id);
+
+      // Check for existing profile to preserve full_name
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      console.log('   Existing profile:', existingProfile ? 'found' : 'not found');
+
+      const profileData = {
+        user_id: user.id,
+        brokerage_id: finalBrokerageId,
+        role: finalRole,
+        full_name: existingProfile?.full_name || user.email || 'User',
+      };
+
+      console.log('   Profile data to upsert:', profileData);
+
+      const { error: profileUpdateError } = await supabase
+        .from('profiles')
+        .upsert(profileData, {
+          onConflict: 'user_id',
+        });
+
+      if (profileUpdateError) {
+        console.error('❌ Failed to upsert profile:', profileUpdateError);
+        throw new Error(`Failed to update profile: ${profileUpdateError.message}`);
+      }
+
+      console.log('✅ Profile upserted successfully with role:', finalRole);
+
+      // Step 5: Mark invitation as used (if token exists)
+      if (invitationToken) {
+        console.log('📝 Step 5: Marking invitation as used');
+
+        const { data: currentInvitation } = await supabase
+          .from('invitations')
+          .select('used_count, max_uses')
+          .eq('token', invitationToken)
+          .maybeSingle();
+
+        if (currentInvitation) {
+          const newUsedCount = currentInvitation.used_count + 1;
+          const shouldDeactivate = currentInvitation.max_uses
+            ? newUsedCount >= currentInvitation.max_uses
+            : false;
+
+          const { error: inviteUpdateError } = await supabase
+            .from('invitations')
+            .update({
+              used_count: newUsedCount,
+              is_active: shouldDeactivate ? false : true,
+            })
+            .eq('token', invitationToken);
+
+          if (inviteUpdateError) {
+            console.error('❌ Failed to update invitation:', inviteUpdateError);
+            // Don't throw - profile is updated, this is not critical
+          } else {
+            console.log('✅ Invitation marked as used. Count:', newUsedCount, 'Active:', !shouldDeactivate);
+          }
+        }
       }
 
       setSuccess(true);
       setLoading(false);
 
+      // Step 6: Redirect based on role
       setTimeout(async () => {
-        console.log('🚀 Redirecting user based on role');
+        console.log('🚀 Step 6: Redirecting user based on role:', finalRole);
 
         const { data: { user: currentUser } } = await supabase.auth.getUser();
 
@@ -298,19 +334,19 @@ export function SetPassword() {
           return;
         }
 
-        // Fetch updated profile
+        // Fetch updated profile to get the actual role
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, organization_id')
+          .select('role, brokerage_id')
           .eq('user_id', currentUser.id)
           .maybeSingle();
 
         console.log('👤 User profile loaded:', {
           role: profile?.role,
-          organization_id: profile?.organization_id,
+          brokerage_id: profile?.brokerage_id,
         });
 
-        const userRole = profile?.role || invitationRole;
+        const userRole = profile?.role || finalRole;
 
         if (userRole === 'super_admin') {
           console.log('🔀 Redirecting to super admin dashboard');
@@ -318,11 +354,11 @@ export function SetPassword() {
         } else if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'admin') {
           console.log('🔀 Redirecting to broker dashboard');
 
-          if (profile?.organization_id) {
+          if (profile?.brokerage_id) {
             const { data: brokerage } = await supabase
               .from('brokerages')
               .select('subdomain, slug')
-              .eq('id', profile.organization_id)
+              .eq('id', profile.brokerage_id)
               .maybeSingle();
 
             if (brokerage) {
