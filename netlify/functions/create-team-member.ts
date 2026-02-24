@@ -1,5 +1,6 @@
 import { Handler } from "@netlify/functions";
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "crypto";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -59,16 +60,20 @@ export const handler: Handler = async (event) => {
 
     // 1) Create invitation record
     console.log("Creating invitation for:", email);
+    const token = randomUUID();
+const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: invite, error: inviteError } = await supabase
       .from("invitations")
-      .insert({
-        email,
-        role,
-        brokerage_id: brokerageId,
-        max_uses: 1,
-        used_count: 0,
-        is_active: true,
-      })
+   .insert({
+  email,
+  role,
+  brokerage_id: brokerageId,
+  token,
+  expires_at: expiresAt,
+  is_active: true,
+  used_count: 0,
+  max_uses: 1,
+})
       .select()
       .single();
 
@@ -89,7 +94,7 @@ export const handler: Handler = async (event) => {
       type: "invite",
       email,
       options: {
-        redirectTo: `${process.env.SITE_URL || 'https://claimsportal.co.za'}/set-password?token=${invite.token}&brokerId=${brokerageId}`,
+        redirectTo: `${process.env.SITE_URL || "https://claimsportal.co.za"}/set-password?token=${token}&brokerId=${brokerageId}`,
       },
     });
 
