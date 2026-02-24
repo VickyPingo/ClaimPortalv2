@@ -22,6 +22,29 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    // Fetch brokerage details to get tenant subdomain
+    const { data: brokerageData, error: brokerageError } = await supabaseAdmin
+      .from("brokerages")
+      .select("subdomain, slug")
+      .eq("id", brokerageId)
+      .maybeSingle();
+
+    if (brokerageError || !brokerageData) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Invalid brokerage ID" }),
+      };
+    }
+
+    const tenant = brokerageData.subdomain || brokerageData.slug;
+
+    if (!tenant) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Brokerage has no subdomain or slug" }),
+      };
+    }
+
     const token = randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -39,12 +62,29 @@ export const handler: Handler = async (event) => {
 
     if (dbErr) throw dbErr;
 
-    // 2) Send email via Resend
+    // 2) Generate Supabase invite link
+    const { data: linkData, error: linkError } =
+      await supabaseAdmin.auth.admin.generateLink({
+        type: "invite",
+        email,
+        options: {
+          redirectTo: `https://${tenant}.claimsportal.co.za/set-password?token=${token}&brokerId=${brokerageId}`,
+        },
+      });
+
+    if (linkError) {
+      console.error("Generate invite link failed:", linkError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: linkError.message }),
+      };
+    }
+
+    const inviteUrl = linkData.properties.action_link;
+
+    // 3) Send email via Resend
     const from = process.env.RESEND_FROM_EMAIL!;
     const resendKey = process.env.RESEND_API_KEY!;
-    const baseUrl = process.env.APP_BASE_URL!;
-
-    const inviteUrl = `${baseUrl}/set-password?token=${token}`;
 
     const subject =
       role === "main_broker"
@@ -54,16 +94,17 @@ export const handler: Handler = async (event) => {
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.5">
         <h2>You're invited</h2>
-        <p>You’ve been invited to Claims Portal as <b>${role}</b>.</p>
+        <p>You've been invited to Claims Portal as <b>${role}</b>.</p>
         <p>Click the button below to set your password and get started:</p>
         <p>
           <a href="${inviteUrl}"
              style="display:inline-block;padding:10px 14px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">
-             Accept Invite
+             Accept Invite & Set Password
           </a>
         </p>
-        <p>If the button doesn’t work, copy/paste this link:</p>
+        <p>If the button doesn't work, copy/paste this link:</p>
         <p><a href="${inviteUrl}">${inviteUrl}</a></p>
+        <p style="color:#666;font-size:12px;margin-top:20px;">This invitation link will expire in 7 days.</p>
       </div>
     `;
 
