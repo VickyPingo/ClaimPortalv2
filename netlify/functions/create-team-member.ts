@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -58,22 +58,61 @@ export const handler: Handler = async (event) => {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // 0) Fetch brokerage subdomain for redirectTo URL
+    console.log("Fetching brokerage subdomain for:", brokerageId);
+    const { data: brokerageData, error: brokerageError } = await supabase
+      .from("brokerages")
+      .select("subdomain, slug")
+      .eq("id", brokerageId)
+      .maybeSingle();
+
+    if (brokerageError) {
+      console.error("Failed to fetch brokerage:", brokerageError);
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Failed to fetch brokerage details" }),
+      };
+    }
+
+    if (!brokerageData) {
+      console.error("Brokerage not found:", brokerageId);
+      return {
+        statusCode: 404,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Brokerage not found" }),
+      };
+    }
+
+    const tenant = brokerageData.subdomain || brokerageData.slug;
+    if (!tenant) {
+      console.error("Brokerage has no subdomain or slug:", brokerageId);
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: "Brokerage has no subdomain configured" }),
+      };
+    }
+
+    console.log("Brokerage tenant subdomain:", tenant);
+
     // 1) Create invitation record
     console.log("Creating invitation for:", email);
     const token = randomUUID();
-const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data: invite, error: inviteError } = await supabase
       .from("invitations")
-   .insert({
-  email,
-  role,
-  brokerage_id: brokerageId,
-  token,
-  expires_at: expiresAt,
-  is_active: true,
-  used_count: 0,
-  max_uses: 1,
-})
+      .insert({
+        email,
+        role: role || "broker",
+        brokerage_id: brokerageId,
+        token,
+        expires_at: expiresAt,
+        is_active: true,
+        used_count: 0,
+        max_uses: 1,
+      })
       .select()
       .single();
 
@@ -88,13 +127,15 @@ const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     console.log("Invitation created successfully:", invite);
 
-    // 2) Generate Supabase invite link
-    console.log("Generating invite link for:", email);
+    // 2) Generate Supabase invite link with tenant-specific redirectTo
+    const redirectTo = `https://${tenant}.claimsportal.co.za/set-password?token=${token}&brokerId=${brokerageId}`;
+    console.log("Generating invite link with redirectTo:", redirectTo);
+
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: "invite",
       email,
       options: {
-        redirectTo: `${process.env.SITE_URL || "https://claimsportal.co.za"}/set-password?token=${token}&brokerId=${brokerageId}`,
+        redirectTo,
       },
     });
 
@@ -109,18 +150,19 @@ const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
     console.log("Invite link generated successfully");
 
-    // 3) Auto-populate broker_profiles with brokerage_id
+    // 3) Auto-populate profiles table with organization_id (mapped from brokerage_id)
     if (linkData?.user) {
-      console.log("Auto-populating broker_profiles for:", linkData.user.id);
+      console.log("Auto-populating profiles for user:", linkData.user.id);
 
       const { error: profileError } = await supabase
-        .from("broker_profiles")
+        .from("profiles")
         .upsert(
           {
             id: linkData.user.id,
-            brokerage_id: brokerageId,
-            role: role || "staff",
+            organization_id: brokerageId,
+            role: role || "broker",
             full_name: fullName || email,
+            email: email,
             cell_number: phoneNumber || "",
             id_number: idNumber || "",
           },
@@ -128,9 +170,9 @@ const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         );
 
       if (profileError) {
-        console.error("Failed to create broker_profiles entry:", profileError);
+        console.error("Failed to create profiles entry:", profileError);
       } else {
-        console.log("broker_profiles entry created successfully");
+        console.log("profiles entry created successfully");
       }
     }
 
@@ -139,6 +181,7 @@ const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       headers: corsHeaders,
       body: JSON.stringify({
         success: true,
+        inviteUrl: linkData?.properties?.action_link,
         invitation: invite,
       }),
     };

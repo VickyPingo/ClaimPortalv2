@@ -7,13 +7,13 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const handler: Handler = async (event) => {
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
+export const handler: Handler = async (event) => {
 
   // Handle CORS preflight
   if (event.httpMethod === "OPTIONS") {
@@ -38,6 +38,7 @@ export const handler: Handler = async (event) => {
     if (!email || !role || !brokerageId) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: "Missing email, role, or brokerageId" }),
       };
     }
@@ -52,6 +53,7 @@ export const handler: Handler = async (event) => {
     if (brokerageError || !brokerageData) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: "Invalid brokerage ID" }),
       };
     }
@@ -61,6 +63,7 @@ export const handler: Handler = async (event) => {
     if (!tenant) {
       return {
         statusCode: 400,
+        headers: corsHeaders,
         body: JSON.stringify({ error: "Brokerage has no subdomain or slug" }),
       };
     }
@@ -96,24 +99,26 @@ export const handler: Handler = async (event) => {
       console.error("Generate invite link failed:", linkError);
       return {
         statusCode: 500,
+        headers: corsHeaders,
         body: JSON.stringify({ error: linkError.message }),
       };
     }
 
     const inviteUrl = linkData.properties.action_link;
 
-    // CRITICAL: If user was just created, upsert broker_profiles with brokerage_id
+    // CRITICAL: If user was just created, upsert profiles with organization_id
     if (linkData.user) {
-      console.log("Auto-populating broker_profiles for invited user:", linkData.user.id);
+      console.log("Auto-populating profiles for invited user:", linkData.user.id);
 
       const { error: profileError } = await supabaseAdmin
-        .from("broker_profiles")
+        .from("profiles")
         .upsert(
           {
             id: linkData.user.id,
-            brokerage_id: brokerageId,
+            organization_id: brokerageId,
             role: role,
             full_name: email,
+            email: email,
             id_number: "",
             cell_number: "",
           },
@@ -121,9 +126,9 @@ export const handler: Handler = async (event) => {
         );
 
       if (profileError) {
-        console.error("Failed to create broker_profiles entry:", profileError);
+        console.error("Failed to create profiles entry:", profileError);
       } else {
-        console.log("broker_profiles entry created successfully");
+        console.log("profiles entry created successfully");
       }
     }
 
@@ -172,10 +177,15 @@ export const handler: Handler = async (event) => {
       throw new Error(`Resend failed: ${text}`);
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: true, inviteUrl })
+    };
   } catch (err: any) {
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ error: err?.message || String(err) }),
     };
   }
