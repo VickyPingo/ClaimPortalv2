@@ -174,15 +174,17 @@ export const handler: Handler = async (event) => {
 
     const inviteUrl = linkData?.properties?.action_link;
 
-    // ✅ 5) CRITICAL: Upsert broker profile so your app finds brokerage_id immediately
-    // NOTE: Your DB uses user_id as the primary key (from your screenshot), not "id"
+    // ✅ 5) CRITICAL: Upsert broker profile - ALWAYS overwrite role and brokerage_id
+    // This ensures invited users get the correct role even if they already have a profile
     if (linkData?.user?.id) {
       await supabaseAdmin.from("profiles").upsert(
         {
+          id: linkData.user.id,
           user_id: linkData.user.id,
-          brokerage_id: brokerageId,
+          organization_id: brokerageId,
           role: role || "broker",
           full_name: fullName || email,
+          email: email,
           cell_number: phoneNumber || "",
           id_number: idNumber || "",
         },

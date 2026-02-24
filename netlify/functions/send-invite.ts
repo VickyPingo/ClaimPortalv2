@@ -106,7 +106,8 @@ export const handler: Handler = async (event) => {
 
     const inviteUrl = linkData.properties.action_link;
 
-    // CRITICAL: If user was just created, upsert profiles with organization_id
+    // CRITICAL: Upsert profiles - ALWAYS overwrite role and brokerage_id
+    // This ensures invited users get the correct role even if they already have a profile
     if (linkData.user) {
       console.log("Auto-populating profiles for invited user:", linkData.user.id);
 
@@ -129,7 +130,7 @@ export const handler: Handler = async (event) => {
       if (profileError) {
         console.error("Failed to create profiles entry:", profileError);
       } else {
-        console.log("profiles entry created successfully");
+        console.log("profiles entry created successfully - role and brokerage always set from invite");
       }
     }
 
