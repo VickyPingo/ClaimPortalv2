@@ -82,6 +82,31 @@ export const handler: Handler = async (event) => {
 
     const inviteUrl = linkData.properties.action_link;
 
+    // CRITICAL: If user was just created, upsert broker_profiles with brokerage_id
+    if (linkData.user) {
+      console.log("Auto-populating broker_profiles for invited user:", linkData.user.id);
+
+      const { error: profileError } = await supabaseAdmin
+        .from("broker_profiles")
+        .upsert(
+          {
+            id: linkData.user.id,
+            brokerage_id: brokerageId,
+            role: role,
+            full_name: email,
+            id_number: "",
+            cell_number: "",
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileError) {
+        console.error("Failed to create broker_profiles entry:", profileError);
+      } else {
+        console.log("broker_profiles entry created successfully");
+      }
+    }
+
     // 3) Send email via Resend
     const from = process.env.RESEND_FROM_EMAIL!;
     const resendKey = process.env.RESEND_API_KEY!;

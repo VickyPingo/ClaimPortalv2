@@ -83,6 +83,52 @@ export const handler: Handler = async (event) => {
 
     console.log("Invitation created successfully:", invite);
 
+    // 2) Generate Supabase invite link
+    console.log("Generating invite link for:", email);
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: "invite",
+      email,
+      options: {
+        redirectTo: `${process.env.SITE_URL || 'https://claimsportal.co.za'}/set-password?token=${invite.token}&brokerId=${brokerageId}`,
+      },
+    });
+
+    if (linkError) {
+      console.error("Failed to generate invite link:", linkError);
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: linkError.message }),
+      };
+    }
+
+    console.log("Invite link generated successfully");
+
+    // 3) Auto-populate broker_profiles with brokerage_id
+    if (linkData?.user) {
+      console.log("Auto-populating broker_profiles for:", linkData.user.id);
+
+      const { error: profileError } = await supabase
+        .from("broker_profiles")
+        .upsert(
+          {
+            id: linkData.user.id,
+            brokerage_id: brokerageId,
+            role: role || "staff",
+            full_name: fullName || email,
+            cell_number: phoneNumber || "",
+            id_number: idNumber || "",
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileError) {
+        console.error("Failed to create broker_profiles entry:", profileError);
+      } else {
+        console.log("broker_profiles entry created successfully");
+      }
+    }
+
     return {
       statusCode: 200,
       headers: corsHeaders,
