@@ -13,16 +13,20 @@ const corsHeaders = {
 };
 
 export const handler: Handler = async (event) => {
+  console.log("create-team-member called", event.httpMethod);
+
   try {
     if (event.httpMethod === "OPTIONS") {
+      console.log("OPTIONS preflight request");
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: "",
+        body: JSON.stringify({ success: true }),
       };
     }
 
     if (event.httpMethod !== "POST") {
+      console.log("Invalid method:", event.httpMethod);
       return {
         statusCode: 405,
         headers: corsHeaders,
@@ -30,17 +34,21 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const { fullName, email, role, phoneNumber, idNumber, brokerageId } = JSON.parse(
-      event.body || "{}"
-    );
+    const body = JSON.parse(event.body || "{}");
+    console.log("body", body);
+
+    const { fullName, email, role, phoneNumber, idNumber, brokerageId } = body;
 
     if (!email || !role || !brokerageId) {
+      console.error("Missing required fields:", { email: !!email, role: !!role, brokerageId: !!brokerageId });
       return {
         statusCode: 400,
         headers: corsHeaders,
         body: JSON.stringify({ error: "Missing required fields: email, role, or brokerageId" }),
       };
     }
+
+    console.log("Creating auth user for email:", email);
 
     // 1) Create auth user without password
     const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
@@ -58,8 +66,10 @@ export const handler: Handler = async (event) => {
     }
 
     const userId = userData.user.id;
+    console.log("User created successfully:", userId);
 
     // 2) Upsert into profiles table
+    console.log("Creating profile for user:", userId);
     const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
       user_id: userId,
       role,
@@ -74,11 +84,14 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 500,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Failed to create user profile" }),
+        body: JSON.stringify({ error: "Failed to create user profile: " + profileError.message }),
       };
     }
 
+    console.log("Profile created successfully");
+
     // 3) Fetch brokerage details to get tenant subdomain/slug
+    console.log("Fetching brokerage details for ID:", brokerageId);
     const { data: brokerageData, error: brokerageError } = await supabaseAdmin
       .from("brokerages")
       .select("subdomain, slug")
@@ -94,15 +107,20 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    console.log("Brokerage found:", brokerageData);
+
     const tenant = brokerageData.subdomain || brokerageData.slug;
 
     if (!tenant) {
+      console.error("Brokerage has no subdomain or slug:", brokerageData);
       return {
         statusCode: 400,
         headers: corsHeaders,
         body: JSON.stringify({ error: "Brokerage has no subdomain or slug" }),
       };
     }
+
+    console.log("Generating invite link for tenant:", tenant);
 
     // 4) Generate Supabase invite link
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
@@ -118,15 +136,18 @@ export const handler: Handler = async (event) => {
       return {
         statusCode: 500,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Failed to generate invite link" }),
+        body: JSON.stringify({ error: "Failed to generate invite link: " + (linkError?.message || "Unknown error") }),
       };
     }
 
     const inviteUrl = linkData.properties.action_link;
+    console.log("Invite link generated successfully");
 
     // 5) Send email via Resend
     const from = process.env.RESEND_FROM_EMAIL!;
     const resendKey = process.env.RESEND_API_KEY!;
+
+    console.log("Sending invitation email to:", email);
 
     const subject = `You've been added to Claims Portal as ${role}`;
 
@@ -164,13 +185,18 @@ export const handler: Handler = async (event) => {
 
     if (!resendResp.ok) {
       const text = await resendResp.text();
-      console.error("Resend failed:", text);
+      console.error("Resend failed:", resendResp.status, text);
       return {
         statusCode: 500,
         headers: corsHeaders,
-        body: JSON.stringify({ error: "Failed to send invitation email" }),
+        body: JSON.stringify({ error: "Failed to send invitation email: " + text }),
       };
     }
+
+    const resendData = await resendResp.json();
+    console.log("Email sent successfully:", resendData);
+
+    console.log("Team member creation completed successfully for:", email);
 
     return {
       statusCode: 200,
@@ -178,7 +204,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({ success: true, userId }),
     };
   } catch (err: any) {
-    console.error("Unexpected error:", err);
+    console.error("Unexpected error in create-team-member:", err);
     return {
       statusCode: 500,
       headers: corsHeaders,
