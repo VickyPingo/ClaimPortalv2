@@ -112,20 +112,25 @@ export default function TeamManagement() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
+      const { data: currentProfile } = await supabase
+        .from('profiles')
+        .select('brokerage_id')
+        .eq('id', user!.id)
+        .maybeSingle();
+
+      if (!currentProfile?.brokerage_id) {
+        throw new Error('No brokerage found');
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-team-member`;
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/.netlify/functions/create-team-member', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          brokerageId: currentProfile.brokerage_id,
+        }),
       });
 
       const result = await response.json();
