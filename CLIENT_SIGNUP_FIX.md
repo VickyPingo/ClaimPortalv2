@@ -147,9 +147,46 @@ Routing was already correct - clients with `role='client'` are routed to `/claim
 - [x] Deactivated clients cannot log in
 - [x] Error message shown for deactivated accounts
 
+### 5. Runtime Profile Completion (src/contexts/AuthContext.tsx)
+
+Added automatic profile completion when a user logs in with an incomplete profile:
+
+```typescript
+// If profile is incomplete (missing brokerage_id, email, or full_name)
+if (!brokerProfileData.organization_id || !brokerProfileData.email || !brokerProfileData.full_name) {
+  const subdomain = getSubdomain();
+
+  if (subdomain) {
+    const { data: brokerage } = await supabase
+      .from('brokerages')
+      .select('id')
+      .or(`subdomain.eq.${subdomain},slug.eq.${subdomain}`)
+      .maybeSingle();
+
+    if (brokerage) {
+      await supabase
+        .from('profiles')
+        .update({
+          organization_id: brokerage.id,
+          email: userEmail || '',
+          full_name: user?.user_metadata?.full_name || userEmail || '',
+          cell_number: user?.user_metadata?.cell_number || '',
+          is_active: true
+        })
+        .eq('user_id', userId);
+
+      // Reload profile with updated data
+      brokerProfileData = await fetchUpdatedProfile();
+    }
+  }
+}
+```
+
+This ensures that even if the database trigger fails or a profile was created before the fix, the profile will be automatically completed on the next login.
+
 ## Files Modified
 1. `supabase/migrations/[timestamp]_fix_client_signup_profiles_table.sql` - Database trigger update
-2. `src/contexts/AuthContext.tsx` - Client role handling and deactivation checks
+2. `src/contexts/AuthContext.tsx` - Client role handling, deactivation checks, and runtime profile completion
 3. `src/utils/subdomain.ts` - Helper function for brokerage ID lookup
 4. `src/components/Login.tsx` - Display auth errors from context
 

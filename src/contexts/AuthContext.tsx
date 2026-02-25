@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { useBrokerage } from './BrokerageContext';
 import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
-import { isIndependiSubdomain, getBrokerageSlug } from '../utils/subdomain';
+import { isIndependiSubdomain, getBrokerageSlug, getSubdomain } from '../utils/subdomain';
 
 // BROKERAGE ID FOR CLAIMS.INDEPENDI.CO.ZA
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
@@ -245,13 +245,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isUserSuperAdmin = isSuperAdmin(userEmail);
 
       // Try to load profile from profiles table (without role filter to catch all users)
-      const { data: brokerProfileData } = await supabase
+      let { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
       if (brokerProfileData) {
+        // CRITICAL: If profile is incomplete (missing brokerage_id, email, or full_name), update it
+        if (!brokerProfileData.organization_id || !brokerProfileData.email || !brokerProfileData.full_name) {
+          console.log('📝 Profile incomplete - updating with subdomain brokerage and user data');
+
+          const subdomain = getSubdomain();
+
+          if (subdomain) {
+            const { data: brokerage } = await supabase
+              .from('brokerages')
+              .select('id')
+              .or(`subdomain.eq.${subdomain},slug.eq.${subdomain}`)
+              .maybeSingle();
+
+            if (brokerage) {
+              console.log('✓ Found brokerage for subdomain:', subdomain, '→', brokerage.id);
+
+              await supabase
+                .from('profiles')
+                .update({
+                  organization_id: brokerage.id,
+                  email: userEmail || '',
+                  full_name: user?.user_metadata?.full_name || userEmail || '',
+                  cell_number: user?.user_metadata?.cell_number || brokerProfileData.cell_number || '',
+                  is_active: true
+                })
+                .eq('user_id', userId);
+
+              // Reload profile with updated data
+              const { data: updatedProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+              if (updatedProfile) {
+                brokerProfileData = updatedProfile;
+                console.log('✓ Profile updated successfully');
+              }
+            } else {
+              console.warn('⚠️ No brokerage found for subdomain:', subdomain);
+            }
+          }
+        }
+
         // CRITICAL: Check if user is deactivated
         if (brokerProfileData.is_active === false) {
           console.log('🚫 User account is deactivated');
