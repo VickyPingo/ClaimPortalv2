@@ -62,9 +62,21 @@ export default function HomePageRouter() {
     // ADMIN OVERRIDE: vickypingo@gmail.com bypasses all subdomain restrictions
     const isSuperAdminEmail = user.email === 'vickypingo@gmail.com';
 
+    // CRITICAL: Clients should never access broker or admin routes - CHECK THIS FIRST
+    const clientRestrictedPaths = ['/broker-dashboard', '/admin-dashboard', '/organisations', '/users-management', '/invitations', '/admin-settings'];
+    const isClientRestrictedPath = clientRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
+
+    if (isClientRestrictedPath && (userRole === 'client' || userType === 'client')) {
+      console.log('❌ CLIENT ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
+      console.log('  Redirecting to claims portal');
+      window.history.replaceState(null, '', '/claims-portal');
+      return;
+    }
+
     // CRITICAL: On Independi subdomain (claims.independi.co.za), FORCE broker dashboard
     // EXCEPT for vickypingo@gmail.com who always has full super admin access
-    if (onIndependiSubdomain && !isSuperAdminEmail) {
+    // EXCEPT for clients who should go to claims portal
+    if (onIndependiSubdomain && !isSuperAdminEmail && userRole !== 'client' && userType !== 'client') {
       console.log('🔒 INDEPENDI SUBDOMAIN - FORCING BROKER ACCESS ONLY');
 
       if (currentPath !== '/broker-dashboard' && currentPath !== '/') {
@@ -73,17 +85,6 @@ export default function HomePageRouter() {
       } else if (currentPath === '/') {
         window.history.replaceState(null, '', '/broker-dashboard');
       }
-      return;
-    }
-
-    // CRITICAL: Clients should never access broker or admin routes
-    const clientRestrictedPaths = ['/broker-dashboard', '/admin-dashboard', '/organisations', '/users-management', '/invitations', '/admin-settings'];
-    const isClientRestrictedPath = clientRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
-
-    if (isClientRestrictedPath && (userRole === 'client' || userType === 'client')) {
-      console.log('❌ CLIENT ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
-      console.log('  Redirecting to claims portal');
-      window.history.replaceState(null, '', '/claims-portal');
       return;
     }
 
@@ -195,14 +196,38 @@ export default function HomePageRouter() {
   if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
       (userType === 'client' || userRole === 'client')) {
     console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING TO CLAIMS PORTAL');
-    window.location.href = '/claims-portal';
-    return null;
+    console.log('  User Role:', userRole);
+    console.log('  User Type:', userType);
+    console.log('  Current Path:', currentPath);
+    window.location.replace('/claims-portal');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to your portal...</p>
+        </div>
+      </div>
+    );
   }
 
   // STEP 3: ADMIN OVERRIDE - Already handled in STEP 1.5 (moved up for priority)
 
   // STEP 4: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard (for non-super-admins)
+  // CRITICAL: Clients should go to claims portal even on Independi subdomain
   if (onIndependiSubdomain) {
+    // If user is a client, redirect to claims portal
+    if (userType === 'client' || userRole === 'client') {
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🏢 INDEPENDI SUBDOMAIN - CLIENT REDIRECTING TO PORTAL');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      return (
+        <>
+          <EmergencyLogoutButton />
+          <ClientPortal />
+        </>
+      );
+    }
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('🏢 INDEPENDI SUBDOMAIN - BROKER ONLY ACCESS');
     console.log('✅ FORCING BROKER DASHBOARD VIEW');

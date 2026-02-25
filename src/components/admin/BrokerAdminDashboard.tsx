@@ -25,10 +25,26 @@ export default function BrokerAdminDashboard() {
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
   // CRITICAL: Block clients from accessing broker dashboard
+  // Use useEffect to redirect immediately on mount if user is a client
+  useEffect(() => {
+    if (userRole === 'client' || userType === 'client') {
+      console.log('❌ CLIENT BLOCKED FROM BROKER DASHBOARD - REDIRECTING TO CLAIMS PORTAL');
+      console.log('  User Role:', userRole);
+      console.log('  User Type:', userType);
+      window.location.replace('/claims-portal');
+    }
+  }, [userRole, userType]);
+
+  // Show nothing while redirecting clients
   if (userRole === 'client' || userType === 'client') {
-    console.log('❌ CLIENT BLOCKED FROM BROKER DASHBOARD - REDIRECTING TO CLAIMS PORTAL');
-    window.location.href = '/claims-portal';
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to your portal...</p>
+        </div>
+      </div>
+    );
   }
 
   // CRITICAL: On Independi subdomain, NEVER show super admin features
