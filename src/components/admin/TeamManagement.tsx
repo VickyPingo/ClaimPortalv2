@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 interface TeamMember {
   id: string;
   full_name: string;
-  email: string;
+  email?: string;
   role: string;
   user_type: string;
   phone_number: string;
@@ -69,7 +69,7 @@ export default function TeamManagement() {
 
         const { data: profiles, error: fallbackError } = await supabase
           .from('profiles')
-          .select('user_id, full_name, role, created_at')
+          .select('user_id, full_name, email, role, created_at')
           .eq('brokerage_id', me.brokerage_id)
           .neq('user_id', user.id)
           .order('created_at', { ascending: false });
@@ -83,7 +83,7 @@ export default function TeamManagement() {
         const enrichedProfiles = profiles.map(profile => ({
           ...profile,
           id: profile.user_id,
-          email: 'Email unavailable',
+          email: profile.email || 'Email unavailable',
           user_type: profile.role,
           phone_number: '',
         }));
@@ -380,7 +380,7 @@ export default function TeamManagement() {
                           <div className="flex flex-col gap-1 mt-1">
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <Mail className="w-4 h-4" />
-                              <span className="truncate">{member.email}</span>
+                              <span className="truncate">{member.email || 'Email unavailable'}</span>
                             </div>
                             {member.phone_number && (
                               <div className="flex items-center gap-2 text-sm text-gray-600">
