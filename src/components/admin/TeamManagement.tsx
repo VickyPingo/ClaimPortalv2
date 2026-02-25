@@ -22,7 +22,7 @@ interface AddMemberFormData {
 }
 
 export default function TeamManagement() {
-  const { user, brokerageId } = useAuth();
+  const { user } = useAuth();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -47,20 +47,20 @@ export default function TeamManagement() {
     try {
       setLoading(true);
 
-      const { data: currentProfile } = await supabase
+      const { data: me, error: meError } = await supabase
         .from('profiles')
-        .select('organization_id')
+        .select('brokerage_id')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .single();
 
-      if (!currentProfile?.organization_id) {
-        console.error('No organization found for current user');
+      if (meError || !me?.brokerage_id) {
+        console.error('Failed to get brokerage:', meError);
         setLoading(false);
         return;
       }
 
       const { data: rawResult, error: profilesError } = await supabase.rpc('get_team_members_with_email', {
-        target_brokerage_id: currentProfile.organization_id
+        target_brokerage_id: me.brokerage_id
       });
 
       if (profilesError) {
@@ -69,8 +69,9 @@ export default function TeamManagement() {
 
         const { data: profiles, error: fallbackError } = await supabase
           .from('profiles')
-          .select('id, full_name, email, role, cell_number, created_at')
-          .eq('organization_id', currentProfile.organization_id)
+          .select('user_id, full_name, role, created_at')
+          .eq('brokerage_id', me.brokerage_id)
+          .neq('user_id', user.id)
           .order('created_at', { ascending: false });
 
         if (fallbackError) {
@@ -81,7 +82,10 @@ export default function TeamManagement() {
 
         const enrichedProfiles = profiles.map(profile => ({
           ...profile,
+          id: profile.user_id,
           email: 'Email unavailable',
+          user_type: profile.role,
+          phone_number: '',
         }));
 
         setTeamMembers(enrichedProfiles);
