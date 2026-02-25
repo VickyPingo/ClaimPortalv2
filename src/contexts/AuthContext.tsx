@@ -205,6 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Loading profile for userId:', userId);
 
+      // Get current user to access metadata
+      const { data: { user } } = await supabase.auth.getUser();
+
       // CRITICAL: Force super_admin role for vickypingo@gmail.com regardless of database
       if (userEmail === 'vickypingo@gmail.com') {
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -361,6 +364,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          return;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CLIENT LOGIC - Handle clients in profiles table
+        // ═══════════════════════════════════════════════════════════════
+        if (profileWithBrokerageId.role === 'client') {
+          console.log('✓ Client profile found in profiles table');
+          console.log('  🔒 CLIENT: Restricted to brokerage_id:', brokerageId);
+
+          setUserType('client');
+          setUserRole('client');
+          setBrokerageId(brokerageId);
+          setClientProfile({
+            id: profileWithBrokerageId.id,
+            full_name: profileWithBrokerageId.full_name || '',
+            email: profileWithBrokerageId.email || '',
+            cell_number: profileWithBrokerageId.cell_number || '',
+            brokerage_id: brokerageId,
+            role: 'client'
+          });
+          setLoading(false);
           return;
         }
 

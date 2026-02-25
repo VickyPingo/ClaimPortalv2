@@ -84,3 +84,32 @@ export function getBrokerageSlug(): string | null {
 
   return null;
 }
+
+export async function getSubdomainBrokerageId(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const response = await fetch('/.netlify/functions/get-brokerage-from-host', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.error('Failed to fetch brokerage from host');
+      return null;
+    }
+
+    const result = await response.json();
+
+    if (result.success && result.brokerage) {
+      return result.brokerage.id;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching brokerage ID:', error);
+    return null;
+  }
+}
