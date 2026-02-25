@@ -224,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profileCheck } = await supabase
           .from('profiles')
           .select('*')
-          .eq('user_id', userId)
+          .eq('id', userId)
           .maybeSingle();
 
         if (profileCheck) {
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await supabase
               .from('profiles')
               .update({ role: 'super_admin' })
-              .eq('user_id', userId);
+              .eq('id', userId);
           }
         }
         return;
@@ -248,51 +248,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .maybeSingle();
 
       if (brokerProfileData) {
-        // CRITICAL: If profile is incomplete (missing brokerage_id, email, or full_name), update it
+        // CRITICAL: If profile is incomplete (missing organization_id, email, or full_name), update it
         if (!brokerProfileData.organization_id || !brokerProfileData.email || !brokerProfileData.full_name) {
           console.log('📝 Profile incomplete - updating with subdomain brokerage and user data');
+          console.log('   Current profile:', {
+            id: brokerProfileData.id,
+            organization_id: brokerProfileData.organization_id,
+            email: brokerProfileData.email,
+            full_name: brokerProfileData.full_name
+          });
 
           const subdomain = getSubdomain();
 
           if (subdomain) {
-            const { data: brokerage } = await supabase
+            const { data: brokerage, error: brokerageError } = await supabase
               .from('brokerages')
               .select('id')
               .or(`subdomain.eq.${subdomain},slug.eq.${subdomain}`)
               .maybeSingle();
 
-            if (brokerage) {
+            if (brokerageError) {
+              console.error('❌ Error fetching brokerage:', brokerageError);
+            } else if (brokerage) {
               console.log('✓ Found brokerage for subdomain:', subdomain, '→', brokerage.id);
 
-              await supabase
-                .from('profiles')
-                .update({
-                  organization_id: brokerage.id,
-                  email: userEmail || '',
-                  full_name: user?.user_metadata?.full_name || userEmail || '',
-                  cell_number: user?.user_metadata?.cell_number || brokerProfileData.cell_number || '',
-                  is_active: true
-                })
-                .eq('user_id', userId);
+              const updatePayload = {
+                organization_id: brokerage.id,
+                email: userEmail || user?.email || '',
+                full_name: user?.user_metadata?.full_name || user?.email || '',
+                cell_number: user?.user_metadata?.cell_number || brokerProfileData.cell_number || '',
+                is_active: true
+              };
 
-              // Reload profile with updated data
-              const { data: updatedProfile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('user_id', userId)
-                .maybeSingle();
+              console.log('📤 Updating profile with:', updatePayload);
 
-              if (updatedProfile) {
-                brokerProfileData = updatedProfile;
-                console.log('✓ Profile updated successfully');
+              const { error: updateErr } = await supabase
+                .from('profiles')
+                .update(updatePayload)
+                .eq('id', userId);
+
+              if (updateErr) {
+                console.error('❌ PROFILE UPDATE FAILED:', updateErr);
+              } else {
+                console.log('✓ Profile update successful');
+
+                // Reload profile with updated data
+                const { data: updatedProfile, error: reloadErr } = await supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', userId)
+                  .single();
+
+                if (reloadErr) {
+                  console.error('❌ Error reloading profile:', reloadErr);
+                } else if (updatedProfile) {
+                  brokerProfileData = updatedProfile;
+                  console.log('✓ Profile reloaded successfully:', {
+                    organization_id: updatedProfile.organization_id,
+                    email: updatedProfile.email,
+                    full_name: updatedProfile.full_name
+                  });
+                }
               }
             } else {
               console.warn('⚠️ No brokerage found for subdomain:', subdomain);
             }
+          } else {
+            console.warn('⚠️ No subdomain detected');
           }
         }
 
@@ -322,7 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase
             .from('profiles')
             .update({ role: 'super_admin' })
-            .eq('user_id', userId);
+            .eq('id', userId);
           profileWithBrokerageId.role = 'super_admin';
         }
 
@@ -446,7 +472,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: clientProfileData } = await supabase
         .from('client_profiles')
         .select('*')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .maybeSingle();
 
       if (clientProfileData) {
