@@ -8,17 +8,20 @@ Client profiles were not being updated correctly during login:
 
 ## Root Causes
 
-1. **Wrong column name**: Code was trying to update `organization_id` instead of checking the correct table structure
-2. **Wrong query field**: Code was using `.eq('user_id', userId)` but the `profiles` table uses `id` as the primary key that references `auth.users(id)`
-3. **Missing error handling**: No logging to identify when updates failed
+1. **Missing column**: The `profiles` table didn't have a `brokerage_id` column
+2. **Wrong query field**: Code needed to use `.eq('user_id', userId)` to query profiles
+3. **Wrong column reference**: Code was using `organization_id` instead of `brokerage_id`
+4. **Missing error handling**: No logging to identify when updates failed
 
 ## Database Schema
 
-### profiles table
+### profiles table (UPDATED)
 ```sql
 CREATE TABLE profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id),
+  user_id uuid NOT NULL,  -- Added for querying by auth user
   organization_id uuid NOT NULL REFERENCES organizations(id),
+  brokerage_id uuid REFERENCES brokerages(id),  -- NEW COLUMN
   full_name text NOT NULL,
   email text NOT NULL,
   role text NOT NULL CHECK (role IN ('broker', 'client')),
@@ -39,25 +42,60 @@ CREATE TABLE client_profiles (
 
 ## Fixes Applied
 
-### 1. Corrected Query Field (src/contexts/AuthContext.tsx)
+### 1. Database Migration
 
-Changed all profile queries from `.eq('user_id', userId)` to `.eq('id', userId)`:
+Created migration to add `brokerage_id` column to profiles table:
+
+```sql
+ALTER TABLE profiles ADD COLUMN brokerage_id uuid REFERENCES brokerages(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_profiles_brokerage_id ON profiles(brokerage_id);
+```
+
+### 2. Corrected Query Field (src/contexts/AuthContext.tsx)
+
+Changed all profile queries to use `.eq('user_id', userId)`:
 
 **Before:**
 ```typescript
 .from('profiles')
 .select('*')
-.eq('user_id', userId)  // ❌ Wrong - profiles doesn't have user_id column
+.eq('id', userId)  // ❌ Wrong - should query by user_id
 ```
 
 **After:**
 ```typescript
 .from('profiles')
 .select('*')
-.eq('id', userId)  // ✅ Correct - id is the primary key
+.eq('user_id', userId)  // ✅ Correct - query by user_id field
 ```
 
-### 2. Added Comprehensive Error Handling
+### 3. Updated Column References
+
+Changed all references from `organization_id` to `brokerage_id`:
+
+**Before:**
+```typescript
+if (!brokerProfileData.organization_id || !brokerProfileData.email) {
+  const updatePayload = {
+    organization_id: brokerage.id,
+    email: userEmail || '',
+    ...
+  };
+}
+```
+
+**After:**
+```typescript
+if (!brokerProfileData.brokerage_id || !brokerProfileData.email) {
+  const updatePayload = {
+    brokerage_id: brokerage.id,
+    email: userEmail || '',
+    ...
+  };
+}
+```
+
+### 4. Added Comprehensive Error Handling
 
 ```typescript
 const { data: brokerage, error: brokerageError } = await supabase
@@ -74,7 +112,7 @@ if (brokerageError) {
   const { error: updateErr } = await supabase
     .from('profiles')
     .update(updatePayload)
-    .eq('id', userId);
+    .eq('user_id', userId);
 
   if (updateErr) {
     console.error('❌ PROFILE UPDATE FAILED:', updateErr);
@@ -82,7 +120,7 @@ if (brokerageError) {
 }
 ```
 
-### 3. Enhanced Logging
+### 5. Enhanced Logging
 
 Added detailed logging throughout the profile update process:
 - Current profile state before update
@@ -90,14 +128,6 @@ Added detailed logging throughout the profile update process:
 - Update payload being sent
 - Success/failure of each step
 - Final profile state after reload
-
-### 4. Fixed All Profile Queries
-
-Updated all instances in the file:
-- Profile loading: `.eq('id', userId)`
-- Profile updates: `.eq('id', userId)`
-- Super admin checks: `.eq('id', userId)`
-- Client profile queries: `.eq('id', userId)`
 
 ## Testing
 
@@ -108,15 +138,16 @@ Updated all instances in the file:
    ```
    📝 Profile incomplete - updating with subdomain brokerage and user data
    ✓ Found brokerage for subdomain: demo → [brokerage-id]
-   📤 Updating profile with: { organization_id: [...], email: [...], ... }
+   📤 Updating profile with: { brokerage_id: [...], email: [...], ... }
    ✓ Profile update successful
-   ✓ Profile reloaded successfully
+   ✓ Profile reloaded successfully: { brokerage_id: [...], email: [...], ... }
    ```
 
 ### Expected Outcome
-- Client profile gets `organization_id` set to the brokerage's ID
+- Client profile gets `brokerage_id` set to the brokerage's ID
 - Client profile gets `email` and `full_name` populated
 - Client can access the client portal without "Access Denied" errors
 
 ## Files Modified
-1. `src/contexts/AuthContext.tsx` - Fixed all profile queries to use correct column names and added error handling
+1. `supabase/migrations/add_brokerage_id_to_profiles.sql` - Added brokerage_id column
+2. `src/contexts/AuthContext.tsx` - Fixed all profile queries and column references

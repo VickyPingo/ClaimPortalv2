@@ -224,18 +224,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: profileCheck } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('user_id', userId)
           .maybeSingle();
 
         if (profileCheck) {
-          // Map organization_id to brokerage_id
-          const mappedProfile = { ...profileCheck, brokerage_id: profileCheck.organization_id };
-          setBrokerProfile(mappedProfile);
+          setBrokerProfile(profileCheck);
           if (profileCheck.role !== 'super_admin') {
             await supabase
               .from('profiles')
               .update({ role: 'super_admin' })
-              .eq('id', userId);
+              .eq('user_id', userId);
           }
         }
         return;
@@ -248,16 +246,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (brokerProfileData) {
-        // CRITICAL: If profile is incomplete (missing organization_id, email, or full_name), update it
-        if (!brokerProfileData.organization_id || !brokerProfileData.email || !brokerProfileData.full_name) {
+        // CRITICAL: If profile is incomplete (missing brokerage_id, email, or full_name), update it
+        if (!brokerProfileData.brokerage_id || !brokerProfileData.email || !brokerProfileData.full_name) {
           console.log('📝 Profile incomplete - updating with subdomain brokerage and user data');
           console.log('   Current profile:', {
             id: brokerProfileData.id,
-            organization_id: brokerProfileData.organization_id,
+            brokerage_id: brokerProfileData.brokerage_id,
             email: brokerProfileData.email,
             full_name: brokerProfileData.full_name
           });
@@ -277,10 +275,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.log('✓ Found brokerage for subdomain:', subdomain, '→', brokerage.id);
 
               const updatePayload = {
-                organization_id: brokerage.id,
+                brokerage_id: brokerage.id,
                 email: userEmail || user?.email || '',
                 full_name: user?.user_metadata?.full_name || user?.email || '',
-                cell_number: user?.user_metadata?.cell_number || brokerProfileData.cell_number || '',
                 is_active: true
               };
 
@@ -289,7 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const { error: updateErr } = await supabase
                 .from('profiles')
                 .update(updatePayload)
-                .eq('id', userId);
+                .eq('user_id', userId);
 
               if (updateErr) {
                 console.error('❌ PROFILE UPDATE FAILED:', updateErr);
@@ -300,7 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const { data: updatedProfile, error: reloadErr } = await supabase
                   .from('profiles')
                   .select('*')
-                  .eq('id', userId)
+                  .eq('user_id', userId)
                   .single();
 
                 if (reloadErr) {
@@ -308,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } else if (updatedProfile) {
                   brokerProfileData = updatedProfile;
                   console.log('✓ Profile reloaded successfully:', {
-                    organization_id: updatedProfile.organization_id,
+                    brokerage_id: updatedProfile.brokerage_id,
                     email: updatedProfile.email,
                     full_name: updatedProfile.full_name
                   });
@@ -337,9 +334,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Map organization_id to brokerage_id for consistency
-        const brokerageId = brokerProfileData.organization_id;
-        const profileWithBrokerageId = { ...brokerProfileData, brokerage_id: brokerageId };
+        // Get brokerage_id from profile
+        const brokerageId = brokerProfileData.brokerage_id;
+        const profileWithBrokerageId = brokerProfileData;
 
         console.log('Profile found', brokerageId);
 
@@ -348,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase
             .from('profiles')
             .update({ role: 'super_admin' })
-            .eq('id', userId);
+            .eq('user_id', userId);
           profileWithBrokerageId.role = 'super_admin';
         }
 
@@ -689,13 +686,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // MANUAL PROFILE CREATION
     const brokerageId = profile.brokerage_id || INDEPENDI_BROKERAGE_ID;
 
-    // Insert into profiles (use organization_id instead of brokerage_id)
+    // Insert into profiles
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
         id: authData.user.id,
         user_id: authData.user.id,
-        organization_id: brokerageId,
+        brokerage_id: brokerageId,
         full_name: profile.full_name || email,
         email: email,
         id_number: profile.id_number || '',
