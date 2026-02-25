@@ -80,7 +80,7 @@ export default function ClientPortal() {
       const profileResponse = await supabase
         .from('client_profiles')
         .select('id, brokerage_id')
-        .eq('id', user?.id)
+        .eq('user_id', user?.id)
         .maybeSingle();
 
       if (profileResponse.data) {
@@ -195,10 +195,11 @@ export default function ClientPortal() {
       const profileData = await supabase
         .from('client_profiles')
         .select('id, brokerage_id, cell_number, full_name, email, policy_number')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (!profileData.data) {
+        console.error('Profile lookup failed for user:', user.id);
         throw new Error('Profile not found. Please complete your profile or contact support.');
       }
 

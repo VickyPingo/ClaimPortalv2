@@ -54,10 +54,15 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
       const { data: clientData, error: clientError } = await supabase
         .from('client_profiles')
         .select('*')
-        .eq('id', clientId)
+        .eq('user_id', clientId)
         .maybeSingle();
 
       if (clientError) throw clientError;
+
+      if (!clientData) {
+        console.error('Profile lookup failed for client:', clientId);
+      }
+
       setClient(clientData);
 
       if (clientData) {
@@ -108,7 +113,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
           policy_number: editForm.policy_number || null,
           broker_notes: editForm.broker_notes,
         })
-        .eq('id', clientId);
+        .eq('user_id', clientId);
 
       if (error) throw error;
 

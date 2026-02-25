@@ -13,8 +13,12 @@ export async function getClaimantSnapshot(userId: string): Promise<ClaimantSnaps
   const { data: profile } = await supabase
     .from('client_profiles')
     .select('full_name, cell_number, email, policy_number')
-    .eq('id', userId)
+    .eq('user_id', userId)
     .maybeSingle();
+
+  if (!profile) {
+    console.error('Profile lookup failed for user:', userId);
+  }
 
   if (profile) {
     return {

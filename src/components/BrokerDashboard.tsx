@@ -48,7 +48,7 @@ export default function BrokerDashboard({
             const { data: clientData } = await supabase
               .from('client_profiles')
               .select('full_name')
-              .eq('id', claim.user_id)
+              .eq('user_id', claim.user_id)
               .maybeSingle();
 
             return {

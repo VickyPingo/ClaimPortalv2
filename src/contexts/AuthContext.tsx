@@ -469,8 +469,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: clientProfileData } = await supabase
         .from('client_profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
+
+      if (!clientProfileData) {
+        console.error('Profile lookup failed for user:', userId);
+      }
 
       if (clientProfileData) {
         // CRITICAL: Check if client is deactivated
