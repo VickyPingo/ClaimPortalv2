@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Mail, Phone, Shield, User, X, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Plus, Mail, Phone, Shield, User, X, Loader2, CheckCircle, XCircle, UserX } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
 interface TeamMember {
   id: string;
+  user_id: string;
   full_name: string;
   email?: string;
   role: string;
   user_type: string;
   phone_number: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -69,8 +71,9 @@ export default function TeamManagement() {
 
         const { data: profiles, error: fallbackError } = await supabase
           .from('profiles')
-          .select('user_id, full_name, email, role, created_at')
+          .select('user_id, full_name, email, role, is_active, created_at')
           .eq('brokerage_id', me.brokerage_id)
+          .eq('is_active', true)
           .neq('user_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -86,6 +89,7 @@ export default function TeamManagement() {
           email: profile.email || 'Email unavailable',
           user_type: profile.role,
           phone_number: '',
+          is_active: profile.is_active,
         }));
 
         setTeamMembers(enrichedProfiles);
@@ -186,6 +190,31 @@ export default function TeamManagement() {
         return User;
       default:
         return User;
+    }
+  };
+
+  const handleDeactivate = async (member: TeamMember) => {
+    if (!confirm('Deactivate this team member?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_active: false })
+        .eq('user_id', member.user_id);
+
+      if (error) {
+        console.error('Error deactivating member:', error);
+        setMessage({ type: 'error', text: 'Failed to deactivate team member' });
+        return;
+      }
+
+      setMessage({ type: 'success', text: 'Team member deactivated' });
+      await loadTeamMembers();
+    } catch (error) {
+      console.error('Error deactivating member:', error);
+      setMessage({ type: 'error', text: 'Failed to deactivate team member' });
     }
   };
 
@@ -396,6 +425,15 @@ export default function TeamManagement() {
                           <RoleIcon className="w-3.5 h-3.5" />
                           {member.role.charAt(0).toUpperCase() + member.role.slice(1).replace('_', ' ')}
                         </span>
+                        {member.user_id !== user?.id && (
+                          <button
+                            onClick={() => handleDeactivate(member)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Deactivate member"
+                          >
+                            <UserX className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
