@@ -16,7 +16,7 @@ import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain'
 type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
-  const { isSuperAdmin, userRole, user, userType } = useAuth();
+  const { isSuperAdmin, userRole, user, userType, loading } = useAuth();
 
   const onIndependiSubdomain = isIndependiSubdomain();
   const onSuperAdminDomain = isSuperAdminDomain();
@@ -24,16 +24,35 @@ export default function BrokerAdminDashboard() {
   // ADMIN OVERRIDE: vickypingo@gmail.com always has full super admin access
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
-  // CRITICAL: Block clients from accessing broker dashboard
-  // Use useEffect to redirect immediately on mount if user is a client
+  // CRITICAL: Wait for loading to complete before checking roles
+  // This prevents redirect loops caused by checking userRole before it's set
   useEffect(() => {
+    if (loading) {
+      console.log('⏳ BrokerAdminDashboard waiting for auth to load');
+      return;
+    }
+
+    // CRITICAL: Block clients from accessing broker dashboard
+    // Only redirect AFTER loading is complete and userRole is known
     if (userRole === 'client' || userType === 'client') {
       console.log('❌ CLIENT BLOCKED FROM BROKER DASHBOARD - REDIRECTING TO CLAIMS PORTAL');
       console.log('  User Role:', userRole);
       console.log('  User Type:', userType);
       window.location.replace('/claims-portal');
     }
-  }, [userRole, userType]);
+  }, [userRole, userType, loading]);
+
+  // Show loading while auth is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show nothing while redirecting clients
   if (userRole === 'client' || userType === 'client') {

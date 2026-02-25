@@ -57,6 +57,12 @@ export default function HomePageRouter() {
   }
 
   useEffect(() => {
+    // CRITICAL: Wait for auth and profile to fully load before any redirects
+    if (loading) {
+      console.log('⏳ Auth still loading - skipping redirect logic');
+      return;
+    }
+
     if (!user) return;
 
     // ADMIN OVERRIDE: vickypingo@gmail.com bypasses all subdomain restrictions
@@ -124,14 +130,15 @@ export default function HomePageRouter() {
       targetPath = '/broker-dashboard';
     }
 
-    // Redirect if not on the correct path
-    if (currentPath !== targetPath && currentPath !== '/') {
+    // Redirect if not on the correct path - prevent redirect loops
+    if (targetPath && currentPath !== targetPath) {
       console.log(`🔀 Redirecting from ${currentPath} to ${targetPath}`);
       window.history.replaceState(null, '', targetPath);
-    } else if (currentPath === '/') {
+    } else if (targetPath && currentPath === '/') {
+      console.log(`🔀 Redirecting from home to ${targetPath}`);
       window.history.replaceState(null, '', targetPath);
     }
-  }, [user, userType, userRole, currentPath, isSuperAdmin, onIndependiSubdomain, onSuperAdminDomain]);
+  }, [user, userType, userRole, currentPath, isSuperAdmin, onIndependiSubdomain, onSuperAdminDomain, loading]);
 
   // Profile wait timeout - show welcome page after 3 seconds if no profile
   useEffect(() => {
@@ -190,6 +197,21 @@ export default function HomePageRouter() {
   if (needsPasswordSetup) {
     console.log('🔐 User needs to set password - showing SetPassword component');
     return <SetPassword />;
+  }
+
+  // STEP 1.7: CRITICAL - Wait for auth and profile to load before routing
+  // This prevents redirect loops by ensuring userRole and userType are set
+  if (loading) {
+    console.log('⏳ Auth/profile still loading - showing loading screen');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-16 h-16 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-6"></div>
+          <h2 className="text-2xl font-semibold text-gray-800 mb-2">Loading your account...</h2>
+          <p className="text-gray-600">Please wait while we set things up</p>
+        </div>
+      </div>
+    );
   }
 
   // STEP 2: Check if client is trying to access broker/admin routes
