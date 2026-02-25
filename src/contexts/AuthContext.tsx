@@ -36,6 +36,7 @@ interface AuthContextType {
   clientProfile: ClientProfile | null;
   loading: boolean;
   needsPasswordSetup: boolean;
+  error: string | null;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<User>;
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [clientProfile, setClientProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('🚀 AuthContext initialising');
@@ -120,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setBrokerProfile(null);
         setClientProfile(null);
         setNeedsPasswordSetup(false);
+        setError(null);
         return;
       }
 
@@ -246,6 +249,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (brokerProfileData) {
+        // CRITICAL: Check if user is deactivated
+        if (brokerProfileData.is_active === false) {
+          console.log('🚫 User account is deactivated');
+          await supabase.auth.signOut();
+          setUser(null);
+          setUserType(null);
+          setUserRole(null);
+          setBrokerageId(null);
+          setBrokerProfile(null);
+          setClientProfile(null);
+          setError('Your account has been deactivated. Please contact your broker administrator.');
+          setLoading(false);
+          return;
+        }
+
         // Map organization_id to brokerage_id for consistency
         const brokerageId = brokerProfileData.organization_id;
         const profileWithBrokerageId = { ...brokerProfileData, brokerage_id: brokerageId };
@@ -363,6 +381,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (clientProfileData) {
+        // CRITICAL: Check if client is deactivated
+        if (clientProfileData.is_active === false) {
+          console.log('🚫 Client account is deactivated');
+          await supabase.auth.signOut();
+          setUser(null);
+          setUserType(null);
+          setUserRole(null);
+          setBrokerageId(null);
+          setBrokerProfile(null);
+          setClientProfile(null);
+          setError('Your account has been deactivated. Please contact your broker administrator.');
+          setLoading(false);
+          return;
+        }
+
         console.log('✓ Client profile found');
         setUserType('client');
         setBrokerageId(clientProfileData.brokerage_id);
@@ -390,6 +423,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setBrokerageId(null);
     setBrokerProfile(null);
     setClientProfile(null);
+    setError(null);
   };
 
   const completePasswordSetup = async () => {
@@ -843,6 +877,7 @@ const clientSignUp = async (
         clientProfile,
         loading,
         needsPasswordSetup,
+        error,
         signOut,
         signIn,
         brokerSignUp,

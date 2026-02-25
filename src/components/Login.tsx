@@ -8,7 +8,7 @@ import { clearSupabaseSession, shouldResetSession } from '../utils/sessionClear'
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 
 export default function Login({ roleType }: { roleType?: 'client' | 'broker' | null }) {
-  const { signIn, userType, user } = useAuth();
+  const { signIn, userType, user, error: authError } = useAuth();
   const { brokerage } = useBrokerage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -112,10 +112,10 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
           </div>
         )}
 
-        {error && (
+        {(error || authError) && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{error}</p>
+            <p className="text-sm text-red-700">{error || authError}</p>
           </div>
         )}
 
