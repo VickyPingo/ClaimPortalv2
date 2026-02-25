@@ -76,11 +76,22 @@ export default function HomePageRouter() {
       return;
     }
 
-    // CRITICAL: Brokers should never access super admin routes
-    const restrictedPaths = ['/organisations', '/users-management', '/invitations', '/admin-settings'];
-    const isRestrictedPath = restrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
+    // CRITICAL: Clients should never access broker or admin routes
+    const clientRestrictedPaths = ['/broker-dashboard', '/admin-dashboard', '/organisations', '/users-management', '/invitations', '/admin-settings'];
+    const isClientRestrictedPath = clientRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
 
-    if (isRestrictedPath && userRole === 'broker') {
+    if (isClientRestrictedPath && (userRole === 'client' || userType === 'client')) {
+      console.log('❌ CLIENT ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
+      console.log('  Redirecting to claims portal');
+      window.history.replaceState(null, '', '/claims-portal');
+      return;
+    }
+
+    // CRITICAL: Brokers should never access super admin routes
+    const brokerRestrictedPaths = ['/organisations', '/users-management', '/invitations', '/admin-settings'];
+    const isBrokerRestrictedPath = brokerRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
+
+    if (isBrokerRestrictedPath && userRole === 'broker') {
       console.log('❌ BROKER ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
       console.log('  Redirecting to broker dashboard');
       window.history.replaceState(null, '', '/broker-dashboard');
@@ -98,18 +109,18 @@ export default function HomePageRouter() {
       targetPath = '/admin-dashboard';
     }
     // ═══════════════════════════════════════════════════════════════
-    // BROKER ROUTING - ONLY IF NOT SUPER ADMIN
-    // ═══════════════════════════════════════════════════════════════
-    else if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') && userRole !== 'super_admin') {
-      console.log('🏢 BROKER ROUTING: /broker-dashboard');
-      targetPath = '/broker-dashboard';
-    }
-    // ═══════════════════════════════════════════════════════════════
-    // CLIENT ROUTING
+    // CLIENT ROUTING - SECOND PRIORITY (before broker)
     // ═══════════════════════════════════════════════════════════════
     else if (userType === 'client' || userRole === 'client') {
       console.log('👤 CLIENT ROUTING: /claims-portal');
       targetPath = '/claims-portal';
+    }
+    // ═══════════════════════════════════════════════════════════════
+    // BROKER ROUTING - ONLY IF NOT SUPER ADMIN OR CLIENT
+    // ═══════════════════════════════════════════════════════════════
+    else if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') && userRole !== 'super_admin' && userRole !== 'client') {
+      console.log('🏢 BROKER ROUTING: /broker-dashboard');
+      targetPath = '/broker-dashboard';
     }
 
     // Redirect if not on the correct path
@@ -182,23 +193,10 @@ export default function HomePageRouter() {
 
   // STEP 2: Check if client is trying to access broker/admin routes
   if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
-      userType === 'client' && userRole === 'client') {
-    console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - BLOCKING');
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">
-            You don't have permission to access this area. Redirecting to your claims portal...
-          </p>
-        </div>
-        {setTimeout(() => {
-          window.history.replaceState(null, '', '/claims-portal');
-          window.location.reload();
-        }, 2000)}
-      </div>
-    );
+      (userType === 'client' || userRole === 'client')) {
+    console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING TO CLAIMS PORTAL');
+    window.location.href = '/claims-portal';
+    return null;
   }
 
   // STEP 3: ADMIN OVERRIDE - Already handled in STEP 1.5 (moved up for priority)
@@ -231,27 +229,30 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 6: BROKER ROUTING
+  // STEP 6: CLIENT ROUTING - MUST COME BEFORE BROKER ROUTING
+  // CRITICAL: Check client role first to prevent clients from accessing broker dashboard
+  if (userType === 'client' || userRole === 'client') {
+    console.log('✅ ROUTING TO: /claims-portal (userType: client, userRole: client)');
+    return (
+      <>
+        <EmergencyLogoutButton />
+        <ClientPortal />
+      </>
+    );
+  }
+
+  // STEP 7: BROKER ROUTING
   // CRITICAL: Super admins should NEVER be treated as brokers
+  // CRITICAL: Clients should NEVER reach this point
   if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') &&
       userRole !== 'super_admin' &&
+      userRole !== 'client' &&
       !isSuperAdmin()) {
     console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
     return (
       <>
         <EmergencyLogoutButton />
         <BrokerAdminDashboard />
-      </>
-    );
-  }
-
-  // STEP 7: CLIENT ROUTING
-  if (userType === 'client' || userRole === 'client') {
-    console.log('✅ ROUTING TO: /claims-portal (userType: client)');
-    return (
-      <>
-        <EmergencyLogoutButton />
-        <ClientPortal />
       </>
     );
   }

@@ -16,13 +16,20 @@ import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain'
 type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view';
 
 export default function BrokerAdminDashboard() {
-  const { isSuperAdmin, userRole, user } = useAuth();
+  const { isSuperAdmin, userRole, user, userType } = useAuth();
 
   const onIndependiSubdomain = isIndependiSubdomain();
   const onSuperAdminDomain = isSuperAdminDomain();
 
   // ADMIN OVERRIDE: vickypingo@gmail.com always has full super admin access
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
+
+  // CRITICAL: Block clients from accessing broker dashboard
+  if (userRole === 'client' || userType === 'client') {
+    console.log('❌ CLIENT BLOCKED FROM BROKER DASHBOARD - REDIRECTING TO CLAIMS PORTAL');
+    window.location.href = '/claims-portal';
+    return null;
+  }
 
   // CRITICAL: On Independi subdomain, NEVER show super admin features
   // EXCEPT for vickypingo@gmail.com who always has full access
@@ -33,6 +40,7 @@ export default function BrokerAdminDashboard() {
   console.log('🎯 BrokerAdminDashboard - Initialising');
   console.log('  User Email:', user?.email);
   console.log('  User Role:', userRole);
+  console.log('  User Type:', userType);
   console.log('  Is Super Admin Email:', isSuperAdminEmail);
   console.log('  On Independi Subdomain:', onIndependiSubdomain);
   console.log('  On Super Admin Domain:', onSuperAdminDomain);
