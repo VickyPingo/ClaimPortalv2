@@ -201,8 +201,9 @@ export default function HomePageRouter() {
 
   // STEP 1.7: CRITICAL - Wait for auth and profile to load before routing
   // This prevents redirect loops by ensuring userRole and userType are set
-  if (loading) {
-    console.log('⏳ Auth/profile still loading - showing loading screen');
+  // Also prevents flash to /broker-dashboard before userRole is determined
+  if (loading || !userRole) {
+    console.log('⏳ Auth/profile still loading - showing loading screen', { loading, userRole });
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
