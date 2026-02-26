@@ -5,6 +5,8 @@ import TheftClaimForm from './TheftClaimForm';
 import MotorVehicleTheftForm from './MotorVehicleTheftForm';
 import StructuralDamageForm from './StructuralDamageForm';
 import AllRiskForm from './AllRiskForm';
+import ClientPastClaims from './ClientPastClaims';
+import ClientClaimDetail from './ClientClaimDetail';
 import {
   Car,
   Droplet,
@@ -21,11 +23,13 @@ import {
   CarFront,
   Home,
   Briefcase,
+  History,
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 'success';
 type IncidentType = 'motor_accident' | 'burst_geyser' | null;
 type CarCondition = 'drivable' | 'not_drivable' | null;
+type ViewMode = 'home' | 'past-claims' | 'claim-detail';
 
 const SA_PROVINCES = {
   'Eastern Cape': ['Port Elizabeth', 'East London', 'Mthatha', 'Graaff-Reinet', 'Uitenhage'],
@@ -62,6 +66,8 @@ export default function ClientPortal() {
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationAddress, setLocationAddress] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('home');
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -941,6 +947,32 @@ export default function ClientPortal() {
     }
   };
 
+  // Handle Past Claims view
+  if (viewMode === 'past-claims') {
+    return (
+      <ClientPastClaims
+        onViewClaim={(claimId) => {
+          setSelectedClaimId(claimId);
+          setViewMode('claim-detail');
+        }}
+        onBack={() => setViewMode('home')}
+      />
+    );
+  }
+
+  // Handle Claim Detail view
+  if (viewMode === 'claim-detail' && selectedClaimId) {
+    return (
+      <ClientClaimDetail
+        claimId={selectedClaimId}
+        onBack={() => {
+          setSelectedClaimId(null);
+          setViewMode('past-claims');
+        }}
+      />
+    );
+  }
+
   if (step === 'success') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -1022,13 +1054,22 @@ export default function ClientPortal() {
               <h1 className="text-3xl font-bold text-gray-900">File a Claim</h1>
               <p className="text-gray-600 mt-1">Select the type of claim you'd like to submit</p>
             </div>
-            <button
-              onClick={signOut}
-              className="flex items-center px-4 py-2 text-gray-700 hover:bg-white rounded-lg transition"
-            >
-              <LogOut className="w-5 h-5 mr-2" />
-              Sign Out
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setViewMode('past-claims')}
+                className="flex items-center px-4 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium"
+              >
+                <History className="w-5 h-5 mr-2" />
+                Past Claims
+              </button>
+              <button
+                onClick={signOut}
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-white rounded-lg transition"
+              >
+                <LogOut className="w-5 h-5 mr-2" />
+                Sign Out
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
