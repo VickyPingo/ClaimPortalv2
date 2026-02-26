@@ -7,6 +7,9 @@ import StructuralDamageForm from './StructuralDamageForm';
 import AllRiskForm from './AllRiskForm';
 import ClientPastClaims from './ClientPastClaims';
 import ClientClaimDetail from './ClientClaimDetail';
+import ClientDocuments from './client-admin/ClientDocuments';
+import ClientDetails from './client-admin/ClientDetails';
+import ContactBroker from './client-admin/ContactBroker';
 import {
   Car,
   Droplet,
@@ -24,12 +27,16 @@ import {
   Home,
   Briefcase,
   History,
+  Settings,
+  FileText,
+  User,
+  MessageSquare,
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 'success';
 type IncidentType = 'motor_accident' | 'burst_geyser' | null;
 type CarCondition = 'drivable' | 'not_drivable' | null;
-type ViewMode = 'home' | 'past-claims' | 'claim-detail';
+type ViewMode = 'home' | 'past-claims' | 'claim-detail' | 'admin-documents' | 'admin-details' | 'admin-contact';
 
 const SA_PROVINCES = {
   'Eastern Cape': ['Port Elizabeth', 'East London', 'Mthatha', 'Graaff-Reinet', 'Uitenhage'],
@@ -973,6 +980,19 @@ export default function ClientPortal() {
     );
   }
 
+  // Handle Client Admin views
+  if (viewMode === 'admin-documents') {
+    return <ClientDocuments onBack={() => setViewMode('home')} />;
+  }
+
+  if (viewMode === 'admin-details') {
+    return <ClientDetails onBack={() => setViewMode('home')} />;
+  }
+
+  if (viewMode === 'admin-contact') {
+    return <ContactBroker onBack={() => setViewMode('home')} />;
+  }
+
   if (step === 'success') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
@@ -1051,8 +1071,8 @@ export default function ClientPortal() {
         <div className="max-w-6xl mx-auto p-4 py-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">File a Claim</h1>
-              <p className="text-gray-600 mt-1">Select the type of claim you'd like to submit</p>
+              <h1 className="text-3xl font-bold text-gray-900">Client Portal</h1>
+              <p className="text-gray-600 mt-1">Manage your claims, documents, and profile</p>
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -1199,6 +1219,64 @@ export default function ClientPortal() {
                 <span className="text-teal-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
+          </div>
+
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Client Admin</h2>
+            <p className="text-gray-600 mb-6">Manage your account, documents, and broker communications</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <button
+                onClick={() => setViewMode('admin-documents')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
+              >
+                <div className="bg-emerald-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-emerald-100 transition-colors">
+                  <FileText className="w-9 h-9 text-emerald-700" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Documents</h3>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
+                  View and upload invoices, receipts, and contracts
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">Manage files</span>
+                  <span className="text-emerald-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setViewMode('admin-details')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
+              >
+                <div className="bg-violet-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-violet-100 transition-colors">
+                  <User className="w-9 h-9 text-violet-700" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">My Details</h3>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
+                  Update your personal information and address
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">Edit profile</span>
+                  <span className="text-violet-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setViewMode('admin-contact')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
+              >
+                <div className="bg-rose-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-rose-100 transition-colors">
+                  <MessageSquare className="w-9 h-9 text-rose-700" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Contact Broker</h3>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
+                  Send voice messages or request meetings
+                </p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500">Get in touch</span>
+                  <span className="text-rose-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
