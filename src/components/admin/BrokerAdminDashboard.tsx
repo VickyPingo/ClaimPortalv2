@@ -14,10 +14,11 @@ import BrokerClientDocuments from './BrokerClientDocuments';
 import BrokerClientRequests from './BrokerClientRequests';
 import BrokerClientFiles from './BrokerClientFiles';
 import BrokerClientFileDetail from './BrokerClientFileDetail';
+import BrokerClientFolder from './BrokerClientFolder';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
-type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents' | 'client-requests' | 'client-files' | 'client-file-detail';
+type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents' | 'client-requests' | 'client-files' | 'client-file-detail' | 'client-folder-files';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin, userRole, user, userType, loading } = useAuth();
@@ -91,6 +92,7 @@ export default function BrokerAdminDashboard() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [selectedFileClientId, setSelectedFileClientId] = useState<string | null>(null);
+  const [selectedFolderClientId, setSelectedFolderClientId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files') => {
@@ -187,6 +189,16 @@ export default function BrokerAdminDashboard() {
     setSelectedFileClientId(null);
   };
 
+  const handleSelectClientFolder = (clientUserId: string) => {
+    setSelectedFolderClientId(clientUserId);
+    setCurrentView('client-folder-files');
+  };
+
+  const handleBackFromClientFolderFiles = () => {
+    setCurrentView('client-files');
+    setSelectedFolderClientId(null);
+  };
+
   const handleBackFromClaimView = () => {
     if (selectedClientId) {
       setCurrentView('client-folder');
@@ -229,7 +241,15 @@ export default function BrokerAdminDashboard() {
         return <BrokerClientRequests />;
 
       case 'client-files':
-        return <BrokerClientFiles onSelectClient={handleSelectClientFiles} />;
+        return <BrokerClientFiles onSelectClient={handleSelectClientFolder} />;
+
+      case 'client-folder-files':
+        return selectedFolderClientId ? (
+          <BrokerClientFolder
+            clientUserId={selectedFolderClientId}
+            onBack={handleBackFromClientFolderFiles}
+          />
+        ) : null;
 
       case 'client-file-detail':
         return selectedFileClientId ? (
@@ -368,6 +388,7 @@ export default function BrokerAdminDashboard() {
   const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files' => {
     if (currentView === 'client-folder') return 'clients';
     if (currentView === 'client-file-detail') return 'client-files';
+    if (currentView === 'client-folder-files') return 'client-files';
     if (currentView === 'claim-view') return selectedClientId ? 'clients' : 'dashboard';
     return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files';
   };
