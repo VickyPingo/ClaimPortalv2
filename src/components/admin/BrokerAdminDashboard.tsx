@@ -11,10 +11,11 @@ import UsersManager from './UsersManager';
 import InvitationManager from './InvitationManager';
 import TeamManagement from './TeamManagement';
 import BrokerClientDocuments from './BrokerClientDocuments';
+import BrokerClientRequests from './BrokerClientRequests';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
-type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents';
+type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents' | 'client-requests';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin, userRole, user, userType, loading } = useAuth();
@@ -89,7 +90,7 @@ export default function BrokerAdminDashboard() {
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests') => {
     console.log('🧭 Navigation requested to:', view);
     console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
@@ -210,6 +211,9 @@ export default function BrokerAdminDashboard() {
 
       case 'client-documents':
         return <BrokerClientDocuments />;
+
+      case 'client-requests':
+        return <BrokerClientRequests />;
 
       case 'client-folder':
         return selectedClientId ? (
@@ -337,10 +341,10 @@ export default function BrokerAdminDashboard() {
     }
   };
 
-  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' => {
+  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' => {
     if (currentView === 'client-folder') return 'clients';
     if (currentView === 'claim-view') return selectedClientId ? 'clients' : 'dashboard';
-    return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents';
+    return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests';
   };
 
   return (
