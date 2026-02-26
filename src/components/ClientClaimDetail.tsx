@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   FileCheck,
   X,
+  Camera,
 } from 'lucide-react';
 
 interface ClientClaimDetailProps {
@@ -56,7 +57,9 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
   const [docType, setDocType] = useState<string>('photo');
   const [notes, setNotes] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadClaimAndDocuments();
@@ -123,7 +126,29 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
       }
 
       setSelectedFile(file);
+
+      // Generate image preview if it's an image
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setImagePreview(null);
+      }
     }
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
+
+  const handleCameraClick = () => {
+    cameraInputRef.current?.click();
   };
 
   const handleUpload = async () => {
@@ -154,10 +179,14 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
 
       showToast('Document uploaded successfully', 'success');
       setSelectedFile(null);
+      setImagePreview(null);
       setNotes('');
       setDocType('photo');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
+      }
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = '';
       }
 
       await loadClaimAndDocuments();
@@ -472,18 +501,94 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   File (PDF, JPEG, PNG - Max 10MB) *
                 </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileSelect}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                {selectedFile && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)}{' '}
-                    MB)
-                  </p>
+
+                {!selectedFile ? (
+                  <div className="space-y-3">
+                    {/* Main file input with camera support */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,application/pdf"
+                      capture="environment"
+                      onChange={handleFileSelect}
+                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+
+                    {/* Camera-only hidden input */}
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+
+                    {/* Take Photo button */}
+                    <button
+                      type="button"
+                      onClick={handleCameraClick}
+                      className="w-full flex items-center justify-center px-4 py-3 border-2 border-blue-300 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-semibold"
+                    >
+                      <Camera className="w-5 h-5 mr-2" />
+                      Take Photo
+                    </button>
+
+                    <p className="text-xs text-gray-500 text-center">
+                      On mobile: Use camera or select from gallery
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border-2 border-gray-300 rounded-lg p-4">
+                    {imagePreview ? (
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full max-h-64 object-contain rounded-lg bg-gray-50"
+                          />
+                          <button
+                            type="button"
+                            onClick={clearFile}
+                            className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition shadow-lg"
+                            title="Remove"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-gray-700 font-medium flex items-center">
+                            <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                            {selectedFile.name}
+                          </p>
+                          <span className="text-xs text-gray-500">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <FileText className="w-8 h-8 text-blue-600 mr-3" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={clearFile}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Remove"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
