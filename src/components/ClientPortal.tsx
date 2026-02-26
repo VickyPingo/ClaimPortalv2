@@ -1074,6 +1074,23 @@ export default function ClientPortal() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <button
+              onClick={() => setViewMode('past-claims')}
+              className="group bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border-2 border-blue-500"
+            >
+              <div className="bg-white/20 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-white/30 transition-colors">
+                <History className="w-9 h-9 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Past Claims</h3>
+              <p className="text-sm text-blue-50 mb-8 leading-relaxed">
+                View and update documents for your submitted claims
+              </p>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-blue-100">View your claims</span>
+                <span className="text-white text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
+              </div>
+            </button>
+
+            <button
               onClick={() => {
                 setClaimType('motor');
                 setIncidentType('motor_accident');
