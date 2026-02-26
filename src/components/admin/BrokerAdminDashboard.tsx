@@ -12,10 +12,12 @@ import InvitationManager from './InvitationManager';
 import TeamManagement from './TeamManagement';
 import BrokerClientDocuments from './BrokerClientDocuments';
 import BrokerClientRequests from './BrokerClientRequests';
+import BrokerClientFiles from './BrokerClientFiles';
+import BrokerClientFileDetail from './BrokerClientFileDetail';
 import { AlertCircle, ShieldAlert } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
-type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents' | 'client-requests';
+type View = 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-folder' | 'claim-view' | 'client-documents' | 'client-requests' | 'client-files' | 'client-file-detail';
 
 export default function BrokerAdminDashboard() {
   const { isSuperAdmin, userRole, user, userType, loading } = useAuth();
@@ -88,9 +90,10 @@ export default function BrokerAdminDashboard() {
   const [currentView, setCurrentView] = useState<View>(initialView);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const [selectedFileClientId, setSelectedFileClientId] = useState<string | null>(null);
   const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files') => {
     console.log('🧭 Navigation requested to:', view);
     console.log('  User Role:', userRole);
     console.log('  Is Super Admin:', isSuperAdmin());
@@ -174,6 +177,16 @@ export default function BrokerAdminDashboard() {
     setSelectedClientId(null);
   };
 
+  const handleSelectClientFiles = (clientUserId: string) => {
+    setSelectedFileClientId(clientUserId);
+    setCurrentView('client-file-detail');
+  };
+
+  const handleBackFromClientFileDetail = () => {
+    setCurrentView('client-files');
+    setSelectedFileClientId(null);
+  };
+
   const handleBackFromClaimView = () => {
     if (selectedClientId) {
       setCurrentView('client-folder');
@@ -214,6 +227,17 @@ export default function BrokerAdminDashboard() {
 
       case 'client-requests':
         return <BrokerClientRequests />;
+
+      case 'client-files':
+        return <BrokerClientFiles onSelectClient={handleSelectClientFiles} />;
+
+      case 'client-file-detail':
+        return selectedFileClientId ? (
+          <BrokerClientFileDetail
+            clientUserId={selectedFileClientId}
+            onBack={handleBackFromClientFileDetail}
+          />
+        ) : null;
 
       case 'client-folder':
         return selectedClientId ? (
@@ -341,10 +365,11 @@ export default function BrokerAdminDashboard() {
     }
   };
 
-  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' => {
+  const getLayoutView = (): 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files' => {
     if (currentView === 'client-folder') return 'clients';
+    if (currentView === 'client-file-detail') return 'client-files';
     if (currentView === 'claim-view') return selectedClientId ? 'clients' : 'dashboard';
-    return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests';
+    return currentView as 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files';
   };
 
   return (

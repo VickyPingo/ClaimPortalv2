@@ -1,12 +1,12 @@
 import { ReactNode, useState, useMemo } from 'react';
-import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link, UsersRound, FileText, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link, UsersRound, FileText, MessageSquare, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
 interface AdminLayoutProps {
   children: ReactNode;
-  currentView: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests';
-  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests') => void;
+  currentView: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files';
+  onNavigate: (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files') => void;
 }
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
@@ -30,6 +30,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'inbox' as const, icon: Inbox, label: 'All Claims' },
       { id: 'clients' as const, icon: Users, label: 'Clients' },
       { id: 'client-requests' as const, icon: MessageSquare, label: 'Client Requests' },
+      { id: 'client-files' as const, icon: FolderOpen, label: 'Client Files' },
       { id: 'client-documents' as const, icon: FileText, label: 'Client Documents' },
       { id: 'team' as const, icon: UsersRound, label: 'Team' },
     ];
@@ -52,7 +53,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     return baseItems;
   }, [isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain]);
 
-  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests') => {
+  const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files') => {
     onNavigate(view);
     setMobileMenuOpen(false);
   };
