@@ -73,10 +73,16 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
 
       console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
-      const claimsWithClientNames = (claimsData || []).map((claim) => ({
-        ...claim,
-        client_name: claim.claimant_name || 'Unknown',
-      }));
+      const claimsWithClientNames = (claimsData || []).map((claim) => {
+        const displayName = claim.claimant_name?.trim()
+          ? claim.claimant_name
+          : (claim.claimant_email?.trim() ? claim.claimant_email : 'Unknown');
+
+        return {
+          ...claim,
+          client_name: displayName,
+        };
+      });
 
       setClaims(claimsWithClientNames);
     } catch (error: any) {

@@ -79,9 +79,13 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       if (claimError) throw claimError;
 
       if (claimData) {
+        const displayName = claimData.claimant_name?.trim()
+          ? claimData.claimant_name
+          : (claimData.claimant_email?.trim() ? claimData.claimant_email : 'Unknown');
+
         setClaim({
           ...claimData,
-          client_name: claimData.claimant_name || 'Unknown',
+          client_name: displayName,
         });
       }
     } catch (error: any) {
@@ -237,7 +241,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {renderField('Incident Type', claim.incident_type?.replace('_', ' ').toUpperCase())}
             {renderField('Status', claim.status?.toUpperCase())}
             {renderField('Submitted', new Date(claim.created_at).toLocaleString())}
-            {renderField('Claimant Name', claim.client_name || claim.claimant_name)}
+            {renderField('Claimant Name', claim.client_name)}
             {renderField('Claimant Phone', claim.claimant_phone)}
             {renderField('Claimant Email', claim.claimant_email)}
 
