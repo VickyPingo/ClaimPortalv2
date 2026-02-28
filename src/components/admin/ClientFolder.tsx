@@ -52,7 +52,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
       setLoading(true);
 
       const { data: clientData, error: clientError } = await supabase
-        .from('client_profiles')
+        .from('profiles')
         .select('*')
         .eq('user_id', clientId)
         .maybeSingle();
@@ -105,7 +105,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
       setSaving(true);
 
       const { error } = await supabase
-        .from('client_profiles')
+        .from('profiles')
         .update({
           full_name: editForm.full_name,
           email: editForm.email,

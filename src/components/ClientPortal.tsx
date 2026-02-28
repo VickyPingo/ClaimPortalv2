@@ -83,25 +83,30 @@ export default function ClientPortal() {
   }, [user]);
 
   const fetchClientData = async () => {
-    let { data } = await supabase
-      .from('clients')
-      .select('id, brokerage_id')
-      .eq('id', user?.id)
-      .maybeSingle();
+    if (!user) return;
 
-    if (!data) {
-      const profileResponse = await supabase
-        .from('client_profiles')
-        .select('id, brokerage_id')
-        .eq('user_id', user?.id)
-        .maybeSingle();
+    try {
+      const { data: authRes } = await supabase.auth.getUser();
+      const currentUser = authRes.user;
+      if (!currentUser) throw new Error('Not authenticated');
 
-      if (profileResponse.data) {
-        data = profileResponse.data;
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('user_id, brokerage_id')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (profileErr) {
+        console.error('Profile lookup error:', profileErr);
+        return;
       }
-    }
 
-    setClientData(data);
+      if (profile) {
+        setClientData({ id: profile.user_id, brokerage_id: profile.brokerage_id });
+      }
+    } catch (err) {
+      console.error('Error fetching client data:', err);
+    }
   };
 
   const [accidentDateTime, setAccidentDateTime] = useState('');
@@ -205,21 +210,25 @@ export default function ClientPortal() {
 
     setLoading(true);
     try {
-      const profileData = await supabase
-        .from('client_profiles')
-        .select('id, brokerage_id, cell_number, full_name, email, policy_number')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data: authRes } = await supabase.auth.getUser();
+      const currentUser = authRes.user;
+      if (!currentUser) throw new Error('Not authenticated');
 
-      if (!profileData.data) {
-        console.error('Profile lookup failed for user:', user.id);
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('user_id, brokerage_id, cell_number, full_name, email, policy_number')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (profileErr || !profile) {
+        console.error('Profile lookup failed for user:', currentUser.id);
         throw new Error('Profile not found. Please complete your profile or contact support.');
       }
 
-      const claimantName = profileData.data.full_name || 'Unknown';
-      const policyNumber = profileData.data.policy_number || '';
-      const claimantPhone = profileData.data.cell_number || '';
-      const claimantEmail = profileData.data.email || '';
+      const claimantName = profile.full_name || 'Unknown';
+      const policyNumber = profile.policy_number || '';
+      const claimantPhone = profile.cell_number || '';
+      const claimantEmail = profile.email || '';
 
       let clientData = await supabase
         .from('clients')
@@ -231,10 +240,10 @@ export default function ClientPortal() {
         const { error: insertError } = await supabase
           .from('clients')
           .insert({
-            id: profileData.data.id,
-            brokerage_id: profileData.data.brokerage_id,
-            phone: profileData.data.cell_number,
-            name: profileData.data.full_name,
+            id: profile.user_id,
+            brokerage_id: profile.brokerage_id,
+            phone: profile.cell_number,
+            name: profile.full_name,
           });
 
         if (insertError) {
@@ -243,8 +252,8 @@ export default function ClientPortal() {
 
         clientData = {
           data: {
-            id: profileData.data.id,
-            brokerage_id: profileData.data.brokerage_id,
+            id: profile.user_id,
+            brokerage_id: profile.brokerage_id,
           },
           error: null,
         };

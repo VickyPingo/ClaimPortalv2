@@ -52,7 +52,7 @@ export default function ClientsDirectory({ onViewClient }: ClientsDirectoryProps
       console.log('  Is Super Admin:', isSuperAdmin());
       console.log('  Broker Profile:', brokerProfile);
 
-      let query = supabase.from('client_profiles').select('*');
+      let query = supabase.from('profiles').select('*').eq('role', 'client');
 
       // ACCESS CONTROL:
       // - Super Admin (role: 'super_admin'): See ALL clients across ALL brokerages

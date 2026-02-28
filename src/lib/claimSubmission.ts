@@ -10,32 +10,26 @@ export interface ClaimantSnapshot {
 }
 
 export async function getClaimantSnapshot(userId: string): Promise<ClaimantSnapshot> {
-  const { data: profile } = await supabase
-    .from('client_profiles')
-    .select('full_name, cell_number, email, policy_number')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data: authRes } = await supabase.auth.getUser();
+  const user = authRes.user;
+  if (!user) throw new Error('Not authenticated');
 
-  if (!profile) {
-    console.error('Profile lookup failed for user:', userId);
+  const { data: profile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('user_id, brokerage_id, full_name, cell_number, email, policy_number')
+    .eq('user_id', user.id)
+    .single();
+
+  if (profileErr || !profile) {
+    console.error('Profile lookup failed for user:', user.id);
+    throw new Error('Profile not found. Please complete your profile.');
   }
-
-  if (profile) {
-    return {
-      full_name: profile.full_name || 'Unknown',
-      cell_number: profile.cell_number || '',
-      email: profile.email || '',
-      policy_number: profile.policy_number || '',
-      submission_timestamp: new Date().toISOString(),
-    };
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
 
   return {
-    full_name: user?.user_metadata?.full_name || 'Unknown',
-    cell_number: user?.phone || '',
-    email: user?.email || '',
+    full_name: profile.full_name || 'Unknown',
+    cell_number: profile.cell_number || '',
+    email: profile.email || '',
+    policy_number: profile.policy_number || '',
     submission_timestamp: new Date().toISOString(),
   };
 }

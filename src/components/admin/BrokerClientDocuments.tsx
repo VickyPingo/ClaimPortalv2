@@ -81,7 +81,7 @@ export default function BrokerClientDocuments() {
 
       if (clientIds.length > 0) {
         const { data: clientsData, error: clientsError } = await supabase
-          .from('client_profiles')
+          .from('profiles')
           .select('user_id, full_name, email')
           .in('user_id', clientIds);
 

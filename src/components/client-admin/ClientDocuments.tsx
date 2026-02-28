@@ -63,27 +63,23 @@ export default function ClientDocuments({ onBack }: ClientDocumentsProps) {
     if (!user) return;
 
     try {
-      // Try to get brokerage_id from client_profiles
-      const { data: profileData } = await supabase
-        .from('client_profiles')
-        .select('brokerage_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const { data: authRes } = await supabase.auth.getUser();
+      const currentUser = authRes.user;
+      if (!currentUser) throw new Error('Not authenticated');
 
-      if (profileData?.brokerage_id) {
-        setBrokerageId(profileData.brokerage_id);
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('user_id, brokerage_id')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (profileErr) {
+        console.error('Profile lookup error:', profileErr);
         return;
       }
 
-      // Fallback: try profiles table
-      const { data: fallbackData } = await supabase
-        .from('profiles')
-        .select('brokerage_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (fallbackData?.brokerage_id) {
-        setBrokerageId(fallbackData.brokerage_id);
+      if (profile?.brokerage_id) {
+        setBrokerageId(profile.brokerage_id);
       }
     } catch (err) {
       console.error('Error fetching brokerage ID:', err);

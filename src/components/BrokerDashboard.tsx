@@ -46,7 +46,7 @@ export default function BrokerDashboard({
         (claimsData || []).map(async (claim) => {
           if (claim.user_id) {
             const { data: clientData } = await supabase
-              .from('client_profiles')
+              .from('profiles')
               .select('full_name')
               .eq('user_id', claim.user_id)
               .maybeSingle();

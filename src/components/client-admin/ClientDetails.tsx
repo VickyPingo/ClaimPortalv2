@@ -43,23 +43,31 @@ export default function ClientDetails({ onBack }: ClientDetailsProps) {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('client_profiles')
+
+      const { data: authRes } = await supabase.auth.getUser();
+      const currentUser = authRes.user;
+      if (!currentUser) throw new Error('Not authenticated');
+
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .eq('user_id', currentUser.id)
+        .single();
 
-      if (error) throw error;
+      if (profileErr) {
+        console.error('Profile lookup error:', profileErr);
+        return;
+      }
 
-      if (data) {
-        setFullName(data.full_name || '');
-        setCellNumber(data.cell_number || '');
-        setEmail(data.email || '');
-        setPolicyNumber(data.policy_number || '');
-        setAddress(data.address || '');
-        setCity(data.city || '');
-        setProvince(data.province || '');
-        setPostalCode(data.postal_code || '');
+      if (profile) {
+        setFullName(profile.full_name || '');
+        setCellNumber(profile.cell_number || '');
+        setEmail(profile.email || '');
+        setPolicyNumber(profile.policy_number || '');
+        setAddress(profile.address || '');
+        setCity(profile.city || '');
+        setProvince(profile.province || '');
+        setPostalCode(profile.postal_code || '');
       }
     } catch (err) {
       console.error('Error loading client details:', err);
@@ -76,7 +84,7 @@ export default function ClientDetails({ onBack }: ClientDetailsProps) {
       setSaved(false);
 
       const { error } = await supabase
-        .from('client_profiles')
+        .from('profiles')
         .update({
           full_name: fullName,
           cell_number: cellNumber,
