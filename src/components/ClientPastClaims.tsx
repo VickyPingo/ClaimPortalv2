@@ -37,7 +37,7 @@ export default function ClientPastClaims({ onViewClaim, onBack }: ClientPastClai
       const { data, error: fetchError } = await supabase
         .from('claims')
         .select('id, incident_type, status, created_at, claimant_name, policy_number')
-        .eq('user_id', user.id)
+        .eq('client_id', user.id)
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
