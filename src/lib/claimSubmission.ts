@@ -48,10 +48,14 @@ export async function submitClaimUnified(params: {
 
   // 4. Build unified payload
   const payload = {
-    claim_type: params.claimType,
+    incident_type: params.claimType,
     client_id: uid,
     brokerage_id: profile.brokerage_id,
     status: "new",
+    claimant_name: profile.full_name ?? null,
+    claimant_email: profile.email ?? user.email ?? null,
+    claimant_phone: profile.cell_number ?? null,
+    policy_number: profile.policy_number ?? null,
     claimant_snapshot: claimantSnapshot,
     claim_data: params.claimData ?? {},
     attachments: params.attachments ?? [],
