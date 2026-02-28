@@ -446,7 +446,14 @@ export default function ClaimDetail({ claim, onBack }: ClaimDetailProps) {
             )}
 
             {(() => {
-              const attachments = claim.attachments || [];
+              let attachments = [];
+              if (claim.attachments) {
+                attachments =
+                  typeof claim.attachments === 'string'
+                    ? JSON.parse(claim.attachments)
+                    : claim.attachments;
+              }
+
               const photos = attachments.filter((a: any) =>
                 a.kind && (a.kind.includes('photo') || a.kind.includes('license') || a.kind.includes('disk') || a.kind === 'proof_of_ownership')
               );
