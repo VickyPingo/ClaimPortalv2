@@ -116,11 +116,17 @@ Deno.serve(async (req: Request) => {
     console.log("Invite link generated successfully. User ID:", linkData.user?.id);
 
     if (linkData?.user) {
+      // Determine role-based placeholder name (NEVER use email as full_name)
+      const finalRole = role ?? "broker";
+      const placeholderName = finalRole === 'super_admin' ? 'Admin' :
+                              (finalRole === 'broker' || finalRole === 'main_broker' || finalRole === 'admin') ? 'Broker' :
+                              'Client';
+
       const profileData = {
         id: linkData.user.id,
         organization_id: callingProfile.organization_id,
-        role: role ?? "broker",
-        full_name: full_name ?? email,
+        role: finalRole,
+        full_name: full_name || placeholderName,
       };
 
       console.log("Upserting profile with data:", profileData);

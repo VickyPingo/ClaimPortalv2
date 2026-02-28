@@ -202,11 +202,16 @@ export const handler: Handler = async (event) => {
     if (linkData?.user?.id) {
       console.log('👤 User exists/created, upserting profile for user:', linkData.user.id);
 
+      // Determine role-based placeholder name (NEVER use email as full_name)
+      const placeholderName = finalRole === 'super_admin' ? 'Admin' :
+                              (finalRole === 'broker' || finalRole === 'main_broker' || finalRole === 'admin') ? 'Broker' :
+                              'Client';
+
       const profileData = {
         user_id: linkData.user.id,
         brokerage_id: resolvedBrokerageId,
         role: finalRole,
-        full_name: fullName || email,
+        full_name: fullName || placeholderName,
       };
 
       console.log('📝 Profile data:', profileData);

@@ -226,7 +226,7 @@ export default function ClientPortal() {
         throw new Error('Profile not found. Please complete your profile or contact support.');
       }
 
-      const claimantName = profile.full_name || 'Unknown';
+      const claimantName = profile.full_name || currentUser.email || 'Client';
       const policyNumber = profile.policy_number || '';
       const claimantPhone = profile.cell_number || '';
       const claimantEmail = profile.email || '';

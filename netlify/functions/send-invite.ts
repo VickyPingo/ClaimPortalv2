@@ -111,6 +111,11 @@ export const handler: Handler = async (event) => {
     if (linkData.user) {
       console.log("Auto-populating profiles for invited user:", linkData.user.id);
 
+      // Determine role-based placeholder name (NEVER use email as full_name)
+      const placeholderName = role === 'super_admin' ? 'Admin' :
+                              (role === 'broker' || role === 'main_broker' || role === 'admin') ? 'Broker' :
+                              'Client';
+
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
         .upsert(
@@ -119,7 +124,7 @@ export const handler: Handler = async (event) => {
             user_id: linkData.user.id,
             organization_id: brokerageId,
             role: role,
-            full_name: email,
+            full_name: placeholderName,
             email: email,
             id_number: "",
             cell_number: "",

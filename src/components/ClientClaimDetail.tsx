@@ -433,7 +433,7 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
             </div>
             <div>
               <p className="text-sm text-gray-600">Claimant Name</p>
-              <p className="font-semibold text-gray-900">{claim.claimant_name || 'N/A'}</p>
+              <p className="font-semibold text-gray-900">{claim.claimant_name || claim.claimant_email || 'Client'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">Date Submitted</p>

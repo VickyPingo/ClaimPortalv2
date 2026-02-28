@@ -123,7 +123,7 @@ export async function generateClaimPDF(claim: any): Promise<Blob> {
 
   addText('CLAIMANT INFORMATION', true);
   y += 2;
-  addText(`Name: ${claim.claimant_name || 'N/A'}`);
+  addText(`Name: ${claim.claimant_name || claim.claimant_email || 'Client'}`);
   addText(`Phone: ${claim.claimant_phone || 'N/A'}`);
   addText(`Email: ${claim.claimant_email || 'N/A'}`);
   if (claim.policy_number) {
@@ -275,47 +275,126 @@ export async function generateClaimPDF(claim: any): Promise<Blob> {
 
 export async function downloadClaimPack(claim: any): Promise<void> {
   const zip = new JSZip();
+  const claimRef = claim.id.slice(0, 8);
+  const failedFiles: string[] = [];
 
+  // Add PDF report
   const pdfBlob = await generateClaimPDF(claim);
-  zip.file(`Claim_${claim.id.slice(0, 8)}.pdf`, pdfBlob);
+  zip.file(`Claim_${claimRef}.pdf`, pdfBlob);
 
-  if (claim.voice_note_url) {
-    try {
-      const response = await fetch(claim.voice_note_url);
-      const blob = await response.blob();
-      const extension = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp3') ? 'mp3' : blob.type.includes('wav') ? 'wav' : 'audio';
-      zip.file(`voice_statement.${extension}`, blob);
-    } catch (error) {
-      console.error('Failed to download voice note:', error);
-    }
+  // Add voice transcript if exists
+  if (claim.voice_transcript) {
+    zip.file('voice_transcript.txt', claim.voice_transcript);
   }
 
-  const allFiles: string[] = [];
-  if (claim.driver_license_photo_url) allFiles.push(claim.driver_license_photo_url);
-  if (claim.license_disk_photo_url) allFiles.push(claim.license_disk_photo_url);
-  if (claim.third_party_license_photo_url) allFiles.push(claim.third_party_license_photo_url);
-  if (claim.third_party_disk_photo_url) allFiles.push(claim.third_party_disk_photo_url);
-  if (claim.damage_photo_urls) allFiles.push(...claim.damage_photo_urls);
-  if (claim.media_urls) allFiles.push(...claim.media_urls);
+  // Helper to extract file extension from URL or blob type
+  const getFileExtension = (url: string, blobType?: string): string => {
+    // Try URL first
+    const urlMatch = url.match(/\.([a-zA-Z0-9]+)(\?|$)/);
+    if (urlMatch) return urlMatch[1];
 
-  for (let i = 0; i < allFiles.length; i++) {
+    // Try blob type
+    if (blobType) {
+      const typeMatch = blobType.match(/\/([a-zA-Z0-9]+)/);
+      if (typeMatch) return typeMatch[1];
+    }
+
+    return 'file';
+  };
+
+  // Collect ALL attachments from multiple sources
+  const allAttachments: Array<{url: string, kind?: string, label?: string}> = [];
+
+  // Source 1: attachments array (primary source)
+  if (claim.attachments && Array.isArray(claim.attachments)) {
+    allAttachments.push(...claim.attachments.filter((att: any) => att?.url));
+  }
+
+  // Source 2: documentation array (from claimant_snapshot or claim_data)
+  if (claim.documentation && Array.isArray(claim.documentation)) {
+    allAttachments.push(...claim.documentation.filter((doc: any) => doc?.url));
+  }
+
+  // Source 3: claimant_snapshot.attachments
+  if (claim.claimant_snapshot?.attachments && Array.isArray(claim.claimant_snapshot.attachments)) {
+    allAttachments.push(...claim.claimant_snapshot.attachments.filter((att: any) => att?.url));
+  }
+
+  // Source 4: claim_data.attachments
+  if (claim.claim_data?.attachments && Array.isArray(claim.claim_data.attachments)) {
+    allAttachments.push(...claim.claim_data.attachments.filter((att: any) => att?.url));
+  }
+
+  // Source 5: Legacy URL fields (backwards compatibility)
+  const legacyFiles: Array<{url: string, kind: string}> = [];
+  if (claim.voice_note_url) legacyFiles.push({url: claim.voice_note_url, kind: 'voice_note'});
+  if (claim.driver_license_photo_url) legacyFiles.push({url: claim.driver_license_photo_url, kind: 'driver_license'});
+  if (claim.license_disk_photo_url) legacyFiles.push({url: claim.license_disk_photo_url, kind: 'license_disk'});
+  if (claim.third_party_license_photo_url) legacyFiles.push({url: claim.third_party_license_photo_url, kind: 'third_party_license'});
+  if (claim.third_party_disk_photo_url) legacyFiles.push({url: claim.third_party_disk_photo_url, kind: 'third_party_disk'});
+  if (claim.damage_photo_urls) {
+    claim.damage_photo_urls.forEach((url: string, idx: number) => {
+      legacyFiles.push({url, kind: `damage_photo_${idx + 1}`});
+    });
+  }
+  if (claim.media_urls) {
+    claim.media_urls.forEach((url: string, idx: number) => {
+      legacyFiles.push({url, kind: `media_${idx + 1}`});
+    });
+  }
+
+  allAttachments.push(...legacyFiles);
+
+  // Deduplicate by URL
+  const uniqueAttachments = Array.from(
+    new Map(allAttachments.map(att => [att.url, att])).values()
+  );
+
+  console.log(`📦 Downloading ${uniqueAttachments.length} files for claim pack`);
+
+  // Download each attachment
+  for (const attachment of uniqueAttachments) {
     try {
-      const response = await fetch(allFiles[i]);
+      const response = await fetch(attachment.url);
+      if (!response.ok) {
+        failedFiles.push(attachment.kind || attachment.url);
+        continue;
+      }
+
       const blob = await response.blob();
-      const filename = `evidence_${i + 1}.${blob.type.split('/')[1] || 'jpg'}`;
+      const extension = getFileExtension(attachment.url, blob.type);
+
+      // Create meaningful filename from kind or label
+      const baseName = attachment.kind || attachment.label || 'evidence';
+      const sanitizedName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `${sanitizedName}.${extension}`;
+
       zip.file(filename, blob);
     } catch (error) {
-      console.error(`Failed to download file ${i + 1}:`, error);
+      console.error(`Failed to download ${attachment.kind || attachment.url}:`, error);
+      failedFiles.push(attachment.kind || attachment.url);
     }
   }
 
+  // Add manifest listing any failed downloads
+  if (failedFiles.length > 0) {
+    const manifest = `Download Pack for Claim ${claimRef}\n` +
+                    `Generated: ${new Date().toLocaleString()}\n\n` +
+                    `Failed to download the following files:\n` +
+                    failedFiles.map(f => `- ${f}`).join('\n');
+    zip.file('_manifest.txt', manifest);
+  }
+
+  // Generate and download the zip
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   const url = URL.createObjectURL(zipBlob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `Claim_${claim.id.slice(0, 8)}.zip`;
+  a.download = `Claim_${claimRef}.zip`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+
+  console.log(`✅ Download pack created with ${uniqueAttachments.length - failedFiles.length}/${uniqueAttachments.length} files`);
 }

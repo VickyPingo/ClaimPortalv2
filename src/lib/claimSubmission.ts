@@ -41,7 +41,7 @@ export async function submitClaimUnified(params: {
 
   // 3. Snapshot profile data (stored permanently with claim)
   // Priority: explicit params > claimData > profile > user metadata
-  // NEVER use email as name - keep it as null if no real name exists
+  // NEVER use email as name - use placeholder 'Client' if no valid name exists
   const rawName = params.claimantName ??
     params.claimData?.claimantName ??
     params.claimData?.name ??
@@ -55,7 +55,8 @@ export async function submitClaimUnified(params: {
     return str.includes('@') || str.includes('.co.') || str.includes('.com');
   };
 
-  const finalClaimantName = (rawName && !isEmailLike(rawName)) ? rawName : null;
+  // Always provide a valid display name - NEVER null or email
+  const finalClaimantName = (rawName && !isEmailLike(rawName)) ? rawName : 'Client';
 
   const finalClaimantEmail = params.claimantEmail ??
     params.claimData?.claimantEmail ??
