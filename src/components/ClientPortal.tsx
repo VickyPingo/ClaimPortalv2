@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import { useAuth } from '../contexts/AuthContext';
 import TheftClaimForm from './TheftClaimForm';
 import MotorVehicleTheftForm from './MotorVehicleTheftForm';
@@ -340,6 +341,33 @@ export default function ClientPortal() {
             }
           : null;
 
+        // Build attachments array
+        const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
+
+        if (voiceNoteUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+        }
+
+        damagePhotoUrls.forEach((url, i) => {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/damage_${i + 1}.jpg`, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` });
+        });
+
+        if (driverLicenseUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/driver_license.jpg`, url: driverLicenseUrl, kind: 'driver_license', label: 'Driver License' });
+        }
+
+        if (licenseDiskUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/license_disk.jpg`, url: licenseDiskUrl, kind: 'license_disk', label: 'License Disk' });
+        }
+
+        if (thirdPartyLicenseUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_license.jpg`, url: thirdPartyLicenseUrl, kind: 'third_party_license', label: 'Third Party License' });
+        }
+
+        if (thirdPartyDiskUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_disk.jpg`, url: thirdPartyDiskUrl, kind: 'third_party_disk', label: 'Third Party Disk' });
+        }
+
         const completeClaimData = {
           accident_date_time: accidentDateTime || null,
           location_address: locationAddress || null,
@@ -347,38 +375,20 @@ export default function ClientPortal() {
           location_lng: location?.lng || null,
           car_condition: carCondition,
           panel_beater_location: panelBeaterLocation,
+          selected_province: selectedProvince,
+          selected_city: selectedCity,
           third_party_details: thirdPartyDetails,
+          third_party_name: thirdPartyName,
+          third_party_phone: thirdPartyPhone,
+          third_party_vehicle: thirdPartyVehicle,
           voice_transcript: voiceTranscript || null,
         };
 
-        const { error: insertError } = await supabase.from('claims').insert({
-          brokerage_id: clientData.data.brokerage_id,
-          user_id: user.id,
-          client_id: user.id,
-          incident_type: incidentType,
-          claimant_name: claimantName,
-          policy_number: policyNumber,
-          claimant_phone: claimantPhone,
-          claimant_email: claimantEmail,
-          claim_data: completeClaimData,
-          accident_date_time: accidentDateTime || null,
-          location_lat: location?.lat || null,
-          location_lng: location?.lng || null,
-          location_address: locationAddress || null,
-          car_condition: carCondition,
-          panel_beater_location: panelBeaterLocation,
-          driver_license_photo_url: driverLicenseUrl,
-          license_disk_photo_url: licenseDiskUrl,
-          third_party_license_photo_url: thirdPartyLicenseUrl,
-          third_party_disk_photo_url: thirdPartyDiskUrl,
-          damage_photo_urls: damagePhotoUrls,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-          media_urls: [],
-          third_party_details: thirdPartyDetails,
+        await submitClaimUnified({
+          claimType: 'motor_accident',
+          claimData: completeClaimData,
+          attachments: attachments,
         });
-
-        if (insertError) throw insertError;
       } else if (incidentType === 'burst_geyser') {
         const mediaUrls: string[] = [];
 
@@ -399,6 +409,25 @@ export default function ClientPortal() {
           mediaUrls.push(url);
         }
 
+        // Build attachments array
+        const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
+
+        if (voiceNoteUrl) {
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+        }
+
+        mediaUrls.forEach((url, i) => {
+          const isVideo = url.includes('leak_video');
+          const isSerial = url.includes('serial');
+          attachments.push({
+            bucket: 'claims',
+            path: url.split('/claims/')[1] || `${user.id}/${timestamp}/media_${i}.jpg`,
+            url,
+            kind: isVideo ? 'leak_video' : (isSerial ? 'serial_photo' : 'geyser_damage_photo'),
+            label: isVideo ? 'Leak Video' : (isSerial ? 'Serial Number Photo' : `Geyser Media ${i + 1}`)
+          });
+        });
+
         const completeClaimData = {
           location_address: locationAddress || null,
           location_lat: location?.lat || null,
@@ -407,26 +436,11 @@ export default function ClientPortal() {
           media_count: mediaUrls.length,
         };
 
-        const { error: insertError } = await supabase.from('claims').insert({
-          brokerage_id: clientData.data.brokerage_id,
-          user_id: user.id,
-          client_id: user.id,
-          incident_type: incidentType,
-          claimant_name: claimantName,
-          policy_number: policyNumber,
-          claimant_phone: claimantPhone,
-          claimant_email: claimantEmail,
-          claim_data: completeClaimData,
-          location_lat: location?.lat || null,
-          location_lng: location?.lng || null,
-          location_address: locationAddress || null,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-          media_urls: mediaUrls,
-          third_party_details: null,
+        await submitClaimUnified({
+          claimType: 'motor_accident',
+          claimData: completeClaimData,
+          attachments: attachments,
         });
-
-        if (insertError) throw insertError;
       }
 
       setStep('success');

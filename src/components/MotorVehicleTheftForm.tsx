@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import {
   ArrowLeft,
   Loader2,
@@ -255,48 +256,55 @@ export default function MotorVehicleTheftForm({
         );
       }
 
-      const { error: insertError } = await supabase
-        .from('motor_vehicle_theft_claims')
-        .insert({
-          brokerage_id: brokerageId,
-          client_id: clientId,
-          incident_type: incidentType,
-          trauma_counseling_requested: traumaCounselingRequested,
-          has_all_keys: incidentType === 'theft' ? hasAllKeys : null,
-          missing_keys_explanation:
-            incidentType === 'theft' && hasAllKeys === false
-              ? missingKeysExplanation
-              : null,
-          vehicle_make: vehicleMake,
-          vehicle_model: vehicleModel,
-          vehicle_year: parseInt(vehicleYear),
-          vehicle_registration: vehicleRegistration,
-          vehicle_vin: vehicleVin || null,
-          vehicle_color: vehicleColor,
-          is_financed: isFinanced,
-          finance_bank: isFinanced ? financeBank : null,
-          finance_account_number: isFinanced ? financeAccountNumber : null,
-          has_tracking_device: hasTrackingDevice,
-          reported_to_tracker: hasTrackingDevice ? reportedToTracker : null,
-          tracker_company_name:
-            hasTrackingDevice && trackerCompanyName ? trackerCompanyName : null,
-          last_driver_name: lastDriverName,
-          last_driver_id_number: lastDriverIdNumber,
-          last_driver_license_code: lastDriverLicenseCode,
-          driver_license_front_url: driverLicenseFrontUrl,
-          driver_license_back_url: driverLicenseBackUrl,
-          saps_case_slip_url: sapsCaseSlipUrl,
-          proof_of_purchase_url: proofOfPurchaseUrl,
-          last_known_location_lat: location?.lat || null,
-          last_known_location_lng: location?.lng || null,
-          last_known_location_address: locationAddress,
-          saps_case_number: sapsCaseNumber,
-          police_station_name: policeStationName,
-          date_reported: new Date(dateReported).toISOString(),
-          incident_date_time: new Date(incidentDateTime).toISOString(),
-        });
+      // Build attachments array
+      const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      if (insertError) throw insertError;
+      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/driver_license_front`, url: driverLicenseFrontUrl, kind: 'driver_license_front', label: 'Driver License (Front)' });
+      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/driver_license_back`, url: driverLicenseBackUrl, kind: 'driver_license_back', label: 'Driver License (Back)' });
+      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/saps_case_slip`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
+
+      if (proofOfPurchaseUrl) {
+        attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/proof_of_purchase`, url: proofOfPurchaseUrl, kind: 'proof_of_purchase', label: 'Proof of Purchase' });
+      }
+
+      const claimData = {
+        incident_type: incidentType,
+        trauma_counseling_requested: traumaCounselingRequested,
+        has_all_keys: incidentType === 'theft' ? hasAllKeys : null,
+        missing_keys_explanation:
+          incidentType === 'theft' && hasAllKeys === false
+            ? missingKeysExplanation
+            : null,
+        vehicle_make: vehicleMake,
+        vehicle_model: vehicleModel,
+        vehicle_year: parseInt(vehicleYear),
+        vehicle_registration: vehicleRegistration,
+        vehicle_vin: vehicleVin || null,
+        vehicle_color: vehicleColor,
+        is_financed: isFinanced,
+        finance_bank: isFinanced ? financeBank : null,
+        finance_account_number: isFinanced ? financeAccountNumber : null,
+        has_tracking_device: hasTrackingDevice,
+        reported_to_tracker: hasTrackingDevice ? reportedToTracker : null,
+        tracker_company_name:
+          hasTrackingDevice && trackerCompanyName ? trackerCompanyName : null,
+        last_driver_name: lastDriverName,
+        last_driver_id_number: lastDriverIdNumber,
+        last_driver_license_code: lastDriverLicenseCode,
+        last_known_location_lat: location?.lat || null,
+        last_known_location_lng: location?.lng || null,
+        last_known_location_address: locationAddress,
+        saps_case_number: sapsCaseNumber,
+        police_station_name: policeStationName,
+        date_reported: new Date(dateReported).toISOString(),
+        incident_date_time: new Date(incidentDateTime).toISOString(),
+      };
+
+      await submitClaimUnified({
+        claimType: 'vehicle_theft',
+        claimData: claimData,
+        attachments: attachments,
+      });
 
       setStep('success');
     } catch (error: any) {

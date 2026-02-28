@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import {
   Car,
   Droplet,
@@ -218,28 +219,62 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
           ? `${selectedCity}, ${selectedProvince}`
           : null;
 
-        const { data: claimData, error: insertError } = await supabase.from('claims').insert({
+        // Build attachments array
+        const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
+
+        if (voiceNoteUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+        }
+
+        damagePhotoUrls.forEach((url, i) => {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_${i + 1}.jpg`, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` });
+        });
+
+        if (driverLicenseUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/driver_license.jpg`, url: driverLicenseUrl, kind: 'driver_license', label: 'Driver License' });
+        }
+
+        if (licenseDiskUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/license_disk.jpg`, url: licenseDiskUrl, kind: 'license_disk', label: 'License Disk' });
+        }
+
+        if (thirdPartyLicenseUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/third_party_license.jpg`, url: thirdPartyLicenseUrl, kind: 'third_party_license', label: 'Third Party License' });
+        }
+
+        if (thirdPartyDiskUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/third_party_disk.jpg`, url: thirdPartyDiskUrl, kind: 'third_party_disk', label: 'Third Party Disk' });
+        }
+
+        const claimantSnapshot = {
+          full_name: claimantName,
+          email: claimantEmail || null,
+          cell_number: claimantPhone,
+          policy_number: null,
+          role: null,
           brokerage_id: '00000000-0000-0000-0000-000000000001',
-          client_id: null,
-          claimant_name: claimantName,
-          claimant_phone: claimantPhone,
-          claimant_email: claimantEmail,
-          incident_type: incidentType,
+        };
+
+        const claimDataPayload = {
           accident_date_time: accidentDateTime || null,
           location_lat: location?.lat || null,
           location_lng: location?.lng || null,
           location_address: locationAddress || null,
           car_condition: carCondition,
           panel_beater_location: panelBeaterLocation,
-          driver_license_photo_url: driverLicenseUrl,
-          license_disk_photo_url: licenseDiskUrl,
-          third_party_license_photo_url: thirdPartyLicenseUrl,
-          third_party_disk_photo_url: thirdPartyDiskUrl,
-          damage_photo_urls: damagePhotoUrls,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-          media_urls: [],
-          third_party_details: null,
+          selected_province: selectedProvince,
+          selected_city: selectedCity,
+          voice_transcript: voiceTranscript,
+        };
+
+        const { data: claimData, error: insertError } = await supabase.from('claims').insert({
+          claim_type: 'public_claim',
+          brokerage_id: '00000000-0000-0000-0000-000000000001',
+          client_id: null,
+          status: 'new',
+          claimant_snapshot: claimantSnapshot,
+          claim_data: claimDataPayload,
+          attachments: attachments,
         }).select().single();
 
         if (insertError) throw insertError;
@@ -272,23 +307,52 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
           mediaUrls.push(url);
         }
 
-        const { data: claimData, error: insertError } = await supabase.from('claims').insert({
+        // Build attachments array
+        const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
+
+        if (voiceNoteUrl) {
+          attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+        }
+
+        mediaUrls.forEach((url, i) => {
+          const isVideo = url.includes('leak_video');
+          const isSerial = url.includes('serial');
+          attachments.push({
+            bucket: 'claims',
+            path: url.split('/claims/')[1] || `${tempId}/${timestamp}/media_${i}.jpg`,
+            url,
+            kind: isVideo ? 'leak_video' : (isSerial ? 'serial_photo' : 'geyser_damage_photo'),
+            label: isVideo ? 'Leak Video' : (isSerial ? 'Serial Number Photo' : `Geyser Damage Photo ${i + 1}`)
+          });
+        });
+
+        const claimantSnapshot = {
+          full_name: claimantName,
+          email: claimantEmail || null,
+          cell_number: claimantPhone,
+          policy_number: null,
+          role: null,
           brokerage_id: '00000000-0000-0000-0000-000000000001',
-          client_id: null,
-          claimant_name: claimantName,
-          claimant_phone: claimantPhone,
-          claimant_email: claimantEmail,
-          incident_type: incidentType,
+        };
+
+        const claimDataPayload = {
           location_lat: location?.lat || null,
           location_lng: location?.lng || null,
-          location_address: geyserLocationAddress || location ? (geyserLocationAddress || locationAddress) : null,
+          location_address: geyserLocationAddress || locationAddress || null,
           burst_datetime: burstDateTime || null,
           geyser_type: geyserType || null,
           has_resulting_damage: hasResultingDamage,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-          media_urls: mediaUrls,
-          third_party_details: null,
+          voice_transcript: voiceTranscript,
+        };
+
+        const { data: claimData, error: insertError } = await supabase.from('claims').insert({
+          claim_type: 'public_claim',
+          brokerage_id: '00000000-0000-0000-0000-000000000001',
+          client_id: null,
+          status: 'new',
+          claimant_snapshot: claimantSnapshot,
+          claim_data: claimDataPayload,
+          attachments: attachments,
         }).select().single();
 
         if (insertError) throw insertError;

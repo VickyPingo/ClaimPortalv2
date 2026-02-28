@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import {
   ArrowLeft,
   Loader2,
@@ -206,34 +207,52 @@ export default function StructuralDamageForm({
         ? await uploadFile(contractorReport, 'claims', `${tempId}/${timestamp}/contractor_report.pdf`)
         : null;
 
-      const { error: insertError } = await supabase
-        .from('structural_damage_claims')
-        .insert({
-          brokerage_id: brokerageId,
-          client_id: clientId || null,
-          incident_type: incidentType,
-          sub_incident_type: lightningSubType,
-          is_habitable: isHabitable,
-          is_property_secure: isPropertySecure,
-          water_entry_point: waterEntryPoint || null,
-          is_gradual_leak: isGradualLeak,
-          roof_construction: roofConstruction || null,
-          is_glass_only: isGlassOnly,
-          is_bonded: isBonded,
-          bond_holder_bank: bondBank || null,
-          estimated_repair_cost: estimatedRepairCost ? parseFloat(estimatedRepairCost) : null,
-          damage_photos_urls: damagePhotoUrls,
-          repair_quote_1_url: repairQuote1Url,
-          repair_quote_2_url: repairQuote2Url,
-          contractor_report_url: contractorReportUrl,
-          location_address: locationAddress || null,
-          location_lat: location?.lat || null,
-          location_lng: location?.lng || null,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-        });
+      // Build attachments array
+      const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      if (insertError) throw insertError;
+      if (voiceNoteUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+      }
+
+      damagePhotoUrls.forEach((url, i) => {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_${i + 1}.jpg`, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` });
+      });
+
+      if (repairQuote1Url) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/repair_quote_1.pdf`, url: repairQuote1Url, kind: 'repair_quote', label: 'Repair Quote 1' });
+      }
+
+      if (repairQuote2Url) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/repair_quote_2.pdf`, url: repairQuote2Url, kind: 'repair_quote', label: 'Repair Quote 2' });
+      }
+
+      if (contractorReportUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/contractor_report.pdf`, url: contractorReportUrl, kind: 'contractor_report', label: 'Contractor Report' });
+      }
+
+      const claimData = {
+        incident_type: incidentType,
+        sub_incident_type: lightningSubType,
+        is_habitable: isHabitable,
+        is_property_secure: isPropertySecure,
+        water_entry_point: waterEntryPoint || null,
+        is_gradual_leak: isGradualLeak,
+        roof_construction: roofConstruction || null,
+        is_glass_only: isGlassOnly,
+        is_bonded: isBonded,
+        bond_holder_bank: bondBank || null,
+        estimated_repair_cost: estimatedRepairCost ? parseFloat(estimatedRepairCost) : null,
+        location_address: locationAddress || null,
+        location_lat: location?.lat || null,
+        location_lng: location?.lng || null,
+        voice_transcript: voiceTranscript,
+      };
+
+      await submitClaimUnified({
+        claimType: 'structural_damage',
+        claimData: claimData,
+        attachments: attachments,
+      });
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);

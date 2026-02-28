@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import {
   ArrowLeft,
   Loader2,
@@ -198,48 +199,42 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         forcedEntryPhotoUrl = await uploadFile(forcedEntryPhoto, 'claims-evidence', `${uploadDir}/forced_entry_photo`);
       }
 
-      const { data: claimData, error: insertError } = await supabase
-        .from('theft_claims')
-        .insert({
-          brokerage_id: brokerageId,
-          client_id: clientId,
-          saps_case_number: sapsCase,
-          police_station_name: policeStation,
-          date_reported: new Date(dateReported).toISOString(),
-          investigating_officer_name: investigatingOfficer || null,
-          incident_date_time: new Date(incidentDateTime).toISOString(),
-          property_occupied: propertyOccupied,
-          forced_entry: forcedEntry,
-          forced_entry_photo_url: forcedEntryPhotoUrl,
-          incident_location_address: locationAddress,
-          incident_lat: location?.lat || null,
-          incident_lng: location?.lng || null,
-          cellphone_stolen: cellphoneStolen,
-          itc_reference_number: cellphoneStolen ? itcRefNumber : null,
-          saps_case_slip_url: sapsCaseSlipUrl,
-          proof_of_ownership_urls: [proofOfOwnershipUrl],
-          replacement_quote_url: replacementQuoteUrl,
-          total_claim_value: totalClaimValue,
-        })
-        .select()
-        .single();
+      // Build attachments array
+      const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      if (insertError) throw insertError;
+      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/saps_case_slip`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
+      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/proof_of_ownership`, url: proofOfOwnershipUrl, kind: 'proof_of_ownership', label: 'Proof of Ownership' });
 
-      if (claimData && items.length > 0) {
-        const itemsToInsert = items.map((item) => ({
-          theft_claim_id: claimData.id,
-          item_description: item.description,
-          make_model: item.makeModel || null,
-          serial_number: item.serialNumber || null,
-          purchase_year: item.purchaseYear ? parseInt(item.purchaseYear) : null,
-          replacement_value: parseFloat(item.replacementValue),
-          proof_type: item.proofType,
-        }));
-
-        const { error: itemsError } = await supabase.from('theft_items').insert(itemsToInsert);
-        if (itemsError) throw itemsError;
+      if (replacementQuoteUrl) {
+        attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/replacement_quote`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
       }
+
+      if (forcedEntryPhotoUrl) {
+        attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/forced_entry_photo`, url: forcedEntryPhotoUrl, kind: 'forced_entry_photo', label: 'Forced Entry Photo' });
+      }
+
+      const claimData = {
+        saps_case_number: sapsCase,
+        police_station_name: policeStation,
+        date_reported: new Date(dateReported).toISOString(),
+        investigating_officer_name: investigatingOfficer || null,
+        incident_date_time: new Date(incidentDateTime).toISOString(),
+        property_occupied: propertyOccupied,
+        forced_entry: forcedEntry,
+        incident_location_address: locationAddress,
+        incident_lat: location?.lat || null,
+        incident_lng: location?.lng || null,
+        cellphone_stolen: cellphoneStolen,
+        itc_reference_number: cellphoneStolen ? itcRefNumber : null,
+        total_claim_value: totalClaimValue,
+        stolen_items: items,
+      };
+
+      await submitClaimUnified({
+        claimType: 'theft',
+        claimData: claimData,
+        attachments: attachments,
+      });
 
       setStep('success');
     } catch (error: any) {

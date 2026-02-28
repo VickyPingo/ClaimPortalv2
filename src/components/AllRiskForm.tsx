@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowLeft,
@@ -349,33 +350,60 @@ export default function AllRiskForm({
         );
       }
 
-      const { error: insertError } = await supabase
-        .from('all_risk_claims')
-        .insert({
-          brokerage_id: brokerageId,
-          client_id: clientId || null,
-          incident_type: incidentType,
-          incident_date_time: incidentDateTime,
-          incident_location: incidentLocation,
-          is_international: isInternational,
-          departure_date: departureDate || null,
-          saps_case_number: sapsCase || null,
-          damage_description_url: damageDescriptionUrl,
-          damage_description_transcript: damageDescriptionTranscript,
-          last_known_location: lastKnownLocation || null,
-          items: items,
-          is_repairable: isRepairable,
-          damage_report_url: damageReportUrl,
-          repair_quote_url: repairQuoteUrl,
-          replacement_quote_url: replacementQuoteUrl,
-          proof_of_ownership_urls: proofOfOwnershipUrls,
-          police_report_url: policeReportUrl,
-          valuation_certificate_url: valuationCertUrl,
-          voice_note_url: voiceNoteUrl,
-          voice_transcript_en: voiceTranscript,
-        });
+      // Build attachments array
+      const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      if (insertError) throw insertError;
+      if (voiceNoteUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+      }
+
+      if (damageDescriptionUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_description.webm`, url: damageDescriptionUrl, kind: 'damage_description_audio', label: 'Damage Description Audio' });
+      }
+
+      proofOfOwnershipUrls.forEach((url, i) => {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/proof_${i + 1}.jpg`, url, kind: 'proof_of_ownership', label: `Proof of Ownership ${i + 1}` });
+      });
+
+      if (damageReportUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_report.pdf`, url: damageReportUrl, kind: 'damage_report', label: 'Damage Report' });
+      }
+
+      if (repairQuoteUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/repair_quote.pdf`, url: repairQuoteUrl, kind: 'repair_quote', label: 'Repair Quote' });
+      }
+
+      if (replacementQuoteUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/replacement_quote.pdf`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
+      }
+
+      if (policeReportUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/police_report.pdf`, url: policeReportUrl, kind: 'police_report', label: 'Police Report' });
+      }
+
+      if (valuationCertUrl) {
+        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/valuation_cert.pdf`, url: valuationCertUrl, kind: 'valuation_certificate', label: 'Valuation Certificate' });
+      }
+
+      const claimData = {
+        incident_type: incidentType,
+        incident_date_time: incidentDateTime,
+        incident_location: incidentLocation,
+        is_international: isInternational,
+        departure_date: departureDate || null,
+        saps_case_number: sapsCase || null,
+        damage_description_transcript: damageDescriptionTranscript,
+        last_known_location: lastKnownLocation || null,
+        items: items,
+        is_repairable: isRepairable,
+        voice_transcript: voiceTranscript,
+      };
+
+      await submitClaimUnified({
+        claimType: 'all_risk',
+        claimData: claimData,
+        attachments: attachments,
+      });
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
