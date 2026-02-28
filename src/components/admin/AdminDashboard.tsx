@@ -53,11 +53,8 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
         return;
       }
 
-      // Join with profiles to get real client names
-      let query = supabase.from('claims').select(`
-        *,
-        client_profile:profiles!claims_user_id_fkey(full_name, email)
-      `);
+      // Fetch claims first
+      let query = supabase.from('claims').select('*');
 
       // ACCESS CONTROL:
       // - Super Admin (role: 'super_admin'): See ALL claims across ALL brokerages
@@ -79,20 +76,39 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
 
       console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
+      // Fetch profiles for all claims with user_id
+      const userIds = [...new Set((claimsData || []).map(c => c.user_id).filter(Boolean))];
+      let profilesMap: Record<string, any> = {};
+
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+
+        if (profilesData) {
+          profilesMap = Object.fromEntries(profilesData.map(p => [p.id, p]));
+        }
+      }
+
       // Helper to check if string looks like email
       const isEmail = (s: string | null | undefined): boolean => {
         return !!s && s.includes('@');
       };
 
       const claimsWithClientNames = (claimsData || []).map((claim: any) => {
-        // Priority: client_profile.full_name > claimant_name (if not email) > 'Client'
+        // Priority: profile.full_name > claimant_name (if not email) > 'Client'
         let displayName = 'Client';
 
-        if (claim.client_profile?.full_name && !isEmail(claim.client_profile.full_name)) {
-          displayName = claim.client_profile.full_name.trim();
+        const profile = claim.user_id ? profilesMap[claim.user_id] : null;
+
+        if (profile?.full_name && !isEmail(profile.full_name)) {
+          displayName = profile.full_name.trim();
         } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
           displayName = claim.claimant_name.trim();
         }
+
+        console.log(`  📋 Claim ${claim.id}: user_id=${claim.user_id}, profile.full_name=${profile?.full_name}, displayName=${displayName}`);
 
         return {
           ...claim,
