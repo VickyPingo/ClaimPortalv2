@@ -30,7 +30,7 @@ interface Claim {
   created_at: string;
   claimant_name?: string;
   policy_number?: string;
-  user_id: string;
+  client_id: string;
   brokerage_id: string;
 }
 
@@ -77,17 +77,13 @@ export default function ClientClaimDetail({ claimId, onBack }: ClientClaimDetail
         .from('claims')
         .select('*')
         .eq('id', claimId)
+        .eq('client_id', user.id)
         .maybeSingle();
 
       if (claimError) throw claimError;
 
       if (!claimData) {
         setError('Claim not found');
-        return;
-      }
-
-      if (claimData.user_id !== user.id) {
-        setUnauthorized(true);
         return;
       }
 
