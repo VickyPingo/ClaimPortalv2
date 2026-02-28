@@ -419,108 +419,163 @@ export default function ClaimDetail({ claim, onBack }: ClaimDetailProps) {
               </div>
             )}
 
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Damage Photos
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {claim.damage_photo_urls && Array.isArray(claim.damage_photo_urls) && claim.damage_photo_urls.length > 0 ? (
-                  claim.damage_photo_urls.map((url: string, index: number) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={url}
-                        alt={`Damage ${index + 1}`}
-                        className="w-full aspect-video object-cover rounded-lg"
-                      />
-                      <button
-                        onClick={() => downloadFile(url, `damage_photo_${index + 1}.jpg`)}
-                        className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                      >
-                        <div className="bg-white rounded-full p-3">
-                          <Download className="w-6 h-6 text-gray-900" />
-                        </div>
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-600 col-span-full">No damage photos</p>
-                )}
-              </div>
-            </div>
+            {(() => {
+              const attachments = claim.attachments || [];
+              const photos = attachments.filter((a: any) =>
+                a.kind && (a.kind.includes('photo') || a.kind.includes('license') || a.kind.includes('disk') || a.kind === 'proof_of_ownership')
+              );
+              const voiceNote = attachments.find((a: any) => a.kind === 'voice_note');
+              const damageDescription = attachments.find((a: any) => a.kind === 'damage_description_audio');
+              const documents = attachments.filter((a: any) =>
+                a.kind && (a.kind.includes('report') || a.kind.includes('quote') || a.kind.includes('certificate'))
+              );
+              const videos = attachments.filter((a: any) =>
+                a.url && (a.url.includes('.mp4') || a.url.includes('video'))
+              );
 
-            {claim.media_urls && Array.isArray(claim.media_urls) && claim.media_urls.length > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Additional Media
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {claim.media_urls.map((url: string, index: number) => (
-                    <div key={index} className="relative group">
-                      {url.includes('.mp4') || url.includes('video') ? (
-                        <>
-                          <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-                            <Video className="w-12 h-12 text-gray-400" />
+              return (
+                <>
+                  {photos.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Photos
+                      </h2>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {photos.map((attachment: any, index: number) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={attachment.url}
+                              alt={attachment.label || `Photo ${index + 1}`}
+                              className="w-full aspect-video object-cover rounded-lg"
+                            />
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <span className="text-xs bg-black bg-opacity-70 text-white px-2 py-1 rounded">
+                                {attachment.label || `Photo ${index + 1}`}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => downloadFile(attachment.url, attachment.label || `photo_${index + 1}.jpg`)}
+                              className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <div className="bg-white rounded-full p-3">
+                                <Download className="w-6 h-6 text-gray-900" />
+                              </div>
+                            </button>
                           </div>
-                          <button
-                            onClick={() => downloadFile(url, `video_${index + 1}.mp4`)}
-                            className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <div className="bg-white rounded-full p-3">
-                              <Download className="w-6 h-6 text-gray-900" />
-                            </div>
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <img
-                            src={url}
-                            alt={`Media ${index + 1}`}
-                            className="w-full aspect-video object-cover rounded-lg"
-                          />
-                          <button
-                            onClick={() => downloadFile(url, `media_${index + 1}.jpg`)}
-                            className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <div className="bg-white rounded-full p-3">
-                              <Download className="w-6 h-6 text-gray-900" />
-                            </div>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {claim.voice_note_url && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Mic className="w-5 h-5 mr-2" />
-                  Voice Statement
-                </h2>
-                <audio controls className="w-full mb-6">
-                  <source src={claim.voice_note_url} type="audio/webm" />
-                  Your browser does not support the audio element.
-                </audio>
-
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Voice Transcription (English)
-                  </h3>
-                  {claim.voice_transcript_en ? (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-gray-900 leading-relaxed">{claim.voice_transcript_en}</p>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg">
-                      <p className="text-gray-600 text-sm italic">No transcription available</p>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
+
+                  {videos.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Videos
+                      </h2>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {videos.map((attachment: any, index: number) => (
+                          <div key={index} className="relative group">
+                            <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
+                              <Video className="w-12 h-12 text-gray-400" />
+                            </div>
+                            <div className="absolute bottom-2 left-2 right-2">
+                              <span className="text-xs bg-black bg-opacity-70 text-white px-2 py-1 rounded">
+                                {attachment.label || `Video ${index + 1}`}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => downloadFile(attachment.url, attachment.label || `video_${index + 1}.mp4`)}
+                              className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <div className="bg-white rounded-full p-3">
+                                <Download className="w-6 h-6 text-gray-900" />
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {documents.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                        Documents
+                      </h2>
+                      <div className="space-y-2">
+                        {documents.map((attachment: any, index: number) => (
+                          <button
+                            key={index}
+                            onClick={() => downloadFile(attachment.url, attachment.label || `document_${index + 1}.pdf`)}
+                            className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center">
+                              <FileText className="w-5 h-5 text-gray-600 mr-3" />
+                              <span className="text-gray-900">{attachment.label || `Document ${index + 1}`}</span>
+                            </div>
+                            <Download className="w-5 h-5 text-gray-600" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {voiceNote && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Mic className="w-5 h-5 mr-2" />
+                        Voice Statement
+                      </h2>
+                      <audio controls className="w-full mb-6">
+                        <source src={voiceNote.url} type="audio/webm" />
+                        Your browser does not support the audio element.
+                      </audio>
+
+                      <div className="border-t border-gray-200 pt-6">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                          <FileText className="w-4 h-4 mr-2" />
+                          Voice Transcription (English)
+                        </h3>
+                        {claim.voice_transcript_en ? (
+                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-gray-900 leading-relaxed">{claim.voice_transcript_en}</p>
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg">
+                            <p className="text-gray-600 text-sm italic">No transcription available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {damageDescription && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                        <Mic className="w-5 h-5 mr-2" />
+                        Damage Description Audio
+                      </h2>
+                      <audio controls className="w-full mb-6">
+                        <source src={damageDescription.url} type="audio/webm" />
+                        Your browser does not support the audio element.
+                      </audio>
+
+                      {claim.extra_voice_transcript_en && (
+                        <div className="border-t border-gray-200 pt-6">
+                          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                            <FileText className="w-4 h-4 mr-2" />
+                            Transcription (English)
+                          </h3>
+                          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-gray-900 leading-relaxed">{claim.extra_voice_transcript_en}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           <div className="lg:col-span-1 space-y-6">

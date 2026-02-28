@@ -268,10 +268,13 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
         };
 
         const { data: claimData, error: insertError } = await supabase.from('claims').insert({
-          claim_type: 'public_claim',
+          incident_type: 'motor_accident',
           brokerage_id: '00000000-0000-0000-0000-000000000001',
           client_id: null,
           status: 'new',
+          claimant_name: claimantName,
+          claimant_email: claimantEmail,
+          claimant_phone: claimantPhone,
           claimant_snapshot: claimantSnapshot,
           claim_data: claimDataPayload,
           attachments: attachments,
@@ -346,10 +349,13 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
         };
 
         const { data: claimData, error: insertError } = await supabase.from('claims').insert({
-          claim_type: 'public_claim',
+          incident_type: 'burst_geyser',
           brokerage_id: '00000000-0000-0000-0000-000000000001',
           client_id: null,
           status: 'new',
+          claimant_name: claimantName,
+          claimant_email: claimantEmail,
+          claimant_phone: claimantPhone,
           claimant_snapshot: claimantSnapshot,
           claim_data: claimDataPayload,
           attachments: attachments,
