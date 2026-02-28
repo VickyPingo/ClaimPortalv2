@@ -46,7 +46,6 @@ export async function submitClaimUnified(params: {
     params.claimData?.name ??
     profile.full_name ??
     user.user_metadata?.full_name ??
-    user.email ??
     "Anonymous";
 
   const finalClaimantEmail = params.claimantEmail ??
