@@ -534,15 +534,16 @@ export default function ClaimDetail({ claim, onBack }: ClaimDetailProps) {
                       <div className="border-t border-gray-200 pt-6">
                         <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
                           <FileText className="w-4 h-4 mr-2" />
-                          Voice Transcription (English)
+                          Voice Transcription
                         </h3>
-                        {claim.voice_transcript_en ? (
+                        {claim.voice_transcript ? (
                           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <p className="text-gray-900 leading-relaxed">{claim.voice_transcript_en}</p>
+                            <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">{claim.voice_transcript}</p>
                           </div>
                         ) : (
-                          <div className="p-4 bg-gray-50 border border-gray-300 rounded-lg">
-                            <p className="text-gray-600 text-sm italic">No transcription available</p>
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center">
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin text-amber-600" />
+                            <p className="text-amber-800 text-sm">Transcription processing...</p>
                           </div>
                         )}
                       </div>

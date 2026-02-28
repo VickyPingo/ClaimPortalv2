@@ -96,5 +96,66 @@ export async function submitClaimUnified(params: {
 
   if (error) throw error;
 
+  // 6. Process voice note transcription if any voice attachments exist
+  const voiceAttachments = params.attachments?.filter(att => att.kind === 'voice_note');
+  if (voiceAttachments && voiceAttachments.length > 0 && data?.id) {
+    // Transcribe asynchronously (don't block claim submission)
+    transcribeVoiceNotes(data.id, voiceAttachments).catch(err => {
+      console.error('Voice transcription failed:', err);
+    });
+  }
+
   return data;
+}
+
+async function transcribeVoiceNotes(claimId: string, voiceAttachments: AttachmentRef[]) {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Supabase credentials not configured');
+      return;
+    }
+
+    // Transcribe the first voice note
+    const voiceNote = voiceAttachments[0];
+    const audioUrl = voiceNote.url;
+
+    if (!audioUrl) {
+      console.error('Voice note has no URL');
+      return;
+    }
+
+    // Call the transcribe-voice edge function
+    const response = await fetch(`${supabaseUrl}/functions/v1/transcribe-voice`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ audioUrl }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Transcription API error:', response.status, errorText);
+      return;
+    }
+
+    const result = await response.json();
+    const transcript = result.transcript || '[Transcription unavailable]';
+
+    // Update the claim with the transcript
+    const { error: updateError } = await supabase
+      .from('claims')
+      .update({ voice_transcript: transcript })
+      .eq('id', claimId);
+
+    if (updateError) {
+      console.error('Failed to update claim with transcript:', updateError);
+    }
+  } catch (error) {
+    console.error('Transcription process error:', error);
+  }
 }
