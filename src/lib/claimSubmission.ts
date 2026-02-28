@@ -40,13 +40,14 @@ export async function submitClaimUnified(params: {
   if (!profile) throw new Error("Profile not found");
 
   // 3. Snapshot profile data (stored permanently with claim)
-  // Priority: explicit params > claimData > profile > user metadata > fallback
+  // Priority: explicit params > claimData > profile > user metadata
+  // NEVER use email as name - keep it as null if no real name exists
   const finalClaimantName = params.claimantName ??
     params.claimData?.claimantName ??
     params.claimData?.name ??
     profile.full_name ??
     user.user_metadata?.full_name ??
-    "Anonymous";
+    null;
 
   const finalClaimantEmail = params.claimantEmail ??
     params.claimData?.claimantEmail ??

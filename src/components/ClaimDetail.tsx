@@ -446,24 +446,79 @@ export default function ClaimDetail({ claim, onBack }: ClaimDetailProps) {
             )}
 
             {(() => {
-              let attachments = [];
+              // Collect all evidence from multiple sources
+              let allEvidence: any[] = [];
+
+              // 1. Main attachments array
               if (claim.attachments) {
-                attachments =
-                  typeof claim.attachments === 'string'
-                    ? JSON.parse(claim.attachments)
-                    : claim.attachments;
+                const attachments = typeof claim.attachments === 'string'
+                  ? JSON.parse(claim.attachments)
+                  : claim.attachments;
+                allEvidence.push(...(attachments || []));
               }
 
-              const photos = attachments.filter((a: any) =>
-                a.kind && (a.kind.includes('photo') || a.kind.includes('license') || a.kind.includes('disk') || a.kind === 'proof_of_ownership')
+              // 2. Documentation array (if exists)
+              if (claim.claimant_snapshot?.documentation) {
+                const docs = typeof claim.claimant_snapshot.documentation === 'string'
+                  ? JSON.parse(claim.claimant_snapshot.documentation)
+                  : claim.claimant_snapshot.documentation;
+                allEvidence.push(...(docs || []));
+              }
+
+              // 3. Attachments from claimant_snapshot (if exists)
+              if (claim.claimant_snapshot?.attachments) {
+                const snapAttachments = typeof claim.claimant_snapshot.attachments === 'string'
+                  ? JSON.parse(claim.claimant_snapshot.attachments)
+                  : claim.claimant_snapshot.attachments;
+                allEvidence.push(...(snapAttachments || []));
+              }
+
+              // Filter valid items with URLs
+              allEvidence = allEvidence.filter((a: any) => a?.url);
+
+              // Categorize by file type
+              const isImageFile = (url: string) => {
+                const ext = url.toLowerCase();
+                return ext.includes('.jpg') || ext.includes('.jpeg') || ext.includes('.png') || ext.includes('.webp') || ext.includes('.gif');
+              };
+
+              const isVideoFile = (url: string) => {
+                const ext = url.toLowerCase();
+                return ext.includes('.mp4') || ext.includes('.webm') || ext.includes('.mov') || ext.includes('video');
+              };
+
+              const isAudioFile = (url: string) => {
+                const ext = url.toLowerCase();
+                return ext.includes('.mp3') || ext.includes('.wav') || ext.includes('.webm') || ext.includes('audio');
+              };
+
+              const isPDFFile = (url: string) => {
+                return url.toLowerCase().includes('.pdf');
+              };
+
+              // Separate by type
+              const voiceNote = allEvidence.find((a: any) => a.kind === 'voice_note');
+              const damageDescription = allEvidence.find((a: any) => a.kind === 'damage_description_audio');
+
+              const photos = allEvidence.filter((a: any) =>
+                a.kind !== 'voice_note' &&
+                a.kind !== 'damage_description_audio' &&
+                !isVideoFile(a.url) &&
+                !isPDFFile(a.url) &&
+                (isImageFile(a.url) || a.kind?.includes('photo') || a.kind?.includes('license') || a.kind?.includes('disk') || a.kind === 'proof_of_ownership' || a.kind === 'saps_case_slip' || a.kind === 'forced_entry_photo')
               );
-              const voiceNote = attachments.find((a: any) => a.kind === 'voice_note');
-              const damageDescription = attachments.find((a: any) => a.kind === 'damage_description_audio');
-              const documents = attachments.filter((a: any) =>
-                a.kind && (a.kind.includes('report') || a.kind.includes('quote') || a.kind.includes('certificate'))
+
+              const documents = allEvidence.filter((a: any) =>
+                a.kind !== 'voice_note' &&
+                a.kind !== 'damage_description_audio' &&
+                !isImageFile(a.url) &&
+                (isPDFFile(a.url) || a.kind?.includes('report') || a.kind?.includes('quote') || a.kind?.includes('certificate') || a.kind === 'replacement_quote')
               );
-              const videos = attachments.filter((a: any) =>
-                a.url && (a.url.includes('.mp4') || a.url.includes('video'))
+
+              const videos = allEvidence.filter((a: any) =>
+                a.kind !== 'voice_note' &&
+                a.kind !== 'damage_description_audio' &&
+                isVideoFile(a.url)
               );
 
               return (

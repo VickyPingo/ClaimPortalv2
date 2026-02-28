@@ -168,22 +168,56 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   const getAllMediaUrls = () => {
     if (!claim) return [];
 
-    const attachments = getAttachments();
-    if (attachments.length > 0) {
-      const photos = attachments.filter(a =>
-        ['damage_photo', 'driver_license', 'license_disk', 'third_party_license', 'third_party_disk', 'media', 'photo'].includes(a.kind)
-      );
-      return photos.map(p => p.url);
+    // Collect all evidence from multiple sources
+    const allEvidence: Attachment[] = [];
+
+    // 1. Main attachments array
+    if (claim.attachments) {
+      const attachments = typeof claim.attachments === 'string'
+        ? JSON.parse(claim.attachments)
+        : claim.attachments;
+      allEvidence.push(...(attachments || []));
     }
 
-    // Fallback to legacy fields
-    const urls: string[] = [];
-    if (claim.driver_license_photo_url) urls.push(claim.driver_license_photo_url);
-    if (claim.license_disk_photo_url) urls.push(claim.license_disk_photo_url);
-    if (claim.third_party_license_photo_url) urls.push(claim.third_party_license_photo_url);
-    if (claim.third_party_disk_photo_url) urls.push(claim.third_party_disk_photo_url);
-    if (claim.damage_photo_urls) urls.push(...claim.damage_photo_urls);
-    if (claim.media_urls) urls.push(...claim.media_urls);
+    // 2. Documentation array (if exists)
+    if (claim.claimant_snapshot?.documentation) {
+      const docs = typeof claim.claimant_snapshot.documentation === 'string'
+        ? JSON.parse(claim.claimant_snapshot.documentation)
+        : claim.claimant_snapshot.documentation;
+      allEvidence.push(...(docs || []));
+    }
+
+    // 3. Attachments from claimant_snapshot (if exists)
+    if (claim.claimant_snapshot?.attachments) {
+      const snapAttachments = typeof claim.claimant_snapshot.attachments === 'string'
+        ? JSON.parse(claim.claimant_snapshot.attachments)
+        : claim.claimant_snapshot.attachments;
+      allEvidence.push(...(snapAttachments || []));
+    }
+
+    // Filter to items with URLs (exclude voice_note, we handle that separately)
+    // Accept ANY item with a URL - don't limit by kind
+    const mediaItems = allEvidence.filter(item =>
+      item?.url &&
+      item.kind !== 'voice_note' &&
+      item.kind !== 'damage_description_audio'
+    );
+
+    // Extract URLs
+    const urls = mediaItems.map(item => item.url).filter(Boolean);
+
+    // Fallback to legacy fields if no attachments found
+    if (urls.length === 0) {
+      const legacyUrls: string[] = [];
+      if (claim.driver_license_photo_url) legacyUrls.push(claim.driver_license_photo_url);
+      if (claim.license_disk_photo_url) legacyUrls.push(claim.license_disk_photo_url);
+      if (claim.third_party_license_photo_url) legacyUrls.push(claim.third_party_license_photo_url);
+      if (claim.third_party_disk_photo_url) legacyUrls.push(claim.third_party_disk_photo_url);
+      if (claim.damage_photo_urls) legacyUrls.push(...claim.damage_photo_urls);
+      if (claim.media_urls) legacyUrls.push(...claim.media_urls);
+      return legacyUrls;
+    }
+
     return urls;
   };
 
