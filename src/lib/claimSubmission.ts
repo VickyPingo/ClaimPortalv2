@@ -105,6 +105,13 @@ export async function submitClaimUnified(params: {
     });
   }
 
+  // 7. Generate AI summary asynchronously
+  if (data?.id) {
+    generateClaimSummary(data.id).catch(err => {
+      console.error('AI summary generation failed:', err);
+    });
+  }
+
   return data;
 }
 
@@ -154,8 +161,47 @@ async function transcribeVoiceNotes(claimId: string, voiceAttachments: Attachmen
 
     if (updateError) {
       console.error('Failed to update claim with transcript:', updateError);
+      return;
     }
+
+    // After transcription completes, regenerate AI summary with the new transcript
+    generateClaimSummary(claimId).catch(err => {
+      console.error('AI summary generation after transcription failed:', err);
+    });
   } catch (error) {
     console.error('Transcription process error:', error);
+  }
+}
+
+async function generateClaimSummary(claimId: string) {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Supabase credentials not configured');
+      return;
+    }
+
+    // Call the generate-claim-summary edge function
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-claim-summary`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ claimId }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('AI summary API error:', response.status, errorText);
+      return;
+    }
+
+    const result = await response.json();
+    console.log('AI summary generated:', result.summary);
+  } catch (error) {
+    console.error('AI summary generation process error:', error);
   }
 }

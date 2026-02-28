@@ -182,6 +182,32 @@ export default function ClaimDetail({ claim, onBack }: ClaimDetailProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {claim.ai_summary && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-md border border-blue-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-blue-700" />
+                  AI Claim Summary
+                </h2>
+                <p className="text-gray-800 leading-relaxed">{claim.ai_summary}</p>
+              </div>
+            )}
+
+            {!claim.ai_summary && (
+              <div className="bg-amber-50 rounded-lg shadow border border-amber-200 p-6">
+                <div className="flex items-center">
+                  <Loader2 className="w-5 h-5 mr-3 animate-spin text-amber-600" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-amber-900 mb-1">
+                      Generating AI Summary
+                    </h2>
+                    <p className="text-sm text-amber-700">
+                      Please wait while we analyze this claim...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
                 Incident Information
