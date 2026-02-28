@@ -42,6 +42,11 @@ export default function BrokerDashboard({
 
       if (claimsError) throw claimsError;
 
+      // Helper to check if string looks like email
+      const isEmail = (s: string | null | undefined): boolean => {
+        return !!s && s.includes('@');
+      };
+
       const claimsWithClientNames = await Promise.all(
         (claimsData || []).map(async (claim) => {
           if (claim.user_id) {
@@ -51,14 +56,23 @@ export default function BrokerDashboard({
               .eq('user_id', claim.user_id)
               .maybeSingle();
 
+            // Priority: profile.full_name (if not email) > claimant_name (if not email) > 'Client'
+            let displayName = 'Client';
+            if (clientData?.full_name && !isEmail(clientData.full_name)) {
+              displayName = clientData.full_name;
+            } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
+              displayName = claim.claimant_name;
+            }
+
             return {
               ...claim,
-              client_name: clientData?.full_name || claim.claimant_name || 'Unknown',
+              client_name: displayName,
             };
           }
+          // No user_id - use claimant_name if not email
           return {
             ...claim,
-            client_name: claim.claimant_name || 'Unknown',
+            client_name: (claim.claimant_name && !isEmail(claim.claimant_name)) ? claim.claimant_name : 'Client',
           };
         })
       );

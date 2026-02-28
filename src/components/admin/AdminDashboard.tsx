@@ -53,7 +53,11 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
         return;
       }
 
-      let query = supabase.from('claims').select('*');
+      // Join with profiles to get real client names
+      let query = supabase.from('claims').select(`
+        *,
+        client_profile:profiles!claims_user_id_fkey(full_name, email)
+      `);
 
       // ACCESS CONTROL:
       // - Super Admin (role: 'super_admin'): See ALL claims across ALL brokerages
@@ -75,10 +79,20 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
 
       console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
-      const claimsWithClientNames = (claimsData || []).map((claim) => {
-        const displayName = claim.claimant_name?.trim()
-          ? claim.claimant_name
-          : (claim.claimant_email?.trim() ? claim.claimant_email : 'Unknown');
+      // Helper to check if string looks like email
+      const isEmail = (s: string | null | undefined): boolean => {
+        return !!s && s.includes('@');
+      };
+
+      const claimsWithClientNames = (claimsData || []).map((claim: any) => {
+        // Priority: client_profile.full_name > claimant_name (if not email) > 'Client'
+        let displayName = 'Client';
+
+        if (claim.client_profile?.full_name && !isEmail(claim.client_profile.full_name)) {
+          displayName = claim.client_profile.full_name.trim();
+        } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
+          displayName = claim.claimant_name.trim();
+        }
 
         return {
           ...claim,
