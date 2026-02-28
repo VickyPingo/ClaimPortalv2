@@ -12,6 +12,9 @@ export async function submitClaimUnified(params: {
   claimType: string;
   claimData: Record<string, any>;
   attachments?: AttachmentRef[];
+  claimantName?: string;
+  claimantEmail?: string;
+  claimantPhone?: string;
 }) {
   // 1. Get authenticated user
   const { data: authRes, error: authErr } = await supabase.auth.getUser();
@@ -37,10 +40,33 @@ export async function submitClaimUnified(params: {
   if (!profile) throw new Error("Profile not found");
 
   // 3. Snapshot profile data (stored permanently with claim)
+  // Priority: explicit params > claimData > profile > user metadata > fallback
+  const finalClaimantName = params.claimantName ??
+    params.claimData?.claimantName ??
+    params.claimData?.name ??
+    profile.full_name ??
+    user.user_metadata?.full_name ??
+    user.email ??
+    "Anonymous";
+
+  const finalClaimantEmail = params.claimantEmail ??
+    params.claimData?.claimantEmail ??
+    params.claimData?.email ??
+    profile.email ??
+    user.email ??
+    null;
+
+  const finalClaimantPhone = params.claimantPhone ??
+    params.claimData?.claimantPhone ??
+    params.claimData?.phone ??
+    profile.cell_number ??
+    user.user_metadata?.phone ??
+    null;
+
   const claimantSnapshot = {
-    full_name: profile.full_name ?? user.user_metadata?.full_name ?? user.email ?? "Anonymous",
-    email: profile.email ?? user.email ?? null,
-    cell_number: profile.cell_number ?? user.user_metadata?.phone ?? null,
+    full_name: finalClaimantName,
+    email: finalClaimantEmail,
+    cell_number: finalClaimantPhone,
     policy_number: profile.policy_number ?? null,
     role: profile.role ?? null,
     brokerage_id: profile.brokerage_id ?? null,
@@ -52,9 +78,9 @@ export async function submitClaimUnified(params: {
     client_id: uid,
     brokerage_id: profile.brokerage_id,
     status: "new",
-    claimant_name: profile.full_name ?? user.user_metadata?.full_name ?? user.email ?? "Anonymous",
-    claimant_email: profile.email ?? user.email ?? null,
-    claimant_phone: profile.cell_number ?? user.user_metadata?.phone ?? null,
+    claimant_name: finalClaimantName,
+    claimant_email: finalClaimantEmail,
+    claimant_phone: finalClaimantPhone,
     policy_number: profile.policy_number ?? null,
     claimant_snapshot: claimantSnapshot,
     claim_data: params.claimData ?? {},
