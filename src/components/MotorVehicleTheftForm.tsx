@@ -233,17 +233,17 @@ export default function MotorVehicleTheftForm({
 
       const driverLicenseFrontUrl = await uploadFile(
         driverLicenseFront!,
-        'claims-evidence',
+        'claims',
         `${uploadDir}/driver_license_front`
       );
       const driverLicenseBackUrl = await uploadFile(
         driverLicenseBack!,
-        'claims-evidence',
+        'claims',
         `${uploadDir}/driver_license_back`
       );
       const sapsCaseSlipUrl = await uploadFile(
         sapsCaseSlip!,
-        'claims-evidence',
+        'claims',
         `${uploadDir}/saps_case_slip`
       );
 
@@ -251,7 +251,7 @@ export default function MotorVehicleTheftForm({
       if (proofOfPurchase) {
         proofOfPurchaseUrl = await uploadFile(
           proofOfPurchase,
-          'claims-evidence',
+          'claims',
           `${uploadDir}/proof_of_purchase`
         );
       }
@@ -259,12 +259,12 @@ export default function MotorVehicleTheftForm({
       // Build attachments array
       const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/driver_license_front`, url: driverLicenseFrontUrl, kind: 'driver_license_front', label: 'Driver License (Front)' });
-      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/driver_license_back`, url: driverLicenseBackUrl, kind: 'driver_license_back', label: 'Driver License (Back)' });
-      attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/saps_case_slip`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
+      attachments.push({ bucket: 'claims', path: `${uploadDir}/driver_license_front`, url: driverLicenseFrontUrl, kind: 'driver_license_front', label: 'Driver License (Front)' });
+      attachments.push({ bucket: 'claims', path: `${uploadDir}/driver_license_back`, url: driverLicenseBackUrl, kind: 'driver_license_back', label: 'Driver License (Back)' });
+      attachments.push({ bucket: 'claims', path: `${uploadDir}/saps_case_slip`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
 
       if (proofOfPurchaseUrl) {
-        attachments.push({ bucket: 'claims-evidence', path: `${uploadDir}/proof_of_purchase`, url: proofOfPurchaseUrl, kind: 'proof_of_purchase', label: 'Proof of Purchase' });
+        attachments.push({ bucket: 'claims', path: `${uploadDir}/proof_of_purchase`, url: proofOfPurchaseUrl, kind: 'proof_of_purchase', label: 'Proof of Purchase' });
       }
 
       const claimData = {
