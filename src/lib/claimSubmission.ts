@@ -19,13 +19,18 @@ export async function submitClaimUnified(params: {
     throw new Error("User not authenticated");
   }
 
+  const uid = authRes.user.id;
+  if (!uid) {
+    throw new Error("User ID not available");
+  }
+
   const user = authRes.user;
 
   // 2. Load profile (single source of truth)
   const { data: profile, error: profErr } = await supabase
     .from("profiles")
     .select("user_id, role, brokerage_id, full_name, email, cell_number, policy_number")
-    .eq("user_id", user.id)
+    .eq("user_id", uid)
     .maybeSingle();
 
   if (profErr) throw profErr;
@@ -44,7 +49,8 @@ export async function submitClaimUnified(params: {
   // 4. Build unified payload
   const payload = {
     claim_type: params.claimType,
-    client_id: user.id,
+    client_id: uid,
+    client_user_id: uid,
     brokerage_id: profile.brokerage_id,
     status: "new",
     claimant_snapshot: claimantSnapshot,
