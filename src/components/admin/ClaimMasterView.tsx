@@ -4,6 +4,14 @@ import { ArrowLeft, Loader2, Mail, Download, MapPin, Calendar, User, Phone, File
 import { generateClaimPDF, downloadClaimPack } from '../../lib/claimUtils';
 import DynamicDataViewer from './DynamicDataViewer';
 
+interface Attachment {
+  url: string;
+  kind: string;
+  label?: string;
+  path?: string;
+  bucket?: string;
+}
+
 interface Claim {
   id: string;
   incident_type: string;
@@ -46,6 +54,8 @@ interface Claim {
   item_value: number | null;
   purchase_date: string | null;
   user_id: string | null;
+  attachments: any | null;
+  voice_transcript: string | null;
   client_name?: string;
 }
 
@@ -141,8 +151,31 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     }
   };
 
+  const getAttachments = (): Attachment[] => {
+    if (!claim) return [];
+
+    let attachments: Attachment[] = [];
+    if (claim.attachments) {
+      attachments = typeof claim.attachments === 'string'
+        ? JSON.parse(claim.attachments)
+        : claim.attachments;
+    }
+
+    return attachments;
+  };
+
   const getAllMediaUrls = () => {
     if (!claim) return [];
+
+    const attachments = getAttachments();
+    if (attachments.length > 0) {
+      const photos = attachments.filter(a =>
+        ['damage_photo', 'driver_license', 'license_disk', 'third_party_license', 'third_party_disk', 'media', 'photo'].includes(a.kind)
+      );
+      return photos.map(p => p.url);
+    }
+
+    // Fallback to legacy fields
     const urls: string[] = [];
     if (claim.driver_license_photo_url) urls.push(claim.driver_license_photo_url);
     if (claim.license_disk_photo_url) urls.push(claim.license_disk_photo_url);
@@ -151,6 +184,11 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     if (claim.damage_photo_urls) urls.push(...claim.damage_photo_urls);
     if (claim.media_urls) urls.push(...claim.media_urls);
     return urls;
+  };
+
+  const getVoiceNote = (): Attachment | null => {
+    const attachments = getAttachments();
+    return attachments.find(a => a.kind === 'voice_note') || null;
   };
 
   const renderField = (label: string, value: any) => {
@@ -306,25 +344,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {renderField('Item Description', claim.item_description)}
             {renderField('Item Value', claim.item_value ? `R ${claim.item_value}` : null)}
             {renderField('Purchase Date', claim.purchase_date)}
-
-            {claim.voice_note_url && (
-              <div className="mt-6 p-6 bg-white border border-gray-200 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Mic className="w-5 h-5 text-blue-600" />
-                  Voice Statement
-                </h3>
-                <audio controls className="w-full mb-4">
-                  <source src={claim.voice_note_url} type="audio/webm" />
-                  Your browser does not support the audio element.
-                </audio>
-                {claim.voice_transcript_en && (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                    <p className="text-sm font-semibold text-gray-600 mb-2">Transcript</p>
-                    <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.voice_transcript_en}</p>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {claim.claim_data && Object.keys(claim.claim_data).length > 0 && (
@@ -332,34 +351,60 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
           )}
 
           <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Evidence ({mediaUrls.length})</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">
+              Evidence ({mediaUrls.length + (getVoiceNote() ? 1 : 0)})
+            </h2>
 
-            {mediaUrls.length === 0 ? (
+            {mediaUrls.length === 0 && !getVoiceNote() ? (
               <div className="text-center py-12">
                 <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600">No media files attached</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {mediaUrls.map((url, index) => (
-                  <div
-                    key={index}
-                    onClick={() => setSelectedImage(url)}
-                    className="aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
-                  >
-                    {url.includes('.mp4') || url.includes('.webm') ? (
-                      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                        <Video className="w-12 h-12 text-gray-400" />
+              <div className="space-y-6">
+                {getVoiceNote() && (
+                  <div className="p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Mic className="w-5 h-5 text-blue-600" />
+                      Voice Statement
+                    </h3>
+                    <audio controls className="w-full mb-4">
+                      <source src={getVoiceNote()!.url} type="audio/webm" />
+                      <source src={getVoiceNote()!.url} type="audio/mpeg" />
+                      Your browser does not support the audio element.
+                    </audio>
+                    {claim.voice_transcript && (
+                      <div className="mt-4 p-4 bg-white rounded-lg">
+                        <p className="text-sm font-semibold text-gray-600 mb-2">Transcript</p>
+                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.voice_transcript}</p>
                       </div>
-                    ) : (
-                      <img
-                        src={url}
-                        alt={`Evidence ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
                     )}
                   </div>
-                ))}
+                )}
+
+                {mediaUrls.length > 0 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {mediaUrls.map((url, index) => (
+                      <div
+                        key={index}
+                        onClick={() => setSelectedImage(url)}
+                        className="aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
+                      >
+                        {url.includes('.mp4') || url.includes('.webm') ? (
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                            <Video className="w-12 h-12 text-gray-400" />
+                          </div>
+                        ) : (
+                          <img
+                            src={url}
+                            alt={`Evidence ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
