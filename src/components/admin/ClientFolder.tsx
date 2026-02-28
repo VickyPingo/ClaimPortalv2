@@ -54,7 +54,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
       const { data: clientData, error: clientError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', clientId)
+        .eq('id', clientId)
         .maybeSingle();
 
       if (clientError) throw clientError;
@@ -75,13 +75,20 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
         });
       }
 
+      console.log('🔍 Loading claims for client:', clientId);
+      console.log('  Client user_id:', clientData?.user_id);
+      console.log('  Client brokerage_id:', clientData?.brokerage_id);
+
       const { data: claimsData, error: claimsError } = await supabase
         .from('claims')
         .select('*')
-        .eq('user_id', clientId)
+        .eq('client_id', clientData?.user_id || clientId)
+        .eq('brokerage_id', clientData?.brokerage_id)
         .order('created_at', { ascending: false });
 
       if (claimsError) throw claimsError;
+
+      console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
       const active = claimsData?.filter((c) =>
         ['new', 'pending_info', 'investigating', 'submitted', 'ready_to_submit'].includes(c.status)
@@ -113,7 +120,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
           policy_number: editForm.policy_number || null,
           broker_notes: editForm.broker_notes,
         })
-        .eq('user_id', clientId);
+        .eq('id', clientId);
 
       if (error) throw error;
 

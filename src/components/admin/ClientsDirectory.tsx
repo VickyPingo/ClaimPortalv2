@@ -79,7 +79,8 @@ export default function ClientsDirectory({ onViewClient }: ClientsDirectoryProps
           const { count, error: countError } = await supabase
             .from('claims')
             .select('*', { count: 'exact', head: true })
-            .eq('user_id', client.id);
+            .eq('client_id', client.user_id)
+            .eq('brokerage_id', client.brokerage_id);
 
           return {
             ...client,
