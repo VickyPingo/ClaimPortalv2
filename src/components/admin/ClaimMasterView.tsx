@@ -165,7 +165,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     return attachments;
   };
 
-  const getAllMediaUrls = () => {
+  const getAllEvidence = (): Attachment[] => {
     if (!claim) return [];
 
     // Collect all evidence from multiple sources
@@ -196,29 +196,48 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     }
 
     // Filter to items with URLs (exclude voice_note, we handle that separately)
-    // Accept ANY item with a URL - don't limit by kind
-    const mediaItems = allEvidence.filter(item =>
+    return allEvidence.filter(item =>
       item?.url &&
       item.kind !== 'voice_note' &&
       item.kind !== 'damage_description_audio'
     );
+  };
 
-    // Extract URLs
-    const urls = mediaItems.map(item => item.url).filter(Boolean);
+  const isImageFile = (url: string) => {
+    const lower = url.toLowerCase();
+    return lower.includes('.jpg') || lower.includes('.jpeg') || lower.includes('.png') || lower.includes('.webp') || lower.includes('.gif');
+  };
 
-    // Fallback to legacy fields if no attachments found
-    if (urls.length === 0) {
-      const legacyUrls: string[] = [];
-      if (claim.driver_license_photo_url) legacyUrls.push(claim.driver_license_photo_url);
-      if (claim.license_disk_photo_url) legacyUrls.push(claim.license_disk_photo_url);
-      if (claim.third_party_license_photo_url) legacyUrls.push(claim.third_party_license_photo_url);
-      if (claim.third_party_disk_photo_url) legacyUrls.push(claim.third_party_disk_photo_url);
-      if (claim.damage_photo_urls) legacyUrls.push(...claim.damage_photo_urls);
-      if (claim.media_urls) legacyUrls.push(...claim.media_urls);
-      return legacyUrls;
+  const isVideoFile = (url: string) => {
+    const lower = url.toLowerCase();
+    return lower.includes('.mp4') || lower.includes('.webm') || lower.includes('.mov');
+  };
+
+  const isAudioFile = (url: string) => {
+    const lower = url.toLowerCase();
+    return lower.includes('.mp3') || lower.includes('.wav') || lower.includes('.ogg') || lower.includes('.m4a');
+  };
+
+  const isPDFFile = (url: string) => {
+    return url.toLowerCase().includes('.pdf');
+  };
+
+  const getAllMediaUrls = () => {
+    const evidence = getAllEvidence();
+    if (evidence.length > 0) {
+      return evidence.map(item => item.url).filter(Boolean);
     }
 
-    return urls;
+    // Fallback to legacy fields
+    if (!claim) return [];
+    const legacyUrls: string[] = [];
+    if (claim.driver_license_photo_url) legacyUrls.push(claim.driver_license_photo_url);
+    if (claim.license_disk_photo_url) legacyUrls.push(claim.license_disk_photo_url);
+    if (claim.third_party_license_photo_url) legacyUrls.push(claim.third_party_license_photo_url);
+    if (claim.third_party_disk_photo_url) legacyUrls.push(claim.third_party_disk_photo_url);
+    if (claim.damage_photo_urls) legacyUrls.push(...claim.damage_photo_urls);
+    if (claim.media_urls) legacyUrls.push(...claim.media_urls);
+    return legacyUrls;
   };
 
   const getVoiceNote = (): Attachment | null => {
@@ -405,10 +424,10 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-6">
-              Evidence ({mediaUrls.length + (getVoiceNote() ? 1 : 0)})
+              Evidence ({getAllEvidence().length + (getVoiceNote() ? 1 : 0)})
             </h2>
 
-            {mediaUrls.length === 0 && !getVoiceNote() ? (
+            {getAllEvidence().length === 0 && !getVoiceNote() ? (
               <div className="text-center py-12">
                 <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600">No media files attached</p>
@@ -435,27 +454,76 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                   </div>
                 )}
 
-                {mediaUrls.length > 0 && (
+                {getAllEvidence().length > 0 && (
                   <div className="grid grid-cols-2 gap-4">
-                    {mediaUrls.map((url, index) => (
-                      <div
-                        key={index}
-                        onClick={() => setSelectedImage(url)}
-                        className="aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
-                      >
-                        {url.includes('.mp4') || url.includes('.webm') ? (
-                          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                            <Video className="w-12 h-12 text-gray-400" />
+                    {getAllEvidence().map((item, index) => {
+                      const url = item.url;
+                      const label = item.label || item.kind || `File ${index + 1}`;
+
+                      if (isImageFile(url)) {
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => setSelectedImage(url)}
+                            className="aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
+                          >
+                            <img
+                              src={url}
+                              alt={label}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-2">
+                              {label}
+                            </div>
                           </div>
-                        ) : (
-                          <img
-                            src={url}
-                            alt={`Evidence ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
-                    ))}
+                        );
+                      } else if (isVideoFile(url)) {
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => window.open(url, '_blank')}
+                            className="aspect-square rounded-lg border border-gray-200 cursor-pointer hover:border-blue-500 transition-all bg-gray-100 flex flex-col items-center justify-center p-4"
+                          >
+                            <Video className="w-12 h-12 text-gray-400 mb-2" />
+                            <p className="text-xs text-gray-600 text-center">{label}</p>
+                          </div>
+                        );
+                      } else if (isAudioFile(url)) {
+                        return (
+                          <div key={index} className="col-span-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <p className="text-sm font-medium text-gray-900 mb-2">{label}</p>
+                            <audio controls className="w-full">
+                              <source src={url} />
+                              Your browser does not support the audio element.
+                            </audio>
+                          </div>
+                        );
+                      } else if (isPDFFile(url)) {
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => window.open(url, '_blank')}
+                            className="aspect-square rounded-lg border border-gray-200 cursor-pointer hover:border-blue-500 transition-all bg-red-50 flex flex-col items-center justify-center p-4"
+                          >
+                            <FileText className="w-12 h-12 text-red-600 mb-2" />
+                            <p className="text-xs text-gray-900 text-center font-medium">{label}</p>
+                            <p className="text-xs text-gray-500 mt-1">PDF Document</p>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => window.open(url, '_blank')}
+                            className="aspect-square rounded-lg border border-gray-200 cursor-pointer hover:border-blue-500 transition-all bg-gray-50 flex flex-col items-center justify-center p-4"
+                          >
+                            <FileText className="w-12 h-12 text-gray-400 mb-2" />
+                            <p className="text-xs text-gray-900 text-center font-medium">{label}</p>
+                            <p className="text-xs text-gray-500 mt-1">Click to open</p>
+                          </div>
+                        );
+                      }
+                    })}
                   </div>
                 )}
               </div>

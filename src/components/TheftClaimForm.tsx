@@ -186,31 +186,45 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
       const timestamp = Date.now();
       const uploadDir = `${clientId}/${timestamp}`;
 
-      const sapsCaseSlipUrl = await uploadFile(sapsCaseSlip, 'claims', `${uploadDir}/saps_case_slip`);
-      const proofOfOwnershipUrl = await uploadFile(proofOfOwnership, 'claims', `${uploadDir}/proof_of_ownership`);
+      // Helper to get file extension
+      const getFileExt = (file: File) => {
+        const name = file.name;
+        const lastDot = name.lastIndexOf('.');
+        return lastDot > 0 ? name.substring(lastDot) : '.jpg';
+      };
+
+      const sapsCaseSlipExt = getFileExt(sapsCaseSlip);
+      const proofOfOwnershipExt = getFileExt(proofOfOwnership);
+
+      const sapsCaseSlipUrl = await uploadFile(sapsCaseSlip, 'claims', `${uploadDir}/saps_case_slip${sapsCaseSlipExt}`);
+      const proofOfOwnershipUrl = await uploadFile(proofOfOwnership, 'claims', `${uploadDir}/proof_of_ownership${proofOfOwnershipExt}`);
 
       let replacementQuoteUrl = null;
+      let replacementQuoteExt = '';
       if (replacementQuote) {
-        replacementQuoteUrl = await uploadFile(replacementQuote, 'claims', `${uploadDir}/replacement_quote`);
+        replacementQuoteExt = getFileExt(replacementQuote);
+        replacementQuoteUrl = await uploadFile(replacementQuote, 'claims', `${uploadDir}/replacement_quote${replacementQuoteExt}`);
       }
 
       let forcedEntryPhotoUrl = null;
+      let forcedEntryPhotoExt = '';
       if (forcedEntryPhoto) {
-        forcedEntryPhotoUrl = await uploadFile(forcedEntryPhoto, 'claims', `${uploadDir}/forced_entry_photo`);
+        forcedEntryPhotoExt = getFileExt(forcedEntryPhoto);
+        forcedEntryPhotoUrl = await uploadFile(forcedEntryPhoto, 'claims', `${uploadDir}/forced_entry_photo${forcedEntryPhotoExt}`);
       }
 
       // Build attachments array
       const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-      attachments.push({ bucket: 'claims', path: `${uploadDir}/saps_case_slip`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
-      attachments.push({ bucket: 'claims', path: `${uploadDir}/proof_of_ownership`, url: proofOfOwnershipUrl, kind: 'proof_of_ownership', label: 'Proof of Ownership' });
+      attachments.push({ bucket: 'claims', path: `${uploadDir}/saps_case_slip${sapsCaseSlipExt}`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
+      attachments.push({ bucket: 'claims', path: `${uploadDir}/proof_of_ownership${proofOfOwnershipExt}`, url: proofOfOwnershipUrl, kind: 'proof_of_ownership', label: 'Proof of Ownership' });
 
       if (replacementQuoteUrl) {
-        attachments.push({ bucket: 'claims', path: `${uploadDir}/replacement_quote`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
+        attachments.push({ bucket: 'claims', path: `${uploadDir}/replacement_quote${replacementQuoteExt}`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
       }
 
       if (forcedEntryPhotoUrl) {
-        attachments.push({ bucket: 'claims', path: `${uploadDir}/forced_entry_photo`, url: forcedEntryPhotoUrl, kind: 'forced_entry_photo', label: 'Forced Entry Photo' });
+        attachments.push({ bucket: 'claims', path: `${uploadDir}/forced_entry_photo${forcedEntryPhotoExt}`, url: forcedEntryPhotoUrl, kind: 'forced_entry_photo', label: 'Forced Entry Photo' });
       }
 
       const claimData = {
