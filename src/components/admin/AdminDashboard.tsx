@@ -10,7 +10,9 @@ interface Claim {
   created_at: string;
   claimant_name: string | null;
   claimant_phone: string | null;
+  location: string | null;
   location_address: string | null;
+  claim_data: any | null;
   user_id: string | null;
   brokerage_id: string | null;
   client_name?: string;
@@ -139,6 +141,22 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
       all_risk: 'All-Risk',
     };
     return labels[type] || type;
+  };
+
+  const getDisplayLocation = (claim: Claim): string => {
+    if (claim.location?.trim()) {
+      return claim.location;
+    }
+    if (claim.claim_data?.location_address) {
+      return claim.claim_data.location_address;
+    }
+    if (claim.claim_data?.locationAddress) {
+      return claim.claim_data.locationAddress;
+    }
+    if (claim.location_address) {
+      return claim.location_address;
+    }
+    return 'No location';
   };
 
   const getStatusBadge = (status: string) => {
@@ -313,10 +331,10 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                        {claim.location_address ? (
+                        {getDisplayLocation(claim) !== 'No location' ? (
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span className="truncate">{claim.location_address}</span>
+                            <span className="truncate">{getDisplayLocation(claim)}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400">No location</span>
@@ -377,10 +395,10 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
                     <div className="flex justify-between items-start">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Location</span>
                       <div className="text-sm text-gray-600 text-right max-w-[60%]">
-                        {claim.location_address ? (
+                        {getDisplayLocation(claim) !== 'No location' ? (
                           <div className="flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span className="truncate">{claim.location_address}</span>
+                            <span className="truncate">{getDisplayLocation(claim)}</span>
                           </div>
                         ) : (
                           <span className="text-gray-400">No location</span>

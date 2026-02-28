@@ -20,6 +20,7 @@ interface Claim {
   claimant_name: string | null;
   claimant_phone: string | null;
   claimant_email: string | null;
+  location: string | null;
   location_address: string | null;
   location_lat: number | null;
   location_lng: number | null;
@@ -191,6 +192,24 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     return attachments.find(a => a.kind === 'voice_note') || null;
   };
 
+  const getDisplayLocation = (): string | null => {
+    if (!claim) return null;
+
+    if (claim.location?.trim()) {
+      return claim.location;
+    }
+    if (claim.claim_data?.location_address) {
+      return claim.claim_data.location_address;
+    }
+    if (claim.claim_data?.locationAddress) {
+      return claim.claim_data.locationAddress;
+    }
+    if (claim.location_address) {
+      return claim.location_address;
+    }
+    return null;
+  };
+
   const renderField = (label: string, value: any) => {
     if (value === null || value === undefined) return null;
     return (
@@ -325,7 +344,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
               </div>
             )}
 
-            {renderField('Location', claim.location_address)}
+            {renderField('Location', getDisplayLocation())}
             {renderField('Accident Date/Time', claim.accident_date_time ? new Date(claim.accident_date_time).toLocaleString() : null)}
             {renderField('Car Condition', claim.car_condition)}
             {renderField('Panel Beater Location', claim.panel_beater_location)}

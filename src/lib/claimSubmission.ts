@@ -71,7 +71,13 @@ export async function submitClaimUnified(params: {
     brokerage_id: profile.brokerage_id ?? null,
   };
 
-  // 4. Build unified payload
+  // 4. Extract location from claim data
+  const finalLocation = params.claimData?.location_address ??
+    params.claimData?.locationAddress ??
+    params.claimData?.location ??
+    null;
+
+  // 5. Build unified payload
   const payload = {
     incident_type: params.claimType,
     client_id: uid,
@@ -81,12 +87,13 @@ export async function submitClaimUnified(params: {
     claimant_email: finalClaimantEmail,
     claimant_phone: finalClaimantPhone,
     policy_number: profile.policy_number ?? null,
+    location: finalLocation,
     claimant_snapshot: claimantSnapshot,
     claim_data: params.claimData ?? {},
     attachments: params.attachments ?? [],
   };
 
-  // 5. Insert claim
+  // 6. Insert claim
   const { data, error } = await supabase
     .from("claims")
     .insert(payload)
@@ -95,7 +102,7 @@ export async function submitClaimUnified(params: {
 
   if (error) throw error;
 
-  // 6. Process voice note transcription if any voice attachments exist
+  // 7. Process voice note transcription if any voice attachments exist
   const voiceAttachments = params.attachments?.filter(att => att.kind === 'voice_note');
   if (voiceAttachments && voiceAttachments.length > 0 && data?.id) {
     // Transcribe asynchronously (don't block claim submission)
@@ -104,7 +111,7 @@ export async function submitClaimUnified(params: {
     });
   }
 
-  // 7. Generate AI summary asynchronously
+  // 8. Generate AI summary asynchronously
   if (data?.id) {
     generateClaimSummary(data.id).catch(err => {
       console.error('AI summary generation failed:', err);
