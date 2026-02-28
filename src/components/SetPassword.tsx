@@ -265,11 +265,26 @@ export function SetPassword() {
 
       console.log('   Existing profile:', existingProfile ? 'found' : 'not found');
 
+      // Helper to check if a string looks like an email
+      const looksLikeEmail = (str: string | null | undefined): boolean => {
+        if (!str) return false;
+        return str.includes('@');
+      };
+
+      // NEVER set full_name to email - use null if no real name exists
+      let safeName: string | null = null;
+      if (existingProfile?.full_name && !looksLikeEmail(existingProfile.full_name)) {
+        safeName = existingProfile.full_name;
+      } else if (user.user_metadata?.full_name && !looksLikeEmail(user.user_metadata.full_name)) {
+        safeName = user.user_metadata.full_name;
+      }
+      // If still null, leave it null - DO NOT use email
+
       const profileData = {
         user_id: user.id,
         brokerage_id: finalBrokerageId,
         role: finalRole,
-        full_name: existingProfile?.full_name || user.email || 'User',
+        full_name: safeName,
       };
 
       console.log('   Profile data to upsert:', profileData);
