@@ -38,9 +38,9 @@ export async function submitClaimUnified(params: {
 
   // 3. Snapshot profile data (stored permanently with claim)
   const claimantSnapshot = {
-    full_name: profile.full_name ?? null,
+    full_name: profile.full_name ?? user.user_metadata?.full_name ?? user.email ?? "Anonymous",
     email: profile.email ?? user.email ?? null,
-    cell_number: profile.cell_number ?? null,
+    cell_number: profile.cell_number ?? user.user_metadata?.phone ?? null,
     policy_number: profile.policy_number ?? null,
     role: profile.role ?? null,
     brokerage_id: profile.brokerage_id ?? null,
@@ -52,9 +52,9 @@ export async function submitClaimUnified(params: {
     client_id: uid,
     brokerage_id: profile.brokerage_id,
     status: "new",
-    claimant_name: profile.full_name ?? null,
+    claimant_name: profile.full_name ?? user.user_metadata?.full_name ?? user.email ?? "Anonymous",
     claimant_email: profile.email ?? user.email ?? null,
-    claimant_phone: profile.cell_number ?? null,
+    claimant_phone: profile.cell_number ?? user.user_metadata?.phone ?? null,
     policy_number: profile.policy_number ?? null,
     claimant_snapshot: claimantSnapshot,
     claim_data: params.claimData ?? {},
