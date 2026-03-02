@@ -42,40 +42,43 @@ export default function BrokerDashboard({
 
       if (claimsError) throw claimsError;
 
+      // Fetch profiles for all claims with user_id
+      const userIds = [...new Set((claimsData || []).map(c => c.user_id).filter(Boolean))];
+      let profilesMap: Record<string, any> = {};
+
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+
+        if (profilesData) {
+          profilesMap = Object.fromEntries(profilesData.map(p => [p.id, p]));
+        }
+      }
+
       // Helper to check if string looks like email
       const isEmail = (s: string | null | undefined): boolean => {
         return !!s && s.includes('@');
       };
 
-      const claimsWithClientNames = await Promise.all(
-        (claimsData || []).map(async (claim) => {
-          if (claim.user_id) {
-            const { data: clientData } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('user_id', claim.user_id)
-              .maybeSingle();
+      const claimsWithClientNames = (claimsData || []).map((claim) => {
+        // Priority: profile.full_name > claimant_name (if not email) > 'Client'
+        let displayName = 'Client';
 
-            // Priority: profile.full_name (if not email) > claimant_name (if not email) > 'Client'
-            let displayName = 'Client';
-            if (clientData?.full_name && !isEmail(clientData.full_name)) {
-              displayName = clientData.full_name;
-            } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
-              displayName = claim.claimant_name;
-            }
+        const profile = claim.user_id ? profilesMap[claim.user_id] : null;
 
-            return {
-              ...claim,
-              client_name: displayName,
-            };
-          }
-          // No user_id - use claimant_name if not email
-          return {
-            ...claim,
-            client_name: (claim.claimant_name && !isEmail(claim.claimant_name)) ? claim.claimant_name : 'Client',
-          };
-        })
-      );
+        if (profile?.full_name && !isEmail(profile.full_name)) {
+          displayName = profile.full_name.trim();
+        } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
+          displayName = claim.claimant_name.trim();
+        }
+
+        return {
+          ...claim,
+          client_name: displayName,
+        };
+      });
 
       setRecentClaims(claimsWithClientNames);
     } catch (error) {

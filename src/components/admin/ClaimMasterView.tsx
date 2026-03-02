@@ -90,9 +90,29 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       if (claimError) throw claimError;
 
       if (claimData) {
-        const displayName = claimData.claimant_name?.trim()
-          ? claimData.claimant_name
-          : (claimData.claimant_email?.trim() ? claimData.claimant_email : 'Unknown');
+        // Helper to check if string looks like email
+        const isEmail = (s: string | null | undefined): boolean => {
+          return !!s && s.includes('@');
+        };
+
+        // Fetch client profile if user_id exists
+        let displayName = 'Client';
+
+        if (claimData.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', claimData.user_id)
+            .maybeSingle();
+
+          if (profile?.full_name && !isEmail(profile.full_name)) {
+            displayName = profile.full_name.trim();
+          } else if (claimData.claimant_name && !isEmail(claimData.claimant_name)) {
+            displayName = claimData.claimant_name.trim();
+          }
+        } else if (claimData.claimant_name && !isEmail(claimData.claimant_name)) {
+          displayName = claimData.claimant_name.trim();
+        }
 
         setClaim({
           ...claimData,
