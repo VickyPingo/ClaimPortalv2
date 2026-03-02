@@ -9,7 +9,7 @@ interface Claim {
   incident_type: string;
   status: string;
   created_at: string;
-  user_id: string | null;
+  client_id: string | null;
   claimant_name: string | null;
   client_name?: string;
 }
@@ -37,14 +37,14 @@ export default function BrokerDashboard({
 
       const { data: claimsData, error: claimsError } = await supabase
         .from('claims')
-        .select('id, incident_type, status, created_at, user_id, claimant_name')
+        .select('id, incident_type, status, created_at, client_id, claimant_name')
         .limit(5)
         .order('created_at', { ascending: false });
 
       if (claimsError) throw claimsError;
 
-      // Fetch profiles for all claims with user_id
-      const userIds = [...new Set((claimsData || []).map(c => c.user_id).filter(Boolean))];
+      // Fetch profiles for all claims with client_id
+      const userIds = [...new Set((claimsData || []).map(c => c.client_id).filter(Boolean))];
       let profilesMap: Record<string, any> = {};
 
       if (userIds.length > 0) {
@@ -59,8 +59,16 @@ export default function BrokerDashboard({
       }
 
       const claimsWithClientNames = (claimsData || []).map((claim) => {
-        const profile = claim.user_id ? profilesMap[claim.user_id] : null;
-        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name, 'Unknown Client');
+        const profile = claim.client_id ? profilesMap[claim.client_id] : null;
+
+        // Priority: profile.full_name (not email-like) > claim.claimant_name (not email-like) > "Unknown Client"
+        let displayName = 'Unknown Client';
+
+        if (profile?.full_name && !profile.full_name.includes('@')) {
+          displayName = profile.full_name;
+        } else if (claim.claimant_name && !claim.claimant_name.includes('@')) {
+          displayName = claim.claimant_name;
+        }
 
         return {
           ...claim,
