@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { submitClaimUnified } from '../lib/claimSubmission';
 import {
   ArrowLeft,
   Loader2,
@@ -138,87 +139,88 @@ export default function BurstGeyserForm({
     setError('');
 
     try {
-      const claimData: any = {
-        brokerage_id: brokerageId,
-        broker_id: clientId,
-        incident_type: 'burst_geyser',
+      console.log('[GeyserClaim] Starting submission');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email, cell_number')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      console.log('[GeyserClaim] User profile:', profile);
+
+      const claimData = {
         burst_datetime: `${burstDate}T${burstTime}`,
         geyser_type: geyserType.toLowerCase(),
         has_resulting_damage: hasResultingDamage,
         location_address: locationAddress,
-        gps_latitude: location?.lat,
-        gps_longitude: location?.lng,
+        location_lat: location?.lat || null,
+        location_lng: location?.lng || null,
         estimated_repair_cost: estimatedRepairCost ? parseFloat(estimatedRepairCost) : null,
-        status: 'submitted',
       };
 
-      const { data: claim, error: insertError } = await supabase
-        .from('claims')
-        .insert(claimData)
-        .select()
-        .single();
+      const attachments: Array<{ file: File; kind: string; label: string }> = [];
 
-      if (insertError) throw insertError;
-
-      let damagePhotoPaths: string[] = [];
-      for (let i = 0; i < damagePhotos.length; i++) {
-        const file = damagePhotos[i];
-        const fileName = `claims/${claim.id}/damage_photo_${i}_${Date.now()}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from('claims')
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-        damagePhotoPaths.push(fileName);
-      }
+      damagePhotos.forEach((photo, i) => {
+        attachments.push({
+          file: photo,
+          kind: 'damage_photo',
+          label: `Damage Photo ${i + 1}`,
+        });
+      });
 
       if (audioBlob) {
-        const fileName = `claims/${claim.id}/voice_note_${Date.now()}.webm`;
-        const { error: uploadError } = await supabase.storage
-          .from('claims')
-          .upload(fileName, audioBlob);
-
-        if (uploadError) throw uploadError;
-
-        await supabase
-          .from('claims')
-          .update({ voice_note_url: fileName })
-          .eq('id', claim.id);
+        const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
+        attachments.push({
+          file: audioFile,
+          kind: 'voice_note',
+          label: 'Voice Description',
+        });
       }
 
       if (extraAudioBlob) {
-        const fileName = `claims/${claim.id}/extra_voice_note_${Date.now()}.webm`;
-        const { error: uploadError } = await supabase.storage
-          .from('claims')
-          .upload(fileName, extraAudioBlob);
-
-        if (uploadError) throw uploadError;
-
-        await supabase
-          .from('claims')
-          .update({ extra_voice_note_url: fileName })
-          .eq('id', claim.id);
+        const extraAudioFile = new File([extraAudioBlob], 'extra_voice_note.webm', { type: 'audio/webm' });
+        attachments.push({
+          file: extraAudioFile,
+          kind: 'extra_voice_note',
+          label: 'Additional Voice Note',
+        });
       }
 
       if (repairQuote) {
-        const fileName = `claims/${claim.id}/repair_quote_${Date.now()}.pdf`;
-        const { error: uploadError } = await supabase.storage
-          .from('claims')
-          .upload(fileName, repairQuote);
-
-        if (uploadError) throw uploadError;
+        attachments.push({
+          file: repairQuote,
+          kind: 'repair_quote',
+          label: 'Repair Quote',
+        });
       }
 
-      if (damagePhotoPaths.length > 0) {
-        await supabase
-          .from('claims')
-          .update({ damage_photos: damagePhotoPaths })
-          .eq('id', claim.id);
-      }
+      console.log('[GeyserClaim] Submitting with', attachments.length, 'attachments');
 
+      await submitClaimUnified({
+        claimType: 'burst_geyser',
+        incidentType: 'burst_geyser',
+        claimData,
+        attachments,
+        location: location ? { lat: location.lat, lng: location.lng, address: locationAddress } : null,
+        claimantInfo: {
+          name: profile?.full_name || '',
+          email: profile?.email || user.email || '',
+          phone: profile?.cell_number || '',
+        },
+        clientId: user.id,
+        brokerageId,
+      });
+
+      console.log('[GeyserClaim] Submission successful');
       setStep('success');
     } catch (err: any) {
-      console.error('Submission error:', err);
+      console.error('[GeyserClaim] Submission error:', err);
       setError(err.message || 'Failed to submit claim');
     } finally {
       setLoading(false);

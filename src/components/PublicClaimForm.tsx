@@ -54,8 +54,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
 
   const [accidentDateTime, setAccidentDateTime] = useState('');
   const [carCondition, setCarCondition] = useState<CarCondition>(null);
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
+  const [panelBeaterLocation, setPanelBeaterLocation] = useState('');
 
   const [driverLicensePhoto, setDriverLicensePhoto] = useState<File | null>(null);
   const [licenseDiskPhoto, setLicenseDiskPhoto] = useState<File | null>(null);
@@ -215,9 +214,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
           ? await uploadFile(thirdPartyDiskPhoto, 'claims', `${tempId}/${timestamp}/third_party_disk.jpg`)
           : null;
 
-        const panelBeaterLocation = selectedProvince && selectedCity
-          ? `${selectedCity}, ${selectedProvince}`
-          : null;
+        const panelBeaterLocationValue = panelBeaterLocation.trim() || null;
 
         // Build attachments array
         const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
@@ -261,9 +258,7 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
           location_lng: location?.lng || null,
           location_address: locationAddress || null,
           car_condition: carCondition,
-          panel_beater_location: panelBeaterLocation,
-          selected_province: selectedProvince,
-          selected_city: selectedCity,
+          panel_beater_location: panelBeaterLocationValue,
           voice_transcript: voiceTranscript,
         };
 
@@ -481,48 +476,23 @@ export default function PublicClaimForm({ onBack, onTheftClaim, onMotorVehicleTh
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Preferred Panel Beater Province *
+                Panel Beater Location
               </label>
-              <select
-                value={selectedProvince}
-                onChange={(e) => {
-                  setSelectedProvince(e.target.value);
-                  setSelectedCity('');
-                }}
+              <input
+                type="text"
+                value={panelBeaterLocation}
+                onChange={(e) => setPanelBeaterLocation(e.target.value)}
+                placeholder="Type the closest panel beater / preferred town / area"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a province</option>
-                {Object.keys(SA_PROVINCES).map((province) => (
-                  <option key={province} value={province}>
-                    {province}
-                  </option>
-                ))}
-              </select>
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Optional: Enter the name of your preferred panel beater or area
+              </p>
             </div>
-
-            {selectedProvince && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preferred Panel Beater City *
-                </label>
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select a city</option>
-                  {SA_PROVINCES[selectedProvince as keyof typeof SA_PROVINCES].map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             <button
               onClick={() => setStep(4)}
-              disabled={!accidentDateTime || !carCondition || !selectedProvince || !selectedCity}
+              disabled={!accidentDateTime || !carCondition}
               className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
             >
               Continue

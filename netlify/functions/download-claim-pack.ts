@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import JSZip from 'jszip';
+import PDFDocument from 'pdfkit';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -53,90 +54,94 @@ function formatDate(dateString: string | null): string {
   }
 }
 
-function generateClaimReportText(claim: any, profile: any): string {
-  const lines: string[] = [];
+function generateClaimReportPDF(claim: any, profile: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 });
+    const chunks: Buffer[] = [];
 
-  lines.push('============================================');
-  lines.push('        INSURANCE CLAIM REPORT');
-  lines.push('============================================');
-  lines.push('');
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
 
-  lines.push('CLAIM REFERENCE');
-  lines.push(`Claim ID: ${claim.id}`);
-  lines.push(`Submitted: ${formatDate(claim.created_at)}`);
-  lines.push(`Status: ${claim.status?.toUpperCase() || 'N/A'}`);
-  lines.push(`Incident Type: ${claim.incident_type || 'N/A'}`);
-  lines.push('');
+    doc.fontSize(20).font('Helvetica-Bold').text('INSURANCE CLAIM REPORT', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(10).fillColor('#666666').text('Generated on ' + new Date().toLocaleString('en-ZA'), { align: 'center' });
+    doc.moveDown(2);
 
-  lines.push('--------------------------------------------');
-  lines.push('CLAIMANT INFORMATION');
-  lines.push('--------------------------------------------');
-  lines.push(`Name: ${profile?.full_name || claim.claimant_name || 'N/A'}`);
-  lines.push(`Email: ${profile?.email || claim.claimant_email || 'N/A'}`);
-  lines.push(`Phone: ${profile?.cell_number || claim.claimant_phone || 'N/A'}`);
-  lines.push('');
+    doc.fontSize(14).fillColor('#000000').font('Helvetica-Bold').text('CLAIM REFERENCE');
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica');
+    doc.text(`Claim ID: ${claim.id}`);
+    doc.text(`Submitted: ${formatDate(claim.created_at)}`);
+    doc.text(`Status: ${claim.status?.toUpperCase() || 'N/A'}`);
+    doc.text(`Incident Type: ${claim.incident_type || 'N/A'}`);
+    doc.moveDown(1.5);
 
-  if (claim.location || claim.location_address) {
-    lines.push('--------------------------------------------');
-    lines.push('LOCATION');
-    lines.push('--------------------------------------------');
-    if (claim.location_address) lines.push(`Address: ${claim.location_address}`);
-    if (claim.location) lines.push(`Coordinates: ${claim.location}`);
-    if (claim.location_lat && claim.location_lng) {
-      lines.push(`Lat/Lng: ${claim.location_lat}, ${claim.location_lng}`);
-    }
-    lines.push('');
-  }
+    doc.fontSize(14).font('Helvetica-Bold').text('CLAIMANT INFORMATION');
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica');
+    doc.text(`Name: ${profile?.full_name || claim.claimant_name || 'N/A'}`);
+    doc.text(`Email: ${profile?.email || claim.claimant_email || 'N/A'}`);
+    doc.text(`Phone: ${profile?.cell_number || claim.claimant_phone || 'N/A'}`);
+    doc.moveDown(1.5);
 
-  if (claim.claim_data) {
-    lines.push('--------------------------------------------');
-    lines.push('CLAIM DETAILS');
-    lines.push('--------------------------------------------');
-
-    const claimData = typeof claim.claim_data === 'string'
-      ? JSON.parse(claim.claim_data)
-      : claim.claim_data;
-
-    Object.entries(claimData).forEach(([key, value]) => {
-      if (key === 'voice_transcript' || key === 'voice_transcript_updated_at') return;
-
-      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-      if (typeof value === 'object' && value !== null) {
-        lines.push(`${label}: ${JSON.stringify(value, null, 2)}`);
-      } else {
-        lines.push(`${label}: ${value || 'N/A'}`);
+    if (claim.location || claim.location_address) {
+      doc.fontSize(14).font('Helvetica-Bold').text('LOCATION');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica');
+      if (claim.location_address) doc.text(`Address: ${claim.location_address}`);
+      if (claim.location) doc.text(`Coordinates: ${claim.location}`);
+      if (claim.location_lat && claim.location_lng) {
+        doc.text(`Lat/Lng: ${claim.location_lat}, ${claim.location_lng}`);
       }
-    });
-    lines.push('');
-  }
+      doc.moveDown(1.5);
+    }
 
-  lines.push('--------------------------------------------');
-  lines.push('VOICE TRANSCRIPT');
-  lines.push('--------------------------------------------');
-  if (claim.claim_data?.voice_transcript) {
-    lines.push(claim.claim_data.voice_transcript);
-  } else {
-    lines.push('Not transcribed yet');
-  }
-  lines.push('');
+    if (claim.claim_data) {
+      doc.fontSize(14).font('Helvetica-Bold').text('CLAIM DETAILS');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica');
 
-  if (claim.attachments && Array.isArray(claim.attachments) && claim.attachments.length > 0) {
-    lines.push('--------------------------------------------');
-    lines.push('ATTACHMENTS');
-    lines.push('--------------------------------------------');
-    claim.attachments.forEach((att: any, idx: number) => {
-      lines.push(`${idx + 1}. ${att.label || att.kind || 'File'}`);
-      if (att.url) lines.push(`   URL: ${att.url}`);
-    });
-    lines.push('');
-  }
+      const claimData = typeof claim.claim_data === 'string'
+        ? JSON.parse(claim.claim_data)
+        : claim.claim_data;
 
-  lines.push('============================================');
-  lines.push('           END OF REPORT');
-  lines.push('============================================');
+      Object.entries(claimData).forEach(([key, value]) => {
+        if (key === 'voice_transcript' || key === 'voice_transcript_updated_at') return;
 
-  return lines.join('\n');
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+        if (typeof value === 'object' && value !== null) {
+          doc.text(`${label}: ${JSON.stringify(value, null, 2)}`);
+        } else {
+          doc.text(`${label}: ${value || 'N/A'}`);
+        }
+      });
+      doc.moveDown(1.5);
+    }
+
+    doc.fontSize(14).font('Helvetica-Bold').text('VOICE TRANSCRIPT');
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica');
+    if (claim.claim_data?.voice_transcript) {
+      doc.text(claim.claim_data.voice_transcript, { align: 'left' });
+    } else {
+      doc.text('Not transcribed yet');
+    }
+    doc.moveDown(1.5);
+
+    if (claim.attachments && Array.isArray(claim.attachments) && claim.attachments.length > 0) {
+      doc.fontSize(14).font('Helvetica-Bold').text('ATTACHMENTS');
+      doc.moveDown(0.5);
+      doc.fontSize(10).font('Helvetica');
+      claim.attachments.forEach((att: any, idx: number) => {
+        doc.text(`${idx + 1}. ${att.label || att.kind || 'File'}`);
+        if (att.url) doc.text(`   URL: ${att.url}`, { indent: 15 });
+      });
+    }
+
+    doc.end();
+  });
 }
 
 export const handler: Handler = async (event) => {
@@ -189,9 +194,9 @@ export const handler: Handler = async (event) => {
 
     console.log('[DownloadPack] Generating Insurance Claim Report PDF');
     try {
-      const pdfContent = generateClaimReportText(claim, profile);
-      zip.file('Insurance_Claim_Report.txt', pdfContent);
-      console.log('[DownloadPack] Insurance Claim Report added to zip');
+      const pdfBuffer = await generateClaimReportPDF(claim, profile);
+      zip.file('Insurance_Claim_Report.pdf', pdfBuffer);
+      console.log('[DownloadPack] Insurance Claim Report PDF added to zip');
     } catch (error: any) {
       console.error('[DownloadPack] Failed to generate report:', error);
       failedFiles.push({
