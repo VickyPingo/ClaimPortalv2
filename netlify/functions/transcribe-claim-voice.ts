@@ -56,7 +56,7 @@ export const handler: Handler = async (event) => {
       console.error('[Transcribe] OPENAI_API_KEY not configured');
       return {
         statusCode: 500,
-        body: JSON.stringify({ ok: false, message: 'Transcription service not configured. Please set OPENAI_API_KEY.' }),
+        body: JSON.stringify({ ok: false, message: 'Missing OPENAI_API_KEY (set in Netlify env vars)' }),
       };
     }
 
@@ -102,7 +102,10 @@ export const handler: Handler = async (event) => {
 
     const { error: updateError } = await supabase
       .from('claims')
-      .update({ claim_data: updatedClaimData })
+      .update({
+        voice_transcript: transcript,
+        claim_data: updatedClaimData
+      })
       .eq('id', claimId);
 
     if (updateError) {

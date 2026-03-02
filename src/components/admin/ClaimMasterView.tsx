@@ -417,9 +417,9 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
             <div className="mb-4">
               <p className="text-sm text-gray-600 mb-1">Voice Transcript</p>
-              {claim.claim_data?.voice_transcript ? (
+              {(claim.claim_data?.voice_transcript || claim.voice_transcript) ? (
                 <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{claim.claim_data.voice_transcript}</p>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{claim.claim_data?.voice_transcript || claim.voice_transcript}</p>
                 </div>
               ) : getVoiceNote() ? (
                 <div className="mt-2">
@@ -539,10 +539,10 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                       <source src={getVoiceNote()!.url} type="audio/mpeg" />
                       Your browser does not support the audio element.
                     </audio>
-                    {claim.claim_data?.voice_transcript ? (
+                    {(claim.claim_data?.voice_transcript || claim.voice_transcript) ? (
                       <div className="mt-4 p-4 bg-white rounded-lg">
                         <p className="text-sm font-semibold text-gray-600 mb-2">Transcript</p>
-                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.claim_data.voice_transcript}</p>
+                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.claim_data?.voice_transcript || claim.voice_transcript}</p>
                       </div>
                     ) : (
                       <div className="mt-4">
