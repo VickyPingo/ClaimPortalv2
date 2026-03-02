@@ -52,18 +52,6 @@ const SA_PROVINCES = {
   'Western Cape': ['Cape Town', 'Stellenbosch', 'George', 'Paarl', 'Worcester', 'Mossel Bay', 'Somerset West']
 };
 
-const PANEL_BEATER_LOCATIONS = [
-  'Johannesburg - Sandton',
-  'Johannesburg - Roodepoort',
-  'Pretoria - Centurion',
-  'Cape Town - Central',
-  'Durban - Umhlanga',
-  'Port Elizabeth - Central',
-  'Bloemfontein - Central',
-  'Polokwane - Central',
-  'Nelspruit - Central',
-];
-
 type ClaimType = 'motor' | 'geyser' | 'theft' | 'motor_vehicle_theft' | 'structural_damage' | 'all_risk' | null;
 
 export default function ClientPortal() {
@@ -548,18 +536,16 @@ export default function ClientPortal() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Panel Beater Location *
               </label>
-              <select
+              <input
+                type="text"
                 value={panelBeaterLocation}
                 onChange={(e) => setPanelBeaterLocation(e.target.value)}
+                placeholder="Type the nearest panel beater (name/town)"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a panel beater</option>
-                {PANEL_BEATER_LOCATIONS.map((location) => (
-                  <option key={location} value={location}>
-                    {location}
-                  </option>
-                ))}
-              </select>
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the name or location of your preferred panel beater
+              </p>
             </div>
 
             <button

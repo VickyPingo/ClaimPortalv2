@@ -1,7 +1,7 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import JSZip from 'jszip';
-import PDFDocument from 'pdfkit';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -54,94 +54,126 @@ function formatDate(dateString: string | null): string {
   }
 }
 
-function generateClaimReportPDF(claim: any, profile: any): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 50 });
-    const chunks: Buffer[] = [];
+async function generateClaimReportPDF(claim: any, profile: any): Promise<Buffer> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([595, 842]);
+  const { width, height } = page.getSize();
 
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    doc.fontSize(20).font('Helvetica-Bold').text('INSURANCE CLAIM REPORT', { align: 'center' });
-    doc.moveDown();
-    doc.fontSize(10).fillColor('#666666').text('Generated on ' + new Date().toLocaleString('en-ZA'), { align: 'center' });
-    doc.moveDown(2);
+  let yPosition = height - 50;
+  const margin = 50;
+  const lineHeight = 15;
 
-    doc.fontSize(14).fillColor('#000000').font('Helvetica-Bold').text('CLAIM REFERENCE');
-    doc.moveDown(0.5);
-    doc.fontSize(10).font('Helvetica');
-    doc.text(`Claim ID: ${claim.id}`);
-    doc.text(`Submitted: ${formatDate(claim.created_at)}`);
-    doc.text(`Status: ${claim.status?.toUpperCase() || 'N/A'}`);
-    doc.text(`Incident Type: ${claim.incident_type || 'N/A'}`);
-    doc.moveDown(1.5);
+  const drawText = (text: string, options: { bold?: boolean; size?: number; color?: any } = {}) => {
+    const textFont = options.bold ? fontBold : font;
+    const textSize = options.size || 10;
+    const textColor = options.color || rgb(0, 0, 0);
 
-    doc.fontSize(14).font('Helvetica-Bold').text('CLAIMANT INFORMATION');
-    doc.moveDown(0.5);
-    doc.fontSize(10).font('Helvetica');
-    doc.text(`Name: ${profile?.full_name || claim.claimant_name || 'N/A'}`);
-    doc.text(`Email: ${profile?.email || claim.claimant_email || 'N/A'}`);
-    doc.text(`Phone: ${profile?.cell_number || claim.claimant_phone || 'N/A'}`);
-    doc.moveDown(1.5);
+    page.drawText(text, {
+      x: margin,
+      y: yPosition,
+      size: textSize,
+      font: textFont,
+      color: textColor,
+    });
+    yPosition -= lineHeight;
+  };
 
-    if (claim.location || claim.location_address) {
-      doc.fontSize(14).font('Helvetica-Bold').text('LOCATION');
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica');
-      if (claim.location_address) doc.text(`Address: ${claim.location_address}`);
-      if (claim.location) doc.text(`Coordinates: ${claim.location}`);
-      if (claim.location_lat && claim.location_lng) {
-        doc.text(`Lat/Lng: ${claim.location_lat}, ${claim.location_lng}`);
+  const addSpace = (lines = 1) => {
+    yPosition -= lineHeight * lines;
+  };
+
+  drawText('INSURANCE CLAIM REPORT', { bold: true, size: 20 });
+  drawText(`Generated on ${new Date().toLocaleString('en-ZA')}`, { size: 9, color: rgb(0.4, 0.4, 0.4) });
+  addSpace(2);
+
+  drawText('CLAIM REFERENCE', { bold: true, size: 14 });
+  addSpace(0.5);
+  drawText(`Claim ID: ${claim.id}`);
+  drawText(`Submitted: ${formatDate(claim.created_at)}`);
+  drawText(`Status: ${claim.status?.toUpperCase() || 'N/A'}`);
+  drawText(`Incident Type: ${claim.incident_type || 'N/A'}`);
+  addSpace(1.5);
+
+  drawText('CLAIMANT INFORMATION', { bold: true, size: 14 });
+  addSpace(0.5);
+  drawText(`Name: ${profile?.full_name || claim.claimant_name || 'N/A'}`);
+  drawText(`Email: ${profile?.email || claim.claimant_email || 'N/A'}`);
+  drawText(`Phone: ${profile?.cell_number || claim.claimant_phone || 'N/A'}`);
+  addSpace(1.5);
+
+  if (claim.location || claim.location_address) {
+    drawText('LOCATION', { bold: true, size: 14 });
+    addSpace(0.5);
+    if (claim.location_address) drawText(`Address: ${claim.location_address}`);
+    if (claim.location) drawText(`Coordinates: ${claim.location}`);
+    if (claim.location_lat && claim.location_lng) {
+      drawText(`Lat/Lng: ${claim.location_lat}, ${claim.location_lng}`);
+    }
+    addSpace(1.5);
+  }
+
+  if (claim.claim_data) {
+    drawText('CLAIM DETAILS', { bold: true, size: 14 });
+    addSpace(0.5);
+
+    const claimData = typeof claim.claim_data === 'string'
+      ? JSON.parse(claim.claim_data)
+      : claim.claim_data;
+
+    Object.entries(claimData).forEach(([key, value]) => {
+      if (key === 'voice_transcript' || key === 'voice_transcript_updated_at') return;
+
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      if (typeof value === 'object' && value !== null) {
+        drawText(`${label}: ${JSON.stringify(value)}`);
+      } else {
+        drawText(`${label}: ${value || 'N/A'}`);
       }
-      doc.moveDown(1.5);
-    }
+    });
+    addSpace(1.5);
+  }
 
-    if (claim.claim_data) {
-      doc.fontSize(14).font('Helvetica-Bold').text('CLAIM DETAILS');
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica');
+  drawText('VOICE TRANSCRIPT', { bold: true, size: 14 });
+  addSpace(0.5);
+  if (claim.claim_data?.voice_transcript || claim.voice_transcript) {
+    const transcript = claim.claim_data?.voice_transcript || claim.voice_transcript;
+    const lines = transcript.split('\n');
+    lines.forEach((line: string) => {
+      if (line.length > 80) {
+        const words = line.split(' ');
+        let currentLine = '';
+        words.forEach((word: string) => {
+          if ((currentLine + word).length > 80) {
+            drawText(currentLine);
+            currentLine = word + ' ';
+          } else {
+            currentLine += word + ' ';
+          }
+        });
+        if (currentLine) drawText(currentLine);
+      } else {
+        drawText(line);
+      }
+    });
+  } else {
+    drawText('Not transcribed yet');
+  }
+  addSpace(1.5);
 
-      const claimData = typeof claim.claim_data === 'string'
-        ? JSON.parse(claim.claim_data)
-        : claim.claim_data;
+  if (claim.attachments && Array.isArray(claim.attachments) && claim.attachments.length > 0) {
+    drawText('EVIDENCE & ATTACHMENTS', { bold: true, size: 14 });
+    addSpace(0.5);
+    claim.attachments.forEach((att: any, idx: number) => {
+      drawText(`${idx + 1}. ${att.label || att.kind || 'File'}`);
+    });
+  }
 
-      Object.entries(claimData).forEach(([key, value]) => {
-        if (key === 'voice_transcript' || key === 'voice_transcript_updated_at') return;
-
-        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-        if (typeof value === 'object' && value !== null) {
-          doc.text(`${label}: ${JSON.stringify(value, null, 2)}`);
-        } else {
-          doc.text(`${label}: ${value || 'N/A'}`);
-        }
-      });
-      doc.moveDown(1.5);
-    }
-
-    doc.fontSize(14).font('Helvetica-Bold').text('VOICE TRANSCRIPT');
-    doc.moveDown(0.5);
-    doc.fontSize(10).font('Helvetica');
-    if (claim.claim_data?.voice_transcript) {
-      doc.text(claim.claim_data.voice_transcript, { align: 'left' });
-    } else {
-      doc.text('Not transcribed yet');
-    }
-    doc.moveDown(1.5);
-
-    if (claim.attachments && Array.isArray(claim.attachments) && claim.attachments.length > 0) {
-      doc.fontSize(14).font('Helvetica-Bold').text('ATTACHMENTS');
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica');
-      claim.attachments.forEach((att: any, idx: number) => {
-        doc.text(`${idx + 1}. ${att.label || att.kind || 'File'}`);
-        if (att.url) doc.text(`   URL: ${att.url}`, { indent: 15 });
-      });
-    }
-
-    doc.end();
-  });
+  const pdfBytes = await pdfDoc.save();
+  return Buffer.from(pdfBytes);
 }
 
 export const handler: Handler = async (event) => {
@@ -179,11 +211,11 @@ export const handler: Handler = async (event) => {
     }
 
     let profile = null;
-    if (claim.user_id) {
+    if (claim.client_id) {
       const { data: profileData } = await supabase
         .from('profiles')
         .select('full_name, email, cell_number')
-        .eq('user_id', claim.user_id)
+        .eq('user_id', claim.client_id)
         .maybeSingle();
 
       profile = profileData;

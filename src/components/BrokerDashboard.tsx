@@ -12,6 +12,7 @@ interface Claim {
   client_id: string | null;
   claimant_name: string | null;
   client_name?: string;
+  client_cell_number?: string | null;
 }
 
 export default function BrokerDashboard({
@@ -50,7 +51,7 @@ export default function BrokerDashboard({
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('user_id, full_name, email')
+          .select('user_id, full_name, email, cell_number')
           .in('user_id', userIds);
 
         if (profilesData) {
@@ -73,6 +74,7 @@ export default function BrokerDashboard({
         return {
           ...claim,
           client_name: displayName,
+          client_cell_number: profile?.cell_number ?? null,
         };
       });
 

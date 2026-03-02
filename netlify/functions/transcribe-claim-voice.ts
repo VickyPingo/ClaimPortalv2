@@ -73,6 +73,7 @@ export const handler: Handler = async (event) => {
     formData.append('file', audioBlob, 'voice_note.webm');
     formData.append('model', 'whisper-1');
     formData.append('language', 'en');
+    formData.append('prompt', 'This is a short insurance claim voice statement. Transcribe exactly what is said.');
 
     console.log('[Transcribe] Sending to OpenAI Whisper API');
     const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
