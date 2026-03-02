@@ -1144,30 +1144,6 @@ export default function AllRiskForm({
               </p>
 
               <div className="space-y-6">
-                <div className="bg-blue-50 rounded-lg p-6 border border-blue-100">
-                  <h3 className="font-semibold text-gray-900 mb-4">Reporter Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-gray-600">Full Name</p>
-                      <p className="font-medium text-gray-900">{brokerProfile?.full_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Cell Number</p>
-                      <p className="font-medium text-gray-900">{brokerProfile?.cell_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">ID Number</p>
-                      <p className="font-medium text-gray-900">{brokerProfile?.id_number}</p>
-                    </div>
-                    {brokerProfile?.policy_number && (
-                      <div>
-                        <p className="text-sm text-gray-600">Policy Number</p>
-                        <p className="font-medium text-gray-900">{brokerProfile.policy_number}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-4">Voice Statement</h3>
                   <p className="text-gray-600 text-sm mb-4">Record a detailed account of the incident (optional)</p>

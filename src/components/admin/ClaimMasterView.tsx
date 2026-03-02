@@ -415,6 +415,40 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {renderField('Claimant Phone', claim.claimant_phone)}
             {renderField('Claimant Email', claim.claimant_email)}
 
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-1">Voice Transcript</p>
+              {claim.claim_data?.voice_transcript ? (
+                <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{claim.claim_data.voice_transcript}</p>
+                </div>
+              ) : getVoiceNote() ? (
+                <div className="mt-2">
+                  <button
+                    onClick={handleTranscribeVoice}
+                    disabled={transcribing}
+                    className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {transcribing ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Transcribing...
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-3 h-3" />
+                        Transcribe Voice Note
+                      </>
+                    )}
+                  </button>
+                  {transcriptError && (
+                    <p className="mt-1 text-xs text-red-600">{transcriptError}</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Not transcribed yet</p>
+              )}
+            </div>
+
             {claim.third_party_details && (
               <div className="mt-6 mb-6 p-4 bg-gray-50 border-l-4 border-blue-500 rounded">
                 <h3 className="font-semibold text-gray-900 mb-3">Third Party Details</h3>

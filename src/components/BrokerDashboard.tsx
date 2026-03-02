@@ -50,17 +50,17 @@ export default function BrokerDashboard({
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, full_name, email')
-          .in('id', userIds);
+          .select('user_id, full_name, email')
+          .in('user_id', userIds);
 
         if (profilesData) {
-          profilesMap = Object.fromEntries(profilesData.map(p => [p.id, p]));
+          profilesMap = Object.fromEntries(profilesData.map(p => [p.user_id, p]));
         }
       }
 
       const claimsWithClientNames = (claimsData || []).map((claim) => {
         const profile = claim.user_id ? profilesMap[claim.user_id] : null;
-        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name);
+        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name, 'Unknown Client');
 
         return {
           ...claim,
