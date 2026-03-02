@@ -15,7 +15,7 @@ import {
   FileText,
 } from 'lucide-react';
 
-type Step = 1 | 2 | 3 | 4 | 5 | 'success';
+type Step = 1 | 2 | 3 | 4 | 'success';
 type IncidentType = 'theft' | 'hijacking' | null;
 
 interface MotorVehicleTheftFormProps {
@@ -65,9 +65,6 @@ export default function MotorVehicleTheftForm({
   const [reportedToTracker, setReportedToTracker] = useState<boolean | null>(null);
   const [trackerCompanyName, setTrackerCompanyName] = useState('');
 
-  const [lastDriverName, setLastDriverName] = useState('');
-  const [lastDriverIdNumber, setLastDriverIdNumber] = useState('');
-  const [lastDriverLicenseCode, setLastDriverLicenseCode] = useState('');
 
   const [driverLicenseFront, setDriverLicenseFront] = useState<File | null>(null);
   const [driverLicenseBack, setDriverLicenseBack] = useState<File | null>(null);
@@ -196,18 +193,6 @@ export default function MotorVehicleTheftForm({
   };
 
   const validateStep3 = () => {
-    if (
-      !lastDriverName.trim() ||
-      !lastDriverIdNumber.trim() ||
-      !lastDriverLicenseCode.trim()
-    ) {
-      alert('Please fill in all driver information fields');
-      return false;
-    }
-    return true;
-  };
-
-  const validateStep4 = () => {
     if (!driverLicenseFront || !driverLicenseBack || !sapsCaseSlip) {
       alert('Please upload driver license (front and back) and SAPS case slip');
       return false;
@@ -215,7 +200,7 @@ export default function MotorVehicleTheftForm({
     return true;
   };
 
-  const validateStep5 = () => {
+  const validateStep4 = () => {
     if (!location || !locationAddress.trim()) {
       alert('Please provide the last known location');
       return false;
@@ -224,7 +209,7 @@ export default function MotorVehicleTheftForm({
   };
 
   const submitClaim = async () => {
-    if (!validateStep5()) return;
+    if (!validateStep4()) return;
 
     setLoading(true);
     try {
@@ -288,9 +273,6 @@ export default function MotorVehicleTheftForm({
         reported_to_tracker: hasTrackingDevice ? reportedToTracker : null,
         tracker_company_name:
           hasTrackingDevice && trackerCompanyName ? trackerCompanyName : null,
-        last_driver_name: lastDriverName,
-        last_driver_id_number: lastDriverIdNumber,
-        last_driver_license_code: lastDriverLicenseCode,
         last_known_location_lat: location?.lat || null,
         last_known_location_lng: location?.lng || null,
         last_known_location_address: locationAddress,
@@ -367,7 +349,7 @@ export default function MotorVehicleTheftForm({
     );
   }
 
-  const totalSteps = 5;
+  const totalSteps = 4;
   const currentStepNum = typeof step === 'number' ? step : totalSteps;
 
   return (
@@ -930,69 +912,6 @@ export default function MotorVehicleTheftForm({
 
           {step === 3 && (
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Driver Information</h2>
-              <p className="text-gray-600 mb-6">
-                Provide details about the last regular driver of the vehicle
-              </p>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Driver Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={lastDriverName}
-                    onChange={(e) => setLastDriverName(e.target.value)}
-                    placeholder="Full name as on license"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ID Number *
-                  </label>
-                  <input
-                    type="text"
-                    value={lastDriverIdNumber}
-                    onChange={(e) => setLastDriverIdNumber(e.target.value)}
-                    placeholder="13-digit ID number"
-                    maxLength={13}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    License Code *
-                  </label>
-                  <input
-                    type="text"
-                    value={lastDriverLicenseCode}
-                    onChange={(e) =>
-                      setLastDriverLicenseCode(e.target.value.toUpperCase())
-                    }
-                    placeholder="e.g., C1, EB"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    License code is found on the driver's license (e.g., C1, EB, B)
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => validateStep3() && setStep(4)}
-                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 Documents
               </h2>
@@ -1095,7 +1014,7 @@ export default function MotorVehicleTheftForm({
                 </div>
 
                 <button
-                  onClick={() => validateStep4() && setStep(5)}
+                  onClick={() => validateStep3() && setStep(4)}
                   className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
                 >
                   Continue
@@ -1104,7 +1023,7 @@ export default function MotorVehicleTheftForm({
             </div>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <div>
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Last Known Location</h2>
               <p className="text-gray-600 mb-6">
