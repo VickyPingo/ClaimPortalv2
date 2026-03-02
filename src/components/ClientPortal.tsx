@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
 import { useAuth } from '../contexts/AuthContext';
+import { safePersonName } from '../lib/display';
 import TheftClaimForm from './TheftClaimForm';
 import MotorVehicleTheftForm from './MotorVehicleTheftForm';
 import StructuralDamageForm from './StructuralDamageForm';
@@ -226,7 +227,7 @@ export default function ClientPortal() {
         throw new Error('Profile not found. Please complete your profile or contact support.');
       }
 
-      const claimantName = profile.full_name || currentUser.email || 'Client';
+      const claimantName = safePersonName(profile.full_name);
       const policyNumber = profile.policy_number || '';
       const claimantPhone = profile.cell_number || '';
       const claimantEmail = profile.email || '';

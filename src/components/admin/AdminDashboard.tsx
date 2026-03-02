@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { safePersonName } from '../../lib/display';
 import { Loader2, Calendar, MapPin, Car, Droplet, Shield, Home, Briefcase, FileText, User } from 'lucide-react';
 
 interface Claim {
@@ -91,22 +92,9 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
         }
       }
 
-      // Helper to check if string looks like email
-      const isEmail = (s: string | null | undefined): boolean => {
-        return !!s && s.includes('@');
-      };
-
       const claimsWithClientNames = (claimsData || []).map((claim: any) => {
-        // Priority: profile.full_name > claimant_name (if not email) > 'Client'
-        let displayName = 'Client';
-
         const profile = claim.user_id ? profilesMap[claim.user_id] : null;
-
-        if (profile?.full_name && !isEmail(profile.full_name)) {
-          displayName = profile.full_name.trim();
-        } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
-          displayName = claim.claimant_name.trim();
-        }
+        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name);
 
         console.log(`  📋 Claim ${claim.id}: user_id=${claim.user_id}, profile.full_name=${profile?.full_name}, displayName=${displayName}`);
 

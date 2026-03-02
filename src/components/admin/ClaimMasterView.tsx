@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { safePersonName } from '../../lib/display';
 import { ArrowLeft, Loader2, Mail, Download, MapPin, Calendar, User, Phone, FileText, Image as ImageIcon, Video, X, Mic } from 'lucide-react';
 import { generateClaimPDF, downloadClaimPack } from '../../lib/claimUtils';
 import DynamicDataViewer from './DynamicDataViewer';
@@ -72,6 +73,8 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   const [emailLoading, setEmailLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
 
   useEffect(() => {
     loadClaim();
@@ -90,12 +93,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       if (claimError) throw claimError;
 
       if (claimData) {
-        // Helper to check if string looks like email
-        const isEmail = (s: string | null | undefined): boolean => {
-          return !!s && s.includes('@');
-        };
-
-        // Fetch client profile if user_id exists
         let displayName = 'Client';
 
         if (claimData.user_id) {
@@ -105,13 +102,9 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             .eq('id', claimData.user_id)
             .maybeSingle();
 
-          if (profile?.full_name && !isEmail(profile.full_name)) {
-            displayName = profile.full_name.trim();
-          } else if (claimData.claimant_name && !isEmail(claimData.claimant_name)) {
-            displayName = claimData.claimant_name.trim();
-          }
-        } else if (claimData.claimant_name && !isEmail(claimData.claimant_name)) {
-          displayName = claimData.claimant_name.trim();
+          displayName = safePersonName(profile?.full_name) || safePersonName(claimData.claimant_name);
+        } else {
+          displayName = safePersonName(claimData.claimant_name);
         }
 
         setClaim({
@@ -163,12 +156,59 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
     try {
       setDownloadLoading(true);
-      await downloadClaimPack(claim);
+      const response = await fetch('/.netlify/functions/download-claim-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId: claim.id }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to download pack' }));
+        throw new Error(errorData.message || 'Failed to download pack');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `claim_${claim.id}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error: any) {
       console.error('Error downloading pack:', error);
       alert('Failed to download pack: ' + error.message);
     } finally {
       setDownloadLoading(false);
+    }
+  };
+
+  const handleTranscribeVoice = async () => {
+    if (!claim) return;
+
+    try {
+      setTranscribing(true);
+      setTranscriptError(null);
+
+      const response = await fetch('/.netlify/functions/transcribe-claim-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId: claim.id }),
+      });
+
+      const result = await response.json();
+
+      if (!result.ok) {
+        throw new Error(result.message || 'Transcription failed');
+      }
+
+      await loadClaim();
+    } catch (error: any) {
+      console.error('Error transcribing voice:', error);
+      setTranscriptError(error.message);
+    } finally {
+      setTranscribing(false);
     }
   };
 
@@ -465,10 +505,33 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                       <source src={getVoiceNote()!.url} type="audio/mpeg" />
                       Your browser does not support the audio element.
                     </audio>
-                    {claim.voice_transcript && (
+                    {claim.claim_data?.voice_transcript ? (
                       <div className="mt-4 p-4 bg-white rounded-lg">
                         <p className="text-sm font-semibold text-gray-600 mb-2">Transcript</p>
-                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.voice_transcript}</p>
+                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.claim_data.voice_transcript}</p>
+                      </div>
+                    ) : (
+                      <div className="mt-4">
+                        <button
+                          onClick={handleTranscribeVoice}
+                          disabled={transcribing}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {transcribing ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Transcribing...
+                            </>
+                          ) : (
+                            <>
+                              <Mic className="w-4 h-4" />
+                              Transcribe Voice Note
+                            </>
+                          )}
+                        </button>
+                        {transcriptError && (
+                          <p className="mt-2 text-sm text-red-600">{transcriptError}</p>
+                        )}
                       </div>
                     )}
                   </div>

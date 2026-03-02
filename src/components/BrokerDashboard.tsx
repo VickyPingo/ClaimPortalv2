@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { safePersonName } from '../lib/display';
 import { LogOut, Clock, LayoutDashboard } from 'lucide-react';
 
 interface Claim {
@@ -57,22 +58,9 @@ export default function BrokerDashboard({
         }
       }
 
-      // Helper to check if string looks like email
-      const isEmail = (s: string | null | undefined): boolean => {
-        return !!s && s.includes('@');
-      };
-
       const claimsWithClientNames = (claimsData || []).map((claim) => {
-        // Priority: profile.full_name > claimant_name (if not email) > 'Client'
-        let displayName = 'Client';
-
         const profile = claim.user_id ? profilesMap[claim.user_id] : null;
-
-        if (profile?.full_name && !isEmail(profile.full_name)) {
-          displayName = profile.full_name.trim();
-        } else if (claim.claimant_name && !isEmail(claim.claimant_name)) {
-          displayName = claim.claimant_name.trim();
-        }
+        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name);
 
         return {
           ...claim,
