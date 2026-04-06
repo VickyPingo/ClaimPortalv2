@@ -14,7 +14,8 @@ interface Claim {
   location: string | null;
   location_address: string | null;
   claim_data: any | null;
-  user_id: string | null;
+  client_id: string | null;
+  user_id?: string | null;
   brokerage_id: string | null;
   client_name?: string;
 }
@@ -78,7 +79,7 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
       console.log('  ✓ Claims loaded:', claimsData?.length || 0);
 
       // Fetch profiles for all claims with user_id
-      const userIds = [...new Set((claimsData || []).map(c => c.user_id).filter(Boolean))];
+      const userIds = [...new Set((claimsData || []).map(c => c.client_id || c.user_id).filter(Boolean))];
       let profilesMap: Record<string, any> = {};
 
       if (userIds.length > 0) {
@@ -93,8 +94,8 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
       }
 
       const claimsWithClientNames = (claimsData || []).map((claim: any) => {
-        const profile = claim.user_id ? profilesMap[claim.user_id] : null;
-        const displayName = safePersonName(profile?.full_name) || safePersonName(claim.claimant_name, 'Unknown Client');
+        const profile = profilesMap[claim.client_id || claim.user_id || ''] || null;
+        const displayName = claim.claimant_name || claim.claimant_snapshot?.full_name || profile?.full_name || 'Unknown Client';
 
         console.log(`  📋 Claim ${claim.id}: user_id=${claim.user_id}, profile.full_name=${profile?.full_name}, displayName=${displayName}`);
 
@@ -327,11 +328,11 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {claim.user_id ? (
+                        {(claim.client_id || claim.user_id) ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onViewClient(claim.user_id!);
+                              onViewClient(claim.client_id || claim.user_id!);
                             }}
                             className="flex items-center gap-2 text-blue-700 hover:underline font-medium"
                           >
@@ -386,11 +387,11 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
 
                     <div className="flex justify-between items-start">
                       <span className="text-xs font-semibold text-gray-500 uppercase">Client Name</span>
-                      {claim.user_id ? (
+                      {(claim.client_id || claim.user_id) ? (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onViewClient(claim.user_id!);
+                            onViewClient(claim.client_id || claim.user_id!);
                           }}
                           className="flex items-center gap-2 text-blue-700 hover:underline font-medium text-sm"
                         >
