@@ -277,7 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const updatePayload = {
                 brokerage_id: brokerage.id,
                 email: userEmail || user?.email || '',
-                full_name: user?.user_metadata?.full_name || user?.email || '',
+                full_name: user?.user_metadata?.full_name || brokerProfileData?.full_name || '',
                 is_active: true
               };
 
