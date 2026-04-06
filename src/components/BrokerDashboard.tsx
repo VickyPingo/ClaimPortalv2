@@ -11,6 +11,7 @@ interface Claim {
   created_at: string;
   client_id: string | null;
   claimant_name: string | null;
+  claimant_snapshot?: { full_name?: string } | null;
   client_name?: string;
   client_cell_number?: string | null;
 }
@@ -38,7 +39,7 @@ export default function BrokerDashboard({
 
       const { data: claimsData, error: claimsError } = await supabase
         .from('claims')
-        .select('id, incident_type, status, created_at, client_id, claimant_name')
+        .select('id, incident_type, status, created_at, client_id, claimant_name, claimant_snapshot')
         .limit(5)
         .order('created_at', { ascending: false });
 
@@ -62,14 +63,7 @@ export default function BrokerDashboard({
       const claimsWithClientNames = (claimsData || []).map((claim) => {
         const profile = claim.client_id ? profilesMap[claim.client_id] : null;
 
-        // Priority: profile.full_name (not email-like) > claim.claimant_name (not email-like) > "Unknown Client"
-        let displayName = 'Unknown Client';
-
-        if (profile?.full_name && !profile.full_name.includes('@')) {
-          displayName = profile.full_name;
-        } else if (claim.claimant_name && !claim.claimant_name.includes('@')) {
-          displayName = claim.claimant_name;
-        }
+        const displayName = claim.claimant_name || claim.claimant_snapshot?.full_name || 'Unknown';
 
         return {
           ...claim,
