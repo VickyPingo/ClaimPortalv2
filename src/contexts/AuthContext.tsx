@@ -827,7 +827,6 @@ const clientSignUp = async (
     throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
   }
 
-  // CRITICAL: Check if user has an existing invitation first
   const { data: existingInvite } = await supabase
     .from('invitations')
     .select('role, brokerage_id, is_active')
@@ -836,21 +835,29 @@ const clientSignUp = async (
     .maybeSingle();
 
   if (existingInvite) {
-    console.log('⚠️ User has pending invitation with role:', existingInvite.role);
-    console.log('❌ BLOCKING client signup - user should complete invite flow instead');
     throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
   }
+
+  const { data: brokerageData, error: brokerageError } = await supabase
+    .from('brokerages')
+    .select('id')
+    .or(`subdomain.eq.${brokerageSlug},slug.eq.${brokerageSlug}`)
+    .maybeSingle();
+
+  if (brokerageError || !brokerageData) {
+    throw new Error('Could not find brokerage for this domain. Please contact your broker.');
+  }
+
+  const brokerageId = brokerageData.id;
 
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        role: 'client',
-        user_type: 'client',
-        brokerage_slug: brokerageSlug,
         full_name: profile.full_name,
         cell_number: profile.cell_number,
+        role: 'client',
       },
     },
   });
@@ -859,6 +866,25 @@ const clientSignUp = async (
   if (!authData.user) throw new Error('User creation failed');
 
   console.log('✅ Client auth user created:', authData.user.id);
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .insert({
+      user_id: authData.user.id,
+      brokerage_id: brokerageId,
+      full_name: profile.full_name,
+      email: email,
+      cell_number: profile.cell_number || '',
+      role: 'client',
+      is_active: true,
+    });
+
+  if (profileError) {
+    console.error('❌ Failed to create client profile:', profileError);
+    throw new Error(`Failed to create profile: ${profileError.message}`);
+  }
+
+  console.log('✅ Client profile created with name:', profile.full_name);
   return authData.user;
 };
 
