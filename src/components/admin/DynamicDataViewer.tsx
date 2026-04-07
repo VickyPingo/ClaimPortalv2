@@ -70,6 +70,28 @@ export default function DynamicDataViewer({ data, title = 'Complete Claim Data' 
   const renderValue = (key: string, value: any, depth: number = 0): JSX.Element => {
     const indentClass = depth > 0 ? 'ml-6' : '';
 
+    if (key === 'items' && Array.isArray(value)) {
+      return (
+        <div key={key} className="mb-4">
+          <p className="text-sm font-semibold text-gray-600 mb-2">Claimed Items</p>
+          <div className="space-y-3">
+            {value.map((item: any, idx: number) => (
+              <div key={idx} className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                <p className="font-semibold text-gray-900">{item.description} ({item.category})</p>
+                {item.makeModel && <p className="text-gray-600">Make/Model: {item.makeModel}</p>}
+                {item.serialImei && <p className="text-gray-600">Serial/IMEI: {item.serialImei}</p>}
+                <p className="text-gray-600">Replacement Value: R {Number(item.replacementValue).toLocaleString()}</p>
+                <p className="text-gray-600">On Policy: {item.onPolicy === 'yes' ? 'Yes' : item.onPolicy === 'no' ? 'No' : 'Unsure'}</p>
+                {item.deviceBlacklisted !== undefined && <p className="text-gray-600">Blacklisted: {item.deviceBlacklisted ? 'Yes' : 'No'}</p>}
+                {item.findMyDeviceLocked !== undefined && <p className="text-gray-600">Find My Device Locked: {item.findMyDeviceLocked ? 'Yes' : 'No'}</p>}
+                {item.hasValuationCert !== undefined && <p className="text-gray-600">Valuation Certificate: {item.hasValuationCert ? 'Yes' : 'No'}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     if (Array.isArray(value)) {
       return (
         <div key={key} className={`${indentClass} mb-4`}>

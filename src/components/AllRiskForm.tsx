@@ -242,7 +242,7 @@ export default function AllRiskForm({
 
         try {
           const transcriptionResponse = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-voice`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-claim-voice`,
             {
               method: 'POST',
               headers: {
@@ -254,7 +254,9 @@ export default function AllRiskForm({
           );
 
           if (transcriptionResponse.ok) {
-            const { transcript } = await transcriptionResponse.json();
+            const transcriptionResult = await transcriptionResponse.json();
+            console.log('🎤 Transcription result:', transcriptionResult);
+            const transcript = transcriptionResult.transcript || transcriptionResult.text || null;
             voiceTranscript = transcript;
           }
         } catch (err) {
@@ -274,7 +276,7 @@ export default function AllRiskForm({
 
         try {
           const transcriptionResponse = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-voice`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-claim-voice`,
             {
               method: 'POST',
               headers: {
@@ -286,7 +288,9 @@ export default function AllRiskForm({
           );
 
           if (transcriptionResponse.ok) {
-            const { transcript } = await transcriptionResponse.json();
+            const transcriptionResult = await transcriptionResponse.json();
+            console.log('🎤 Transcription result:', transcriptionResult);
+            const transcript = transcriptionResult.transcript || transcriptionResult.text || null;
             damageDescriptionTranscript = transcript;
           }
         } catch (err) {
