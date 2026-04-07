@@ -163,7 +163,7 @@ export default function HomePageRouter() {
   const EmergencyLogoutButton = () => (
     <button
       onClick={handleForceLogout}
-      className="fixed top-4 right-4 z-50 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 font-medium transition-colors"
+      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-red-600 text-white text-sm rounded-lg shadow-lg hover:bg-red-700 transition-colors"
       title="Clear cache and force logout"
     >
       <LogOut className="w-4 h-4" />

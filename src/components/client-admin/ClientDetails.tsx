@@ -64,7 +64,7 @@ export default function ClientDetails({ onBack }: ClientDetailsProps) {
         setCellNumber(profile.cell_number || '');
         setEmail(profile.email || '');
         setPolicyNumber(profile.policy_number || '');
-        setAddress(profile.address || '');
+        setAddress(profile.street_address || '');
         setCity(profile.city || '');
         setProvince(profile.province || '');
         setPostalCode(profile.postal_code || '');
@@ -90,7 +90,7 @@ export default function ClientDetails({ onBack }: ClientDetailsProps) {
           cell_number: cellNumber,
           email: email,
           policy_number: policyNumber,
-          address: address,
+          street_address: address,
           city: city,
           province: province,
           postal_code: postalCode,
