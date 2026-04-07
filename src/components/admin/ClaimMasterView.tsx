@@ -470,6 +470,18 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
               {editingTranscript ? (
                 <div className="mt-2">
+                  {/* Keep audio player visible while editing */}
+                  {getVoiceNote() && (
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-xs font-medium text-blue-700 mb-2">
+                        🎧 Listen while you edit:
+                      </p>
+                      <audio controls className="w-full">
+                        <source src={getVoiceNote()!.url} type="audio/webm" />
+                        <source src={getVoiceNote()!.url} type="audio/mpeg" />
+                      </audio>
+                    </div>
+                  )}
                   <textarea
                     value={transcriptDraft}
                     onChange={(e) => setTranscriptDraft(e.target.value)}
