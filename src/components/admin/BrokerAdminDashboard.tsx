@@ -29,6 +29,19 @@ export default function BrokerAdminDashboard() {
   // ADMIN OVERRIDE: vickypingo@gmail.com always has full super admin access
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
+  // CRITICAL: On Independi subdomain, NEVER show super admin features
+  // EXCEPT for vickypingo@gmail.com who always has full access
+  // Only on super admin domain can super_admin role access admin features
+  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
+  const initialView = isActualSuperAdmin ? 'brokerages' : 'dashboard';
+
+  const [currentView, setCurrentView] = useState<View>(initialView);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
+  const [selectedFileClientId, setSelectedFileClientId] = useState<string | null>(null);
+  const [selectedFolderClientId, setSelectedFolderClientId] = useState<string | null>(null);
+  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
+
   // CRITICAL: Wait for loading to complete before checking roles
   // This prevents redirect loops caused by checking userRole before it's set
   useEffect(() => {
@@ -71,12 +84,6 @@ export default function BrokerAdminDashboard() {
     );
   }
 
-  // CRITICAL: On Independi subdomain, NEVER show super admin features
-  // EXCEPT for vickypingo@gmail.com who always has full access
-  // Only on super admin domain can super_admin role access admin features
-  const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
-  const initialView = isActualSuperAdmin ? 'brokerages' : 'dashboard';
-
   console.log('🎯 BrokerAdminDashboard - Initialising');
   console.log('  User Email:', user?.email);
   console.log('  User Role:', userRole);
@@ -87,13 +94,6 @@ export default function BrokerAdminDashboard() {
   console.log('  Is Super Admin:', isSuperAdmin());
   console.log('  Is Actual Super Admin:', isActualSuperAdmin);
   console.log('  Initial View:', initialView);
-
-  const [currentView, setCurrentView] = useState<View>(initialView);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
-  const [selectedFileClientId, setSelectedFileClientId] = useState<string | null>(null);
-  const [selectedFolderClientId, setSelectedFolderClientId] = useState<string | null>(null);
-  const [accessDeniedMessage, setAccessDeniedMessage] = useState<string | null>(null);
 
   const handleNavigate = (view: 'dashboard' | 'inbox' | 'clients' | 'team' | 'settings' | 'brokerages' | 'users' | 'invitations' | 'client-documents' | 'client-requests' | 'client-files') => {
     console.log('🧭 Navigation requested to:', view);
