@@ -74,7 +74,7 @@ export default function TeamManagement() {
           .select('user_id, full_name, email, role, is_active, created_at')
           .eq('brokerage_id', me.brokerage_id)
           .eq('is_active', true)
-          .neq('user_id', user.id)
+          .in('role', ['broker', 'main_broker', 'staff', 'client'])
           .order('created_at', { ascending: false });
 
         if (fallbackError) {
