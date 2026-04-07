@@ -122,7 +122,18 @@ export async function submitClaimUnified(params: {
     });
   }
 
-  // 8. Generate AI summary asynchronously
+  // 8. Send broker notification email asynchronously
+  if (data?.id) {
+    fetch('/.netlify/functions/send-claim-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claimId: data.id }),
+    }).catch(err => {
+      console.error('Broker notification failed:', err);
+    });
+  }
+
+  // 9. Generate AI summary asynchronously
   if (data?.id) {
     generateClaimSummary(data.id).catch(err => {
       console.error('AI summary generation failed:', err);
