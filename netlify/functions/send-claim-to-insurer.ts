@@ -31,8 +31,8 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    await resend.emails.send({
-      from: 'Claims Portal <claims@independi.co.za>',
+    const sendResult = await resend.emails.send({
+      from: 'Claims Portal <onboarding@resend.dev>',
       to: [to],
       subject,
       html: `
@@ -52,6 +52,12 @@ export const handler: Handler = async (event) => {
       `,
       attachments: emailAttachments,
     });
+
+    console.log('Resend result:', JSON.stringify(sendResult));
+
+    if (sendResult.error) {
+      throw new Error(sendResult.error.message);
+    }
 
     return {
       statusCode: 200,
