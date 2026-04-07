@@ -35,28 +35,71 @@ async function generatePDF(claimId: string): Promise<Buffer | null> {
     const sectionGap = 12;
 
     const addText = (text: string, bold = false, size = 10, color = rgb(0, 0, 0)) => {
-      if (y < 80) {
-        page = pdfDoc.addPage([595, 842]);
-        y = height - 50;
+      const maxWidth = width - margin * 2;
+      const font = bold ? boldFont : regularFont;
+      const words = String(text).split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = font.widthOfTextAtSize(testLine, size);
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
       }
-      page.drawText(String(text).substring(0, 100), {
-        x: margin,
-        y,
-        size,
-        font: bold ? boldFont : regularFont,
-        color,
-      });
-      y -= lineHeight;
+      if (currentLine) lines.push(currentLine);
+
+      for (const line of lines) {
+        if (y < 80) {
+          page = pdfDoc.addPage([595, 842]);
+          y = height - 50;
+        }
+        page.drawText(line, { x: margin, y, size, font, color });
+        y -= lineHeight;
+      }
     };
 
     const addRow = (label: string, value: string) => {
-      if (y < 80) {
+      const maxValueWidth = width - margin - 160 - margin; // available width for value
+      const safeValue = String(value || 'N/A');
+
+      // Split value into lines that fit within maxValueWidth
+      const words = safeValue.split(' ');
+      const lines: string[] = [];
+      let currentLine = '';
+
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = regularFont.widthOfTextAtSize(testLine, 10);
+        if (testWidth > maxValueWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+
+      // Check if we need a new page
+      const rowHeight = lines.length * lineHeight;
+      if (y - rowHeight < 80) {
         page = pdfDoc.addPage([595, 842]);
         y = height - 50;
       }
+
+      // Draw label on first line only
       page.drawText(`${label}:`, { x: margin, y, size: 10, font: boldFont, color: rgb(0,0,0) });
-      page.drawText(String(value || 'N/A').substring(0, 80), { x: margin + 160, y, size: 10, font: regularFont, color: rgb(0,0,0) });
-      y -= lineHeight;
+
+      // Draw each value line
+      lines.forEach((line, idx) => {
+        page.drawText(line, { x: margin + 160, y: y - (idx * lineHeight), size: 10, font: regularFont, color: rgb(0,0,0) });
+      });
+
+      y -= rowHeight;
     };
 
     const addSection = (title: string) => {
