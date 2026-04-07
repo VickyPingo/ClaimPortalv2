@@ -324,7 +324,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   };
 
   const renderField = (label: string, value: any) => {
-    if (value === null || value === undefined) return null;
+    if (value === null || value === undefined || value === '') return null;
     return (
       <div className="mb-4">
         <p className="text-sm font-semibold text-gray-600 mb-1">{label}</p>
@@ -494,7 +494,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {renderField('Location', getDisplayLocation())}
             {renderField('Accident Date/Time', claim.accident_date_time ? new Date(claim.accident_date_time).toLocaleString() : null)}
             {renderField('Car Condition', claim.car_condition)}
-            {renderField('Panel Beater Location', claim.panel_beater_location)}
+            {renderField('Panel Beater Location', claim.panel_beater_location || claim.claim_data?.panel_beater_location)}
             {renderField('Burst Date/Time', claim.burst_datetime ? new Date(claim.burst_datetime).toLocaleString() : null)}
             {renderField('Geyser Type', claim.geyser_type)}
             {renderField('Has Resulting Damage', claim.has_resulting_damage !== null ? (claim.has_resulting_damage ? 'Yes' : 'No') : null)}

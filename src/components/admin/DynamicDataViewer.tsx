@@ -68,7 +68,13 @@ export default function DynamicDataViewer({ data, title = 'Complete Claim Data' 
   };
 
   const renderObject = (obj: any, depth: number = 0): JSX.Element[] => {
-    return Object.entries(obj).map(([key, value]) => renderValue(key, value, depth));
+    return Object.entries(obj)
+      .filter(([key, value]) => {
+        if (key === 'selected_city' || key === 'selected_province') return false;
+        if (value === null || value === undefined || value === '') return false;
+        return true;
+      })
+      .map(([key, value]) => renderValue(key, value, depth));
   };
 
   return (
