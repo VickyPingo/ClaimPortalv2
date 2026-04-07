@@ -683,11 +683,38 @@ function EmailModal({ claim, onClose }: { claim: Claim; onClose: () => void }) {
   const [toEmail, setToEmail] = useState('');
   const [subject, setSubject] = useState(`Insurance Claim - ${claim.incident_type?.replace('_', ' ')} - Ref: ${claim.id.slice(0, 8)}`);
   const [message, setMessage] = useState(`Dear Insurer,\n\nPlease find attached the claim details and supporting documentation for the above reference.\n\nBest regards`);
+  const [sending, setSending] = useState(false);
 
-  const handleSend = () => {
-    const mailtoLink = `mailto:${toEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-    window.location.href = mailtoLink;
-    onClose();
+  const handleSendEmail = async () => {
+    if (!toEmail || !subject || !message) return;
+
+    setSending(true);
+    try {
+      const response = await fetch('/.netlify/functions/send-claim-to-insurer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: toEmail,
+          subject,
+          message,
+          claimId: claim.id,
+          claimantName: claim.claimant_name,
+          incidentType: claim.incident_type,
+          attachments: claim.attachments || [],
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error || 'Failed to send');
+
+      alert(`Email sent successfully with ${result.attachmentCount} attachment(s)!`);
+      onClose();
+    } catch (err: any) {
+      alert('Failed to send email: ' + err.message);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -732,25 +759,21 @@ function EmailModal({ claim, onClose }: { claim: Claim; onClose: () => void }) {
             />
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">
-              Note: This will open your default email client. You'll need to manually attach the generated PDF and evidence files.
-            </p>
-          </div>
-
           <div className="flex gap-3 justify-end">
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50"
+              disabled={sending}
+              className="px-6 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
-              onClick={handleSend}
-              disabled={!toEmail}
-              className="px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
+              onClick={handleSendEmail}
+              disabled={!toEmail || sending}
+              className="flex items-center gap-2 px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
             >
-              Open Email Client
+              {sending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {sending ? 'Sending...' : 'Send Email'}
             </button>
           </div>
         </div>
