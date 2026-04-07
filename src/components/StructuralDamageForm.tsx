@@ -410,14 +410,6 @@ export default function StructuralDamageForm({
                       <p className="font-semibold text-gray-900">No, not habitable</p>
                     </button>
                   </div>
-                  {isHabitable === false && (
-                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start">
-                      <AlertTriangle className="w-5 h-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-red-700">
-                        This claim is URGENT. Our team will contact you regarding emergency accommodation.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -449,14 +441,6 @@ export default function StructuralDamageForm({
                       <p className="font-semibold text-gray-900">No, not secure</p>
                     </button>
                   </div>
-                  {securityGuardRequested && (
-                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start">
-                      <AlertCircle className="w-5 h-5 text-orange-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-orange-700">
-                        A security guard has been requested. Our team will arrange this shortly.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 <button

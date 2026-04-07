@@ -10,18 +10,57 @@ export default function DynamicDataViewer({ data, title = 'Complete Claim Data' 
     return null;
   }
 
+  const labelMap: Record<string, string> = {
+    is_bonded: 'Is Property Bonded',
+    bond_holder_bank: 'Bond Holder Bank',
+    is_habitable: 'Is Home Habitable',
+    is_property_secure: 'Is Property Secure',
+    is_gradual_leak: 'Is Gradual Leak',
+    water_entry_point: 'Water Entry Point',
+    incident_type: 'Sub Incident Type',
+    sub_incident_type: 'Sub Incident Type',
+    is_glass_only: 'Glass Only Damage',
+    roof_construction: 'Roof Construction',
+    estimated_repair_cost: 'Estimated Repair Cost',
+    location_address: 'Location Address',
+    location_lat: 'Location Latitude',
+    location_lng: 'Location Longitude',
+    car_condition: 'Car Condition',
+    panel_beater_location: 'Panel Beater Location',
+    third_party_name: 'Third Party Name',
+    third_party_phone: 'Third Party Phone',
+    third_party_vehicle: 'Third Party Vehicle',
+    accident_date_time: 'Accident Date & Time',
+    selected_province: 'Selected Province',
+    selected_city: 'Selected City',
+    has_all_keys: 'Has All Keys',
+    vehicle_make: 'Vehicle Make',
+    vehicle_model: 'Vehicle Model',
+    vehicle_year: 'Vehicle Year',
+    vehicle_registration: 'Vehicle Registration',
+    saps_case_number: 'SAPS Case Number',
+    police_station_name: 'Police Station',
+    voice_transcript: 'Voice Transcript',
+    voice_transcript_updated_at: 'Transcript Updated At',
+    media_count: 'Media Count',
+  };
+
+  const getLabel = (key: string) =>
+    labelMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
   const formatKey = (key: string): string => {
-    return key
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+    return getLabel(key);
   };
 
   const formatValue = (value: any): string => {
-    if (value === null || value === undefined) return 'N/A';
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (value === true) return 'Yes';
+    if (value === false) return 'No';
+    if (value === null || value === undefined || value === '') return 'N/A';
     if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/)) {
       return new Date(value).toLocaleString();
+    }
+    if (typeof value === 'number' && String(value).includes('.') === false && value > 1000) {
+      return `R ${value.toLocaleString()}`;
     }
     if (typeof value === 'number') return value.toString();
     if (typeof value === 'string') return value;
