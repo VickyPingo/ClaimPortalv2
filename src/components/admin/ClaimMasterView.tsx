@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { safePersonName } from '../../lib/display';
-import { ArrowLeft, Loader2, Mail, Download, MapPin, Calendar, User, Phone, FileText, Image as ImageIcon, Video, X, Mic } from 'lucide-react';
+import { ArrowLeft, Loader2, Mail, Download, MapPin, Calendar, User, Phone, FileText, Image as ImageIcon, Video, X, Mic, CreditCard as Edit2, Save } from 'lucide-react';
 import { generateClaimPDF, downloadClaimPack } from '../../lib/claimUtils';
 import DynamicDataViewer from './DynamicDataViewer';
 
@@ -75,6 +75,9 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [transcribing, setTranscribing] = useState(false);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [editingTranscript, setEditingTranscript] = useState(false);
+  const [transcriptDraft, setTranscriptDraft] = useState('');
+  const [savingTranscript, setSavingTranscript] = useState(false);
 
   useEffect(() => {
     loadClaim();
@@ -323,6 +326,39 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     return null;
   };
 
+  const handleSaveTranscript = async () => {
+    if (!claim) return;
+    setSavingTranscript(true);
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({
+          voice_transcript: transcriptDraft,
+          claim_data: {
+            ...claim.claim_data,
+            voice_transcript: transcriptDraft,
+          }
+        })
+        .eq('id', claim.id);
+
+      if (error) throw error;
+
+      setClaim({
+        ...claim,
+        voice_transcript: transcriptDraft,
+        claim_data: {
+          ...claim.claim_data,
+          voice_transcript: transcriptDraft,
+        }
+      });
+      setEditingTranscript(false);
+    } catch (err: any) {
+      alert('Failed to save transcript: ' + err.message);
+    } finally {
+      setSavingTranscript(false);
+    }
+  };
+
   const renderField = (label: string, value: any) => {
     if (value === null || value === undefined || value === '') return null;
     return (
@@ -416,10 +452,53 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {renderField('Claimant Email', claim.claimant_email)}
 
             <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-1">Voice Transcript</p>
-              {(claim.claim_data?.voice_transcript || claim.voice_transcript) ? (
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-gray-600">Voice Transcript</p>
+                {(claim.claim_data?.voice_transcript || claim.voice_transcript) && !editingTranscript && (
+                  <button
+                    onClick={() => {
+                      setTranscriptDraft(claim.claim_data?.voice_transcript || claim.voice_transcript || '');
+                      setEditingTranscript(true);
+                    }}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {editingTranscript ? (
+                <div className="mt-2">
+                  <textarea
+                    value={transcriptDraft}
+                    onChange={(e) => setTranscriptDraft(e.target.value)}
+                    rows={5}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+                    placeholder="Edit transcript..."
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleSaveTranscript}
+                      disabled={savingTranscript}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-blue-700 text-white text-sm rounded-lg hover:bg-blue-800 disabled:opacity-50"
+                    >
+                      {savingTranscript ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                      {savingTranscript ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingTranscript(false)}
+                      className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (claim.claim_data?.voice_transcript || claim.voice_transcript) ? (
                 <div className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
-                  <p className="text-sm text-gray-900 whitespace-pre-wrap">{claim.claim_data?.voice_transcript || claim.voice_transcript}</p>
+                  <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                    {claim.claim_data?.voice_transcript || claim.voice_transcript}
+                  </p>
                 </div>
               ) : getVoiceNote() ? (
                 <div className="mt-2">
