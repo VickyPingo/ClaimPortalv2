@@ -60,6 +60,37 @@ export default function BrokerAdminDashboard() {
     }
   }, [userRole, userType, loading]);
 
+  useEffect(() => {
+    console.log('📺 Current View Changed:', currentView);
+    console.log('  User Role:', userRole);
+    console.log('  Is Super Admin:', isSuperAdmin());
+    console.log('  Is Super Admin Email:', isSuperAdminEmail);
+    console.log('  On Independi Subdomain:', onIndependiSubdomain);
+
+    // CRITICAL: On Independi subdomain, block ALL super admin sections
+    // EXCEPT for vickypingo@gmail.com who always has full access
+    if (onIndependiSubdomain && !isSuperAdminEmail && (currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
+      console.log('❌ Independi subdomain blocks super admin views, redirecting to dashboard');
+      setCurrentView('dashboard');
+      setAccessDeniedMessage('Access Denied: Super admin features are not available on the Independi subdomain.');
+      setTimeout(() => setAccessDeniedMessage(null), 5000);
+      return;
+    }
+
+    // CRITICAL: Check if user is trying to access super admin sections without proper role
+    // vickypingo@gmail.com bypasses domain restrictions
+    if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
+      if (!isSuperAdmin() || userRole !== 'super_admin' || (!onSuperAdminDomain && !isSuperAdminEmail)) {
+        console.log('❌ Unauthorised view access detected, redirecting to dashboard');
+        console.log('  Blocked view:', currentView);
+        console.log('  User email:', user?.email);
+        setCurrentView('dashboard');
+        setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
+        setTimeout(() => setAccessDeniedMessage(null), 5000);
+      }
+    }
+  }, [currentView, isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain, isSuperAdminEmail]);
+
   // Show loading while auth is loading
   if (loading) {
     return (
@@ -132,37 +163,6 @@ export default function BrokerAdminDashboard() {
     setSelectedClientId(null);
     setSelectedClaimId(null);
   };
-
-  useEffect(() => {
-    console.log('📺 Current View Changed:', currentView);
-    console.log('  User Role:', userRole);
-    console.log('  Is Super Admin:', isSuperAdmin());
-    console.log('  Is Super Admin Email:', isSuperAdminEmail);
-    console.log('  On Independi Subdomain:', onIndependiSubdomain);
-
-    // CRITICAL: On Independi subdomain, block ALL super admin sections
-    // EXCEPT for vickypingo@gmail.com who always has full access
-    if (onIndependiSubdomain && !isSuperAdminEmail && (currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
-      console.log('❌ Independi subdomain blocks super admin views, redirecting to dashboard');
-      setCurrentView('dashboard');
-      setAccessDeniedMessage('Access Denied: Super admin features are not available on the Independi subdomain.');
-      setTimeout(() => setAccessDeniedMessage(null), 5000);
-      return;
-    }
-
-    // CRITICAL: Check if user is trying to access super admin sections without proper role
-    // vickypingo@gmail.com bypasses domain restrictions
-    if ((currentView === 'settings' || currentView === 'brokerages' || currentView === 'users' || currentView === 'invitations')) {
-      if (!isSuperAdmin() || userRole !== 'super_admin' || (!onSuperAdminDomain && !isSuperAdminEmail)) {
-        console.log('❌ Unauthorised view access detected, redirecting to dashboard');
-        console.log('  Blocked view:', currentView);
-        console.log('  User email:', user?.email);
-        setCurrentView('dashboard');
-        setAccessDeniedMessage('Access Denied: You do not have permission to access admin sections.');
-        setTimeout(() => setAccessDeniedMessage(null), 5000);
-      }
-    }
-  }, [currentView, isSuperAdmin, userRole, user, onIndependiSubdomain, onSuperAdminDomain, isSuperAdminEmail]);
 
   const handleViewClient = (clientId: string) => {
     setSelectedClientId(clientId);
