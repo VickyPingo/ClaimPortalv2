@@ -23,10 +23,17 @@ export const handler: Handler = async (event) => {
 
     const emailAttachments: { filename: string; content: string }[] = [];
 
-    // Generate and attach the claim report
+    // Generate and attach the claim report PDF
     try {
+      // Use DEPLOY_URL or URL env var, fallback to known production URL
+      const baseUrl = process.env.DEPLOY_URL ||
+                      process.env.URL ||
+                      'https://independi.claimsportal.co.za';
+
+      console.log('📄 Generating PDF report, baseUrl:', baseUrl);
+
       const reportResponse = await fetch(
-        `${process.env.URL}/.netlify/functions/generate-claim-report`,
+        `${baseUrl}/.netlify/functions/generate-claim-report`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -34,19 +41,31 @@ export const handler: Handler = async (event) => {
         }
       );
 
+      console.log('📄 Report response status:', reportResponse.status);
+
       if (reportResponse.ok) {
+        const contentType = reportResponse.headers.get('content-type') || '';
+        console.log('📄 Report content-type:', contentType);
+
         const reportBuffer = await reportResponse.arrayBuffer();
-        const reportBase64 = Buffer.from(reportBuffer).toString('base64');
-        emailAttachments.push({
-          filename: `claim-report-${claimId.substring(0, 8)}.pdf`,
-          content: reportBase64,
-        });
-        console.log('✅ Claim report attached');
+        console.log('📄 Report buffer size:', reportBuffer.byteLength, 'bytes');
+
+        if (reportBuffer.byteLength > 0) {
+          const reportBase64 = Buffer.from(reportBuffer).toString('base64');
+          emailAttachments.push({
+            filename: `claim-report-${claimId.substring(0, 8)}.pdf`,
+            content: reportBase64,
+          });
+          console.log('✅ PDF report attached successfully');
+        } else {
+          console.warn('⚠️ Report buffer was empty');
+        }
       } else {
-        console.warn('⚠️ Could not generate claim report:', reportResponse.status);
+        const errorText = await reportResponse.text();
+        console.error('❌ Report generation failed:', reportResponse.status, errorText);
       }
     } catch (err) {
-      console.warn('⚠️ Failed to attach claim report:', err);
+      console.error('❌ Failed to generate/attach claim report:', err);
     }
 
     for (const att of attachments) {
@@ -62,6 +81,9 @@ export const handler: Handler = async (event) => {
         console.warn('Failed to fetch attachment:', att.url, err);
       }
     }
+
+    console.log('📧 Sending email with', emailAttachments.length, 'attachments:',
+      emailAttachments.map(a => a.filename).join(', '));
 
     const sendResult = await resend.emails.send({
       from: 'Claims Portal <onboarding@resend.dev>',
