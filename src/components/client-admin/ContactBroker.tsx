@@ -267,6 +267,18 @@ export default function ContactBroker({ onBack }: ContactBrokerProps) {
           .eq('id', requestData.id);
       }
 
+      // Send broker notification
+      if (requestData) {
+        fetch('/.netlify/functions/send-claim-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'request',
+            requestId: requestData.id,
+          }),
+        }).catch(err => console.error('Request notification failed:', err));
+      }
+
       // Reset form
       setRequestType('general');
       setSubject('');

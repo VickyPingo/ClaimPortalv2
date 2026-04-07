@@ -127,7 +127,7 @@ export async function submitClaimUnified(params: {
     fetch('/.netlify/functions/send-claim-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ claimId: data.id }),
+      body: JSON.stringify({ type: 'claim', claimId: data.id }),
     }).catch(err => {
       console.error('Broker notification failed:', err);
     });

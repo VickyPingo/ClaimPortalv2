@@ -192,6 +192,23 @@ export default function ClientDocuments({ onBack }: ClientDocumentsProps) {
 
       if (insertError) throw insertError;
 
+      // Send broker notification
+      if (brokerageId) {
+        fetch('/.netlify/functions/send-claim-notification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'file',
+            fileUpload: {
+              brokerageId: brokerageId,
+              clientUserId: user.id,
+              fileName: file.name,
+              fileType: file.type,
+            },
+          }),
+        }).catch(err => console.error('File notification failed:', err));
+      }
+
       // Reset form
       setTitle('');
       setDocType('invoice');
