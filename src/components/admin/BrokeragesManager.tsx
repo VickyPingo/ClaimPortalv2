@@ -35,7 +35,8 @@ export default function BrokeragesManager() {
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
-    notification_email: ''
+    notification_email: '',
+    broker_name: '',
   });
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
@@ -197,6 +198,7 @@ export default function BrokeragesManager() {
               email: formData.notification_email.trim(),
               role: 'broker',
               brokerageId: newBrokerage.id,
+              brokerName: formData.broker_name.trim(),
             }),
           });
 
@@ -217,7 +219,7 @@ export default function BrokeragesManager() {
 
       await fetchBrokerages();
       setShowCreateModal(false);
-      setFormData({ name: '', slug: '', notification_email: '' });
+      setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
     } catch (error: any) {
       console.error('Error creating brokerage:', error);
       setFormError(error.message || 'Failed to create brokerage');
@@ -231,7 +233,8 @@ export default function BrokeragesManager() {
     setFormData({
       name: brokerage.name,
       slug: brokerage.subdomain,
-      notification_email: brokerage.notification_email || ''
+      notification_email: brokerage.notification_email || '',
+      broker_name: '',
     });
     setShowEditModal(true);
   };
@@ -257,7 +260,7 @@ export default function BrokeragesManager() {
       await fetchBrokerages();
       setShowEditModal(false);
       setEditingBrokerage(null);
-      setFormData({ name: '', slug: '', notification_email: '' });
+      setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
     } catch (error: any) {
       console.error('Error updating brokerage:', error);
       setFormError(error.message || 'Failed to update brokerage');
@@ -504,7 +507,7 @@ export default function BrokeragesManager() {
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingBrokerage(null);
-                  setFormData({ name: '', slug: '', notification_email: '' });
+                  setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
                   setFormError('');
                 }}
                 className="text-gray-400 hover:text-gray-600"
@@ -575,7 +578,7 @@ export default function BrokeragesManager() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingBrokerage(null);
-                    setFormData({ name: '', slug: '', notification_email: '' });
+                    setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
                     setFormError('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
@@ -606,7 +609,7 @@ export default function BrokeragesManager() {
               <button
                 onClick={() => {
                   setShowCreateModal(false);
-                  setFormData({ name: '', slug: '', notification_email: '' });
+                  setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
                   setFormError('');
                 }}
                 className="text-gray-400 hover:text-gray-600"
@@ -624,7 +627,7 @@ export default function BrokeragesManager() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Organisation Name
+                  Organisation Name *
                 </label>
                 <input
                   type="text"
@@ -647,6 +650,23 @@ export default function BrokeragesManager() {
                   placeholder="e.g., Timo Marketing"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Main Broker Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.broker_name}
+                  onChange={(e) => setFormData({ ...formData, broker_name: e.target.value })}
+                  placeholder="e.g., John Smith"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The primary broker who will manage this organisation
+                </p>
               </div>
 
               <div>
@@ -694,14 +714,26 @@ export default function BrokeragesManager() {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <LinkIcon className="w-5 h-5" />
+                  <Mail className="w-5 h-5" />
                   What happens next?
                 </h3>
-                <ul className="text-sm text-blue-800 space-y-1">
-                  <li>• A unique invitation link will be generated automatically</li>
-                  <li>• Share the link with organisation brokers to sign up</li>
-                  <li>• They'll be automatically assigned to this organisation</li>
-                  <li>• They will be authorised as broker users</li>
+                <ul className="text-sm text-blue-800 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
+                    <span>An activation email will be sent to <strong>{formData.notification_email || 'the contact email'}</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">2.</span>
+                    <span>The broker clicks the link in the email to set their password</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">3.</span>
+                    <span>They log in at <strong>{formData.slug ? `${formData.slug}.claimsportal.co.za` : 'their subdomain'}</strong></span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">4.</span>
+                    <span>They can immediately start adding clients and managing claims</span>
+                  </li>
                 </ul>
               </div>
 
@@ -710,7 +742,7 @@ export default function BrokeragesManager() {
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    setFormData({ name: '', slug: '', notification_email: '' });
+                    setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
                     setFormError('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
