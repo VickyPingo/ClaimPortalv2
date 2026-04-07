@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Loader2, User, Phone, Mail, FileText, Calendar, MapPin, Car, Droplet, Shield, Home, Briefcase, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, Loader2, User, Phone, Mail, FileText, Calendar, MapPin, Car, Droplet, Shield, Home, Briefcase, CreditCard as Edit2, Save, X } from 'lucide-react';
 
 interface Claim {
   id: string;
@@ -54,7 +54,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
       const { data: clientData, error: clientError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', clientId)
+        .eq('user_id', clientId)
         .maybeSingle();
 
       if (clientError) throw clientError;
@@ -120,7 +120,7 @@ export default function ClientFolder({ clientId, onBack, onViewClaim }: ClientFo
           policy_number: editForm.policy_number || null,
           broker_notes: editForm.broker_notes,
         })
-        .eq('id', clientId);
+        .eq('user_id', clientId);
 
       if (error) throw error;
 
