@@ -5,9 +5,6 @@ import { useBrokerage } from './BrokerageContext';
 import { SUPER_ADMINS, isSuperAdmin } from '../config/roles';
 import { isIndependiSubdomain, getBrokerageSlug, getSubdomain } from '../utils/subdomain';
 
-// BROKERAGE ID FOR CLAIMS.INDEPENDI.CO.ZA
-const INDEPENDI_BROKERAGE_ID = '8f73aeb8-9660-41c6-bdcc-0d03c5b1e923';
-
 export interface BrokerProfile {
   id: string;
   full_name: string;
@@ -688,7 +685,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('✅ Auth user created:', authData.user.id);
 
     // MANUAL PROFILE CREATION
-    const brokerageId = profile.brokerage_id || INDEPENDI_BROKERAGE_ID;
+    const brokerageId = profile.brokerage_id;
+    if (!brokerageId) throw new Error('No brokerage found for this account.');
 
     // Insert into profiles
     const { error: profileError } = await supabase
