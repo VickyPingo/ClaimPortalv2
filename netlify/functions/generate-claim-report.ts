@@ -42,6 +42,7 @@ function generateTextPDF(claim: any, profile: any): string {
   lines.push(`Name: ${profile?.full_name || claim.claimant_name || 'N/A'}`);
   lines.push(`Email: ${profile?.email || claim.claimant_email || 'N/A'}`);
   lines.push(`Phone: ${profile?.cell_number || claim.claimant_phone || 'N/A'}`);
+  lines.push(`Policy Number: ${profile?.policy_number || claim.policy_number || 'N/A'}`);
   lines.push('');
 
   if (claim.location || claim.location_address) {
@@ -142,11 +143,12 @@ export const handler: Handler = async (event) => {
     }
 
     let profile = null;
-    if (claim.user_id) {
+    const lookupId = claim.client_id || claim.user_id;
+    if (lookupId) {
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('full_name, email, cell_number')
-        .eq('user_id', claim.user_id)
+        .select('full_name, email, cell_number, policy_number')
+        .eq('user_id', lookupId)
         .maybeSingle();
 
       profile = profileData;

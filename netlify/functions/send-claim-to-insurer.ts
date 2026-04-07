@@ -1,5 +1,11 @@
 import type { Handler } from '@netlify/functions';
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -16,6 +22,32 @@ export const handler: Handler = async (event) => {
     }
 
     const emailAttachments: { filename: string; content: string }[] = [];
+
+    // Generate and attach the claim report
+    try {
+      const reportResponse = await fetch(
+        `${process.env.URL}/.netlify/functions/generate-claim-report`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ claimId }),
+        }
+      );
+
+      if (reportResponse.ok) {
+        const reportText = await reportResponse.text();
+        const reportBase64 = Buffer.from(reportText).toString('base64');
+        emailAttachments.push({
+          filename: `claim-report-${claimId.substring(0, 8)}.txt`,
+          content: reportBase64,
+        });
+        console.log('✅ Claim report attached');
+      } else {
+        console.warn('⚠️ Could not generate claim report:', reportResponse.status);
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to attach claim report:', err);
+    }
 
     for (const att of attachments) {
       if (att.kind === 'voice_note' || att.kind === 'leak_video') continue;
