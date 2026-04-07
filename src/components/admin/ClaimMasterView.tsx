@@ -78,6 +78,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   const [editingTranscript, setEditingTranscript] = useState(false);
   const [transcriptDraft, setTranscriptDraft] = useState('');
   const [savingTranscript, setSavingTranscript] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     loadClaim();
@@ -359,6 +360,24 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     }
   };
 
+  const handleStatusChange = async (newStatus: string) => {
+    if (!claim) return;
+    setUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('claims')
+        .update({ status: newStatus })
+        .eq('id', claim.id);
+
+      if (error) throw error;
+      setClaim({ ...claim, status: newStatus });
+    } catch (err: any) {
+      alert('Failed to update status: ' + err.message);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const renderField = (label: string, value: any) => {
     if (value === null || value === undefined || value === '') return null;
     return (
@@ -445,7 +464,43 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             <h2 className="text-xl font-bold text-gray-900 mb-6">Claim Information</h2>
 
             {renderField('Incident Type', claim.incident_type?.replace('_', ' ').toUpperCase())}
-            {renderField('Status', claim.status?.toUpperCase())}
+
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-600 mb-2">Status</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: 'new', label: 'New', color: 'bg-red-100 text-red-700 border-red-300' },
+                  { value: 'awaiting_info', label: 'Awaiting Info', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+                  { value: 'investigating', label: 'Investigating', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+                  { value: 'submitted', label: 'Submitted to Insurer', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+                  { value: 'pending', label: 'Pending', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+                  { value: 'approved', label: 'Approved', color: 'bg-green-100 text-green-700 border-green-300' },
+                  { value: 'rejected', label: 'Rejected', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+                  { value: 'paid', label: 'Paid', color: 'bg-green-200 text-green-800 border-green-400' },
+                  { value: 'closed', label: 'Closed', color: 'bg-gray-200 text-gray-800 border-gray-400' },
+                ].map(({ value, label, color }) => (
+                  <button
+                    key={value}
+                    onClick={() => handleStatusChange(value)}
+                    disabled={updatingStatus || claim.status === value}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      claim.status === value
+                        ? `${color} ring-2 ring-offset-1 ring-current scale-105`
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+                    } disabled:opacity-50`}
+                  >
+                    {updatingStatus && claim.status !== value ? label : label}
+                    {claim.status === value && ' ✓'}
+                  </button>
+                ))}
+              </div>
+              {updatingStatus && (
+                <p className="text-xs text-blue-600 mt-2 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Updating status...
+                </p>
+              )}
+            </div>
+
             {renderField('Submitted', new Date(claim.created_at).toLocaleString())}
             {renderField('Claimant Name', claim.client_name)}
             {renderField('Claimant Phone', claim.claimant_phone)}

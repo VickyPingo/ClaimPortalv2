@@ -155,11 +155,14 @@ export default function AdminDashboard({ onViewClaim, onViewClient }: AdminDashb
       motor_accident: 'Motor Accident',
       burst_geyser: 'Burst Geyser',
       theft_claim: 'Theft Claim',
+      theft: 'Theft',
       motor_vehicle_theft: 'Motor Vehicle Theft',
+      vehicle_theft: 'Vehicle Theft',
       structural_damage: 'Structural Damage',
       all_risk: 'All-Risk',
+      all_risk_item: 'All-Risk Item',
     };
-    return labels[type] || type;
+    return labels[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const getDisplayLocation = (claim: Claim): string => {
