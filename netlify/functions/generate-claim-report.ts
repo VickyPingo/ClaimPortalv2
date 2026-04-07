@@ -142,12 +142,72 @@ async function generatePDF(claimId: string): Promise<Buffer | null> {
       addSection('CLAIM DETAILS');
       const data = typeof claim.claim_data === 'string'
         ? JSON.parse(claim.claim_data) : claim.claim_data;
+
+      // Keys to skip entirely in PDF
+      const skipKeys = [
+        'voice_transcript', 'voice_transcript_updated_at',
+        'location_lat', 'location_lng', 'last_known_location_lat',
+        'last_known_location_lng', 'incident_lat', 'incident_lng',
+        'media_count',
+      ];
+
+      // Format values nicely
+      const formatPDFValue = (key: string, value: any): string | null => {
+        if (value === null || value === undefined || value === '') return null;
+        if (value === true || value === 'true') return 'Yes';
+        if (value === false || value === 'false') return 'No';
+
+        // Format date strings
+        if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/)) {
+          try {
+            return new Date(value).toLocaleString('en-ZA', {
+              year: 'numeric', month: 'long', day: 'numeric',
+              hour: '2-digit', minute: '2-digit',
+            });
+          } catch { return value; }
+        }
+
+        // Format currency fields
+        if (key.includes('value') || key.includes('cost') || key.includes('amount')) {
+          const num = parseFloat(value);
+          if (!isNaN(num)) return `R ${num.toLocaleString()}`;
+        }
+
+        // Format arrays (stolen_items, items)
+        if (Array.isArray(value)) return null; // handled separately below
+
+        // Format objects
+        if (typeof value === 'object') return JSON.stringify(value);
+
+        return String(value);
+      };
+
       Object.entries(data).forEach(([key, value]) => {
-        if (key === 'voice_transcript' || key === 'voice_transcript_updated_at') return;
-        if (value === null || value === undefined || value === '') return;
+        if (skipKeys.includes(key)) return;
+
+        // Handle stolen_items and items arrays specially
+        if ((key === 'stolen_items' || key === 'items') && Array.isArray(value)) {
+          addText(`Stolen / Claimed Items:`, true);
+          value.forEach((item: any, idx: number) => {
+            y -= 4;
+            addText(`  Item ${idx + 1}: ${item.description || 'N/A'}`, true, 9);
+            if (item.makeModel) addText(`    Make/Model: ${item.makeModel}`, false, 9);
+            if (item.category) addText(`    Category: ${item.category}`, false, 9);
+            if (item.serialNumber || item.serialImei) addText(`    Serial: ${item.serialNumber || item.serialImei}`, false, 9);
+            if (item.replacementValue) addText(`    Replacement Value: R ${Number(item.replacementValue).toLocaleString()}`, false, 9);
+            if (item.proofType) addText(`    Proof Type: ${item.proofType.replace(/_/g, ' ')}`, false, 9);
+            if (item.onPolicy) addText(`    On Policy: ${item.onPolicy === 'yes' ? 'Yes' : item.onPolicy === 'no' ? 'No' : 'Unsure'}`, false, 9);
+            if (item.isRepairable !== undefined && item.isRepairable !== null) addText(`    Repairable: ${item.isRepairable ? 'Yes' : 'No'}`, false, 9);
+          });
+          y -= 4;
+          return;
+        }
+
+        const formattedValue = formatPDFValue(key, value);
+        if (formattedValue === null) return;
+
         const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const val = typeof value === 'object' ? JSON.stringify(value).substring(0, 80) : String(value);
-        addRow(label, val);
+        addRow(label, formattedValue);
       });
     }
 
