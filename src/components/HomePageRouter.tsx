@@ -199,11 +199,10 @@ export default function HomePageRouter() {
     return <SetPassword />;
   }
 
-  // STEP 1.7: CRITICAL - Wait for auth and profile to load before routing
-  // This prevents redirect loops by ensuring userRole and userType are set
-  // Also prevents flash to /broker-dashboard before userRole is determined
-  if (loading || !userRole) {
-    console.log('⏳ Auth/profile still loading - showing loading screen', { loading, userRole });
+  // STEP 1.7: CRITICAL - Wait for auth to load before routing
+  // If not loading and no userRole, user is not logged in - show login page
+  if (loading) {
+    console.log('⏳ Auth still loading - showing loading screen', { loading });
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
@@ -213,6 +212,12 @@ export default function HomePageRouter() {
         </div>
       </div>
     );
+  }
+
+  // If not loading and no user/role - show login
+  if (!user && !userRole) {
+    console.log('🔓 Not loading, no user - showing login page');
+    return <Login roleType={null} />;
   }
 
   // STEP 2: Check if client is trying to access broker/admin routes
