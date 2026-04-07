@@ -17,7 +17,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 
-type Step = 1 | 2 | 3 | 4 | 5 | 'success';
+type Step = 1 | 2 | 3 | 4 | 'success';
 type IncidentType = 'stolen' | 'accidentally_damaged' | 'lost_missing' | null;
 
 interface ClaimItem {
@@ -31,6 +31,9 @@ interface ClaimItem {
   deviceBlacklisted?: boolean;
   findMyDeviceLocked?: boolean;
   hasValuationCert?: boolean;
+  isRepairable: boolean | null;
+  quoteFile?: File | null;
+  quoteFileName?: string;
 }
 
 interface AllRiskFormProps {
@@ -79,11 +82,6 @@ export default function AllRiskForm({
 
   const [items, setItems] = useState<ClaimItem[]>([]);
   const [newItem, setNewItem] = useState<Partial<ClaimItem>>({});
-
-  const [isRepairable, setIsRepairable] = useState<boolean | null>(null);
-  const [damageReportFile, setDamageReportFile] = useState<File | null>(null);
-  const [repairQuoteFile, setRepairQuoteFile] = useState<File | null>(null);
-  const [replacementQuoteFile, setReplacementQuoteFile] = useState<File | null>(null);
 
   const [proofOfOwnershipFiles, setProofOfOwnershipFiles] = useState<File[]>([]);
   const [policeReportFile, setPoliceReportFile] = useState<File | null>(null);
@@ -170,6 +168,16 @@ export default function AllRiskForm({
       return;
     }
 
+    if (newItem.isRepairable === null || newItem.isRepairable === undefined) {
+      alert('Please indicate if the item is repairable');
+      return;
+    }
+
+    if (!newItem.quoteFile) {
+      alert(`Please upload a ${newItem.isRepairable ? 'repair' : 'replacement'} quote`);
+      return;
+    }
+
     const isPhoneOrTablet = ['Mobile Phone', 'Tablet'].includes(newItem.category as string);
     const isJewelryOrWatch = ['Jewelry', 'Watch'].includes(newItem.category as string);
 
@@ -197,6 +205,9 @@ export default function AllRiskForm({
       deviceBlacklisted: newItem.deviceBlacklisted,
       findMyDeviceLocked: newItem.findMyDeviceLocked,
       hasValuationCert: newItem.hasValuationCert,
+      isRepairable: newItem.isRepairable ?? null,
+      quoteFile: newItem.quoteFile || null,
+      quoteFileName: newItem.quoteFileName || '',
     };
 
     setItems([...items, item]);
@@ -309,33 +320,6 @@ export default function AllRiskForm({
         );
       }
 
-      let damageReportUrl = null;
-      if (damageReportFile) {
-        damageReportUrl = await uploadFile(
-          damageReportFile,
-          'claims',
-          `${tempId}/${timestamp}/damage_report.pdf`
-        );
-      }
-
-      let repairQuoteUrl = null;
-      if (repairQuoteFile) {
-        repairQuoteUrl = await uploadFile(
-          repairQuoteFile,
-          'claims',
-          `${tempId}/${timestamp}/repair_quote.pdf`
-        );
-      }
-
-      let replacementQuoteUrl = null;
-      if (replacementQuoteFile) {
-        replacementQuoteUrl = await uploadFile(
-          replacementQuoteFile,
-          'claims',
-          `${tempId}/${timestamp}/replacement_quote.pdf`
-        );
-      }
-
       let policeReportUrl = null;
       if (policeReportFile) {
         policeReportUrl = await uploadFile(
@@ -369,16 +353,23 @@ export default function AllRiskForm({
         attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/proof_${i + 1}.jpg`, url, kind: 'proof_of_ownership', label: `Proof of Ownership ${i + 1}` });
       });
 
-      if (damageReportUrl) {
-        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_report.pdf`, url: damageReportUrl, kind: 'damage_report', label: 'Damage Report' });
-      }
-
-      if (repairQuoteUrl) {
-        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/repair_quote.pdf`, url: repairQuoteUrl, kind: 'repair_quote', label: 'Repair Quote' });
-      }
-
-      if (replacementQuoteUrl) {
-        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/replacement_quote.pdf`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
+      // Upload per-item quotes
+      for (const item of items) {
+        if (item.quoteFile) {
+          const quoteKind = item.isRepairable ? 'repair_quote' : 'replacement_quote';
+          const quoteLabel = item.isRepairable
+            ? `Repair Quote — ${item.description}`
+            : `Replacement Quote — ${item.description}`;
+          const quotePath = `${tempId}/${timestamp}/quote_${item.id}.pdf`;
+          const quoteUrl = await uploadFile(item.quoteFile, 'claims', quotePath);
+          attachments.push({
+            bucket: 'claims',
+            path: quotePath,
+            url: quoteUrl,
+            kind: quoteKind,
+            label: quoteLabel,
+          });
+        }
       }
 
       if (policeReportUrl) {
@@ -399,7 +390,6 @@ export default function AllRiskForm({
         damage_description_transcript: damageDescriptionTranscript,
         last_known_location: lastKnownLocation || null,
         items: items,
-        is_repairable: isRepairable,
         voice_transcript: voiceTranscript,
       };
 
@@ -452,7 +442,7 @@ export default function AllRiskForm({
 
         <div className="mb-8">
           <div className="flex items-center justify-between">
-            {[1, 2, 3, 4, 5].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex-1 flex items-center">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
@@ -463,7 +453,7 @@ export default function AllRiskForm({
                 >
                   {s}
                 </div>
-                {s < 5 && (
+                {s < 4 && (
                   <div
                     className={`flex-1 h-1 mx-1 ${
                       step > s ? 'bg-blue-700' : 'bg-gray-200'
@@ -687,6 +677,9 @@ export default function AllRiskForm({
                             {item.onPolicy === 'no' && 'Not on policy'}
                             {item.onPolicy === 'unsure' && 'Not sure if on policy'}
                           </p>
+                          <p className="text-xs text-gray-500">
+                            {item.isRepairable ? '🔧 Repairable — repair quote attached' : '🔄 Replacement needed — quote attached'}
+                          </p>
                         </div>
                         <button
                           onClick={() => removeItem(item.id)}
@@ -905,6 +898,63 @@ export default function AllRiskForm({
                     </div>
                   )}
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Is this item repairable? *
+                    </label>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, isRepairable: true })}
+                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${
+                          newItem.isRepairable === true
+                            ? 'border-blue-700 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        Yes, it can be repaired
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewItem({ ...newItem, isRepairable: false })}
+                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${
+                          newItem.isRepairable === false
+                            ? 'border-blue-700 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        No, replacement needed
+                      </button>
+                    </div>
+                  </div>
+
+                  {newItem.isRepairable !== null && newItem.isRepairable !== undefined && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {newItem.isRepairable ? 'Repair Quote (PDF) *' : 'Replacement Quote (PDF) *'}
+                      </label>
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                        <input
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => setNewItem({
+                            ...newItem,
+                            quoteFile: e.target.files?.[0] || null,
+                            quoteFileName: e.target.files?.[0]?.name || ''
+                          })}
+                          className="hidden"
+                          id={`quote-${newItem.category}`}
+                        />
+                        <label htmlFor={`quote-${newItem.category}`} className="cursor-pointer">
+                          <Camera className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+                          <p className="text-sm text-gray-600">
+                            {newItem.quoteFileName || `Tap to upload ${newItem.isRepairable ? 'repair' : 'replacement'} quote`}
+                          </p>
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={addItem}
                     disabled={!newItem.category || !newItem.description || !newItem.replacementValue || newItem.onPolicy === null}
@@ -927,124 +977,6 @@ export default function AllRiskForm({
           )}
 
           {step === 3 && (
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Damage Assessment
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Tell us about the condition of the item
-              </p>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Is the item repairable? *
-                  </label>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setIsRepairable(true)}
-                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                        isRepairable === true
-                          ? 'border-blue-700 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-gray-900">Yes, it can be repaired</p>
-                    </button>
-                    <button
-                      onClick={() => setIsRepairable(false)}
-                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                        isRepairable === false
-                          ? 'border-blue-700 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-gray-900">No, replacement needed</p>
-                    </button>
-                  </div>
-                </div>
-
-                {isRepairable === true && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Damage Report (PDF) *
-                      </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <input
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => setDamageReportFile(e.target.files?.[0] || null)}
-                          className="hidden"
-                          id="damage-report"
-                        />
-                        <label htmlFor="damage-report" className="cursor-pointer">
-                          <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">
-                            {damageReportFile ? damageReportFile.name : 'Tap to upload damage report'}
-                          </p>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Repair Quote (PDF) *
-                      </label>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                        <input
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => setRepairQuoteFile(e.target.files?.[0] || null)}
-                          className="hidden"
-                          id="repair-quote"
-                        />
-                        <label htmlFor="repair-quote" className="cursor-pointer">
-                          <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">
-                            {repairQuoteFile ? repairQuoteFile.name : 'Tap to upload repair quote'}
-                          </p>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {isRepairable === false && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Replacement Quote (PDF) *
-                    </label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setReplacementQuoteFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="replacement-quote"
-                      />
-                      <label htmlFor="replacement-quote" className="cursor-pointer">
-                        <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          {replacementQuoteFile ? replacementQuoteFile.name : 'Tap to upload replacement quote'}
-                        </p>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setStep(4)}
-                  disabled={isRepairable === null || (isRepairable === true && (!damageReportFile || !repairQuoteFile)) || (isRepairable === false && !replacementQuoteFile)}
-                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">
                 Supporting Documents
@@ -1128,7 +1060,7 @@ export default function AllRiskForm({
                 )}
 
                 <button
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(4)}
                   disabled={proofOfOwnershipFiles.length === 0 || (incidentType === 'stolen' && !policeReportFile)}
                   className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
@@ -1138,7 +1070,7 @@ export default function AllRiskForm({
             </div>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">
                 Submission Details
