@@ -142,9 +142,7 @@ export default function BurstGeyserForm({
       console.log('[GeyserClaim] Starting submission');
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
+      if (!user) throw new Error('User not authenticated');
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -152,7 +150,53 @@ export default function BurstGeyserForm({
         .eq('user_id', user.id)
         .maybeSingle();
 
-      console.log('[GeyserClaim] User profile:', profile);
+      const timestamp = Date.now();
+      const uploadDir = `${user.id}/${timestamp}`;
+
+      const uploadFile = async (file: File, path: string): Promise<string> => {
+        const { data, error } = await supabase.storage
+          .from('claims')
+          .upload(path, file);
+        if (error) throw error;
+        const { data: urlData } = supabase.storage
+          .from('claims')
+          .getPublicUrl(data.path);
+        return urlData.publicUrl;
+      };
+
+      const attachments: Array<{
+        bucket: string;
+        path: string;
+        url: string;
+        kind: string;
+        label: string;
+      }> = [];
+
+      for (let i = 0; i < damagePhotos.length; i++) {
+        const path = `${uploadDir}/damage_photo_${i + 1}.jpg`;
+        const url = await uploadFile(damagePhotos[i], path);
+        attachments.push({ bucket: 'claims', path, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` });
+      }
+
+      if (audioBlob) {
+        const path = `${uploadDir}/voice_note.webm`;
+        const file = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
+        const url = await uploadFile(file, path);
+        attachments.push({ bucket: 'claims', path, url, kind: 'voice_note', label: 'Voice Description' });
+      }
+
+      if (extraAudioBlob) {
+        const path = `${uploadDir}/extra_voice_note.webm`;
+        const file = new File([extraAudioBlob], 'extra_voice_note.webm', { type: 'audio/webm' });
+        const url = await uploadFile(file, path);
+        attachments.push({ bucket: 'claims', path, url, kind: 'extra_voice_note', label: 'Additional Voice Note' });
+      }
+
+      if (repairQuote) {
+        const path = `${uploadDir}/repair_quote.pdf`;
+        const url = await uploadFile(repairQuote, path);
+        attachments.push({ bucket: 'claims', path, url, kind: 'repair_quote', label: 'Repair Quote' });
+      }
 
       const claimData = {
         burst_datetime: `${burstDate}T${burstTime}`,
@@ -164,57 +208,12 @@ export default function BurstGeyserForm({
         estimated_repair_cost: estimatedRepairCost ? parseFloat(estimatedRepairCost) : null,
       };
 
-      const attachments: Array<{ file: File; kind: string; label: string }> = [];
-
-      damagePhotos.forEach((photo, i) => {
-        attachments.push({
-          file: photo,
-          kind: 'damage_photo',
-          label: `Damage Photo ${i + 1}`,
-        });
-      });
-
-      if (audioBlob) {
-        const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
-        attachments.push({
-          file: audioFile,
-          kind: 'voice_note',
-          label: 'Voice Description',
-        });
-      }
-
-      if (extraAudioBlob) {
-        const extraAudioFile = new File([extraAudioBlob], 'extra_voice_note.webm', { type: 'audio/webm' });
-        attachments.push({
-          file: extraAudioFile,
-          kind: 'extra_voice_note',
-          label: 'Additional Voice Note',
-        });
-      }
-
-      if (repairQuote) {
-        attachments.push({
-          file: repairQuote,
-          kind: 'repair_quote',
-          label: 'Repair Quote',
-        });
-      }
-
       console.log('[GeyserClaim] Submitting with', attachments.length, 'attachments');
 
       await submitClaimUnified({
         claimType: 'burst_geyser',
-        incidentType: 'burst_geyser',
         claimData,
         attachments,
-        location: location ? { lat: location.lat, lng: location.lng, address: locationAddress } : null,
-        claimantInfo: {
-          name: profile?.full_name || '',
-          email: profile?.email || user.email || '',
-          phone: profile?.cell_number || '',
-        },
-        clientId: user.id,
-        brokerageId,
       });
 
       console.log('[GeyserClaim] Submission successful');
