@@ -65,7 +65,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
         <div className="flex items-center justify-between px-4 py-3">
           <div>
             <h1 className="text-lg font-bold text-gray-900">
-              {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+              {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
             </h1>
             <p className="text-xs text-gray-600">
               {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
@@ -93,7 +93,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-screen">
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-xl font-bold text-gray-900">
-              {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+              {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
@@ -142,7 +142,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-gray-900">
-                {isActualSuperAdmin ? 'Super Admin' : 'Broker Admin'}
+                {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
