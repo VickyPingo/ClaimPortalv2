@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2, Plus, Edit, Trash2, Search, Globe, Mail, Copy, Check, Link as LinkIcon, X } from 'lucide-react';
+import { Building2, Plus, CreditCard as Edit, Trash2, Search, Globe, Mail, Copy, Check, Link as LinkIcon, X } from 'lucide-react';
 
 interface Brokerage {
   id: string;
@@ -183,6 +183,36 @@ export default function BrokeragesManager() {
       if (inviteError) {
         console.error('Failed to create invitation:', inviteError);
         throw inviteError;
+      }
+
+      // Send activation email to the broker
+      if (newInvitation && formData.notification_email) {
+        try {
+          console.log('📧 Sending activation email to:', formData.notification_email);
+
+          const emailResponse = await fetch('/.netlify/functions/send-invite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: formData.notification_email.trim(),
+              role: 'broker',
+              brokerageId: newBrokerage.id,
+            }),
+          });
+
+          const emailResult = await emailResponse.json();
+
+          if (!emailResponse.ok) {
+            console.error('❌ Failed to send activation email:', emailResult);
+            // Don't block brokerage creation — just warn
+            alert(`Brokerage created successfully, but the activation email failed to send. Please invite the broker manually.\n\nError: ${emailResult.error}`);
+          } else {
+            console.log('✅ Activation email sent to:', formData.notification_email);
+          }
+        } catch (emailErr: any) {
+          console.error('❌ Activation email error:', emailErr);
+          // Don't block brokerage creation
+        }
       }
 
       await fetchBrokerages();
