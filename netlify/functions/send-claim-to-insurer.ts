@@ -35,10 +35,10 @@ export const handler: Handler = async (event) => {
       );
 
       if (reportResponse.ok) {
-        const reportText = await reportResponse.text();
-        const reportBase64 = Buffer.from(reportText).toString('base64');
+        const reportBuffer = await reportResponse.arrayBuffer();
+        const reportBase64 = Buffer.from(reportBuffer).toString('base64');
         emailAttachments.push({
-          filename: `claim-report-${claimId.substring(0, 8)}.txt`,
+          filename: `claim-report-${claimId.substring(0, 8)}.pdf`,
           content: reportBase64,
         });
         console.log('✅ Claim report attached');
