@@ -426,7 +426,7 @@ export default function ClientPortal() {
         };
 
         await submitClaimUnified({
-          claimType: 'motor_accident',
+          claimType: 'burst_geyser',
           claimData: completeClaimData,
           attachments: attachments,
         });
