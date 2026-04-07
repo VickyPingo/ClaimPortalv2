@@ -57,7 +57,6 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
           console.log('⚠️ Brokerage lookup failed, treating as platform domain');
           setIsPlatformDomain(true);
           setError(null);
-          setLoading(false);
           return;
         }
 
@@ -66,7 +65,6 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
         if (result.isPlatform) {
           console.log('✓ Platform domain detected - skipping brokerage lookup');
           setIsPlatformDomain(true);
-          setLoading(false);
           return;
         }
 
