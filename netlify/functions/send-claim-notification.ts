@@ -33,19 +33,24 @@ export const handler: Handler = async (event) => {
 
   try {
     const { type, claimId, requestId, fileUpload } = JSON.parse(event.body || '{}');
+    console.log('📨 Notification received:', { type, claimId, requestId, fileUpload });
 
     // ─── CLAIM NOTIFICATION ───────────────────────────────────────────
     if (type === 'claim' || claimId) {
+      console.log('🔍 Fetching claim:', claimId);
       const { data: claim } = await supabase
         .from('claims')
         .select('*, brokerages(name, notification_email)')
         .eq('id', claimId)
         .maybeSingle();
 
+      console.log('📋 Claim data:', claim?.id, 'brokerage:', claim?.brokerages);
+
       if (!claim) return { statusCode: 404, body: JSON.stringify({ error: 'Claim not found' }) };
 
       const brokerageName = claim.brokerages?.name || 'Your Brokerage';
       const notificationEmail = claim.brokerages?.notification_email;
+      console.log('📧 Notification email:', notificationEmail);
       if (!notificationEmail) return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
 
       const incidentLabel = (claim.incident_type || 'Unknown')
@@ -55,6 +60,7 @@ export const handler: Handler = async (event) => {
       });
       const claimRef = claimId.substring(0, 8).toUpperCase();
 
+      console.log('📤 Sending email to:', notificationEmail);
       await resend.emails.send({
         from: 'Claims Portal <onboarding@resend.dev>',
         to: [notificationEmail],
@@ -69,6 +75,7 @@ export const handler: Handler = async (event) => {
           { label: 'Status', value: 'NEW', badge: true },
         ], 'View Claim in Dashboard'),
       });
+      console.log('✅ Email sent successfully');
 
       return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: notificationEmail }) };
     }
