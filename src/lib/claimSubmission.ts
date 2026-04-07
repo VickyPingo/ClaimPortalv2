@@ -91,6 +91,7 @@ export async function submitClaimUnified(params: {
   const payload = {
     incident_type: params.claimType,
     client_id: uid,
+    client_user_id: uid,
     brokerage_id: profile.brokerage_id,
     status: "new",
     claimant_name: finalClaimantName,
