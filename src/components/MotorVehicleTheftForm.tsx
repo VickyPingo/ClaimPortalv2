@@ -13,6 +13,8 @@ import {
   Heart,
   Key,
   FileText,
+  Mic,
+  X,
 } from 'lucide-react';
 
 type Step = 1 | 2 | 3 | 4 | 'success';
@@ -70,6 +72,12 @@ export default function MotorVehicleTheftForm({
   const [driverLicenseBack, setDriverLicenseBack] = useState<File | null>(null);
   const [sapsCaseSlip, setSapsCaseSlip] = useState<File | null>(null);
   const [proofOfPurchase, setProofOfPurchase] = useState<File | null>(null);
+
+  const [voiceBlob, setVoiceBlob] = useState<Blob | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState<any>(null);
 
   const [sapsCaseNumber, setSapsCaseNumber] = useState('');
   const [policeStationName, setPoliceStationName] = useState('');
@@ -140,6 +148,44 @@ export default function MotorVehicleTheftForm({
     if (error) throw error;
     const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
     return urlData.publicUrl;
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setVoiceBlob(blob);
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      const interval = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      setRecordingInterval(interval);
+    } catch (err) {
+      alert('Microphone access denied. Please allow microphone access to record a voice note.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    }
+    setIsRecording(false);
+    clearInterval(recordingInterval);
+  };
+
+  const clearRecording = () => {
+    setVoiceBlob(null);
+    setRecordingSeconds(0);
   };
 
   const validateStep1 = () => {
@@ -250,6 +296,19 @@ export default function MotorVehicleTheftForm({
 
       if (proofOfPurchaseUrl) {
         attachments.push({ bucket: 'claims', path: `${uploadDir}/proof_of_purchase`, url: proofOfPurchaseUrl, kind: 'proof_of_purchase', label: 'Proof of Purchase' });
+      }
+
+      let voiceNoteUrl = null;
+      if (voiceBlob) {
+        const voiceFile = new File([voiceBlob], 'voice_note.webm', { type: 'audio/webm' });
+        voiceNoteUrl = await uploadFile(voiceFile, 'claims', `${uploadDir}/voice_note.webm`);
+        attachments.push({
+          bucket: 'claims',
+          path: `${uploadDir}/voice_note.webm`,
+          url: voiceNoteUrl,
+          kind: 'voice_note',
+          label: 'Voice Statement'
+        });
       }
 
       const claimData = {
@@ -1011,6 +1070,44 @@ export default function MotorVehicleTheftForm({
                   <p className="text-xs text-gray-500 mt-1">
                     Invoice, registration papers, or finance settlement letter
                   </p>
+                </div>
+
+                {/* Optional Voice Note */}
+                <div className="border-t pt-6">
+                  <h3 className="font-semibold text-gray-900 mb-1">Voice Statement (Optional)</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Want to add anything else? Record a short voice note with any additional details about the incident.
+                  </p>
+
+                  {!voiceBlob ? (
+                    <button
+                      type="button"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-lg font-semibold transition ${
+                        isRecording
+                          ? 'bg-red-600 text-white hover:bg-red-700'
+                          : 'bg-blue-50 text-blue-700 border border-blue-300 hover:bg-blue-100'
+                      }`}
+                    >
+                      <Mic className="w-5 h-5" />
+                      {isRecording ? `Stop Recording (${recordingSeconds}s)` : 'Start Recording'}
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-green-800">Voice note recorded ({recordingSeconds}s)</p>
+                          <audio controls className="mt-2 w-full">
+                            <source src={URL.createObjectURL(voiceBlob)} type="audio/webm" />
+                          </audio>
+                        </div>
+                        <button onClick={clearRecording} className="text-gray-400 hover:text-gray-600">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button
