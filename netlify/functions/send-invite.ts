@@ -120,13 +120,11 @@ export const handler: Handler = async (event) => {
         .from("profiles")
         .upsert(
           {
-            id: linkData.user.id,
             user_id: linkData.user.id,
-            organization_id: brokerageId,
+            brokerage_id: brokerageId,
             role: role,
             full_name: placeholderName,
             email: email,
-            id_number: "",
             cell_number: "",
           },
           { onConflict: "user_id" }
