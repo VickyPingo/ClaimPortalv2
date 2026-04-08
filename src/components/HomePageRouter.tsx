@@ -6,19 +6,19 @@ import ClientPortal from './ClientPortal';
 import { SetPassword } from './SetPassword';
 import ForceSession from './ForceSession';
 import { LogOut, AlertCircle, Building2 } from 'lucide-react';
-import { isIndependiSubdomain, isSuperAdminDomain } from '../utils/subdomain';
+import { isIndependiSubdomain, isSuperAdminDomain, isOnBrokerageSubdomain } from '../utils/subdomain';
 
 export default function HomePageRouter() {
   const { user, userType, userRole, loading, needsPasswordSetup, brokerProfile, clientProfile, signOut, isSuperAdmin } = useAuth();
   const [profileWaitTime, setProfileWaitTime] = useState(0);
 
-  const onIndependiSubdomain = isIndependiSubdomain();
   const onSuperAdminDomain = isSuperAdminDomain();
+  const onBrokerageSubdomain = !onSuperAdminDomain && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && window.location.hostname.includes('.claimsportal.co.za');
 
   console.log('🌐 Router state:');
   console.log('  User Type:', userType);
   console.log('  User Role:', userRole);
-  console.log('  On Independi Subdomain:', onIndependiSubdomain);
+  console.log('  On Brokerage Subdomain:', onBrokerageSubdomain);
   console.log('  On Super Admin Domain:', onSuperAdminDomain);
   console.log('  Broker Profile:', brokerProfile);
   console.log('  Client Profile:', clientProfile);
@@ -79,11 +79,11 @@ export default function HomePageRouter() {
       return;
     }
 
-    // CRITICAL: On Independi subdomain (claims.independi.co.za), FORCE broker dashboard
+    // CRITICAL: On brokerage subdomain, FORCE broker dashboard
     // EXCEPT for vickypingo@gmail.com who always has full super admin access
     // EXCEPT for clients who should go to claims portal
-    if (onIndependiSubdomain && !isSuperAdminEmail && userRole !== 'client' && userType !== 'client') {
-      console.log('🔒 INDEPENDI SUBDOMAIN - FORCING BROKER ACCESS ONLY');
+    if (onBrokerageSubdomain && !isSuperAdminEmail && userRole !== 'client' && userType !== 'client') {
+      console.log('🔒 BROKERAGE SUBDOMAIN - FORCING BROKER ACCESS ONLY');
 
       if (currentPath !== '/broker-dashboard' && currentPath !== '/') {
         console.log('  Redirecting to broker dashboard');
@@ -138,7 +138,7 @@ export default function HomePageRouter() {
       console.log(`🔀 Redirecting from home to ${targetPath}`);
       window.history.replaceState(null, '', targetPath);
     }
-  }, [user, userType, userRole, currentPath, isSuperAdmin, onIndependiSubdomain, onSuperAdminDomain, loading]);
+  }, [user, userType, userRole, currentPath, isSuperAdmin, onBrokerageSubdomain, onSuperAdminDomain, loading]);
 
   // Profile wait timeout - show welcome page after 3 seconds if no profile
   useEffect(() => {
@@ -240,14 +240,10 @@ export default function HomePageRouter() {
 
   // STEP 3: ADMIN OVERRIDE - Already handled in STEP 1.5 (moved up for priority)
 
-  // STEP 4: SUBDOMAIN ENFORCEMENT - Independi subdomain ONLY shows broker dashboard (for non-super-admins)
-  // CRITICAL: Clients should go to claims portal even on Independi subdomain
-  if (onIndependiSubdomain) {
-    // If user is a client, redirect to claims portal
+  // STEP 4: SUBDOMAIN ENFORCEMENT - Brokerage subdomain routing
+  if (onBrokerageSubdomain) {
+    // Clients → ClientPortal
     if (userType === 'client' || userRole === 'client') {
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('🏢 INDEPENDI SUBDOMAIN - CLIENT REDIRECTING TO PORTAL');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       return (
         <>
           <EmergencyLogoutButton />
@@ -256,16 +252,21 @@ export default function HomePageRouter() {
       );
     }
 
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🏢 INDEPENDI SUBDOMAIN - BROKER ONLY ACCESS');
-    console.log('✅ FORCING BROKER DASHBOARD VIEW');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return (
-      <>
-        <EmergencyLogoutButton />
-        <BrokerAdminDashboard />
-      </>
-    );
+    // Brokers/admins → BrokerAdminDashboard
+    if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'super_admin' || userType === 'broker') {
+      return (
+        <>
+          <EmergencyLogoutButton />
+          <BrokerAdminDashboard />
+        </>
+      );
+    }
+
+    // No role yet — new visitor or profile still loading
+    // Default to client login on any brokerage subdomain
+    if (!userRole && !userType) {
+      return <Login roleType="client" />;
+    }
   }
 
   // STEP 5: SUPER ADMIN ROUTING (only on super admin domain)

@@ -52,6 +52,14 @@ export function isSuperAdminDomain(): boolean {
          hostname.includes('bolt.new');
 }
 
+export const isOnBrokerageSubdomain = (): boolean => {
+  const hostname = window.location.hostname;
+  return hostname !== 'claimsportal.co.za' &&
+         hostname !== 'localhost' &&
+         hostname !== '127.0.0.1' &&
+         hostname.endsWith('.claimsportal.co.za');
+};
+
 export function getOrganisationIdFromSubdomain(): string | null {
   // Map subdomains to organisation IDs
   const subdomain = getSubdomain();
