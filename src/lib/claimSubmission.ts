@@ -45,7 +45,7 @@ export async function submitClaimUnified(params: {
   const rawName = params.claimantName ??
     params.claimData?.claimantName ??
     params.claimData?.name ??
-    profile.full_name ??
+    (profile.full_name && profile.full_name.trim() !== '' ? profile.full_name : null) ??
     user.user_metadata?.full_name ??
     null;
 
@@ -56,7 +56,7 @@ export async function submitClaimUnified(params: {
   };
 
   // Always provide a valid display name - NEVER null or email
-  const finalClaimantName = (rawName && !isEmailLike(rawName)) ? rawName : 'Client';
+  const finalClaimantName = (rawName && !isEmailLike(rawName)) ? rawName : 'Unknown';
 
   const finalClaimantEmail = params.claimantEmail ??
     params.claimData?.claimantEmail ??
