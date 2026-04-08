@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { Mail, Lock, AlertCircle, Loader, User, Phone, CreditCard } from 'lucide-react';
 import { clearSupabaseSession, shouldResetSession } from '../utils/sessionClear';
+import { isIndependiSubdomain, isOnBrokerageSubdomain } from '../utils/subdomain';
+import ClientAuth from './ClientAuth';
 
 // BROKERAGE ID FOR INDEPENDI
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
@@ -86,6 +88,11 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
       }, 2000);
     }
   };
+
+  // On any brokerage subdomain - always show ClientAuth
+  if (showSignup && (isOnBrokerageSubdomain() || isIndependiSubdomain())) {
+    return <ClientAuth onBackToRole={() => setShowSignup(false)} />;
+  }
 
   if (showSignup) {
     return <Signup onBackToLogin={() => setShowSignup(false)} />;
