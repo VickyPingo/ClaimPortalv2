@@ -56,8 +56,9 @@ export const handler: Handler = async (event) => {
       const incidentLabel = (claim.incident_type || 'Unknown')
         .replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
       const submittedDate = new Date(claim.created_at).toLocaleString('en-ZA', {
-        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      });
+  year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Africa/Johannesburg',
+});
       const claimRef = claimId.substring(0, 8).toUpperCase();
 
       console.log('📤 Sending email to:', notificationEmail);
