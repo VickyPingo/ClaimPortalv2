@@ -869,7 +869,7 @@ const clientSignUp = async (
 
   const { error: profileError } = await supabase
     .from('profiles')
-    .insert({
+    .upsert({
       user_id: authData.user.id,
       brokerage_id: brokerageId,
       full_name: profile.full_name,
@@ -877,7 +877,7 @@ const clientSignUp = async (
       cell_number: profile.cell_number || '',
       role: 'client',
       is_active: true,
-    });
+    }, { onConflict: 'user_id' });
 
   if (profileError) {
     console.error('❌ Failed to create client profile:', profileError);
