@@ -62,7 +62,7 @@ export const handler: Handler = async (event) => {
 
       console.log('📤 Sending email to:', notificationEmail);
       await resend.emails.send({
-        from: 'Claims Portal <onboarding@resend.dev>',
+        from: 'Claims Portal <noreply@claimsportal.co.za>',
         to: [notificationEmail],
         subject: `🆕 New Claim — ${incidentLabel} | Ref: ${claimRef}`,
         html: buildEmail(brokerageName, '🆕 New Claim Submitted', '#1d4ed8', [
@@ -99,7 +99,7 @@ export const handler: Handler = async (event) => {
       });
 
       await resend.emails.send({
-        from: 'Claims Portal <onboarding@resend.dev>',
+        from: 'Claims Portal <noreply@claimsportal.co.za>',
         to: [notificationEmail],
         subject: `💬 New Client Request — ${request.request_type || 'General'} from ${clientName}`,
         html: buildEmail(brokerageName, '💬 New Client Request', '#7c3aed', [
@@ -127,7 +127,7 @@ export const handler: Handler = async (event) => {
       const clientName = await getClientName(clientUserId);
 
       await resend.emails.send({
-        from: 'Claims Portal <onboarding@resend.dev>',
+        from: 'Claims Portal <noreply@claimsportal.co.za>',
         to: [notificationEmail],
         subject: `📎 New File Uploaded by ${clientName}`,
         html: buildEmail(brokerageName, '📎 New File Uploaded', '#059669', [
