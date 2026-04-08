@@ -539,13 +539,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
 
-    // CRITICAL: Clear localStorage to remove any cached data
-    console.log('🧹 Clearing localStorage to remove cached session data');
-    localStorage.clear();
-
-    // CRITICAL: Clear any existing session before attempting login
-    await supabase.auth.signOut();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Only sign out if there's an existing conflicting session
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    if (existingSession && existingSession.user?.email !== email) {
+      console.log('🧹 Different user session found - clearing before login');
+      localStorage.clear();
+      await supabase.auth.signOut();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     try {
       // CRITICAL: ONLY use signInWithPassword - NO OAuth or social providers
@@ -717,13 +718,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
 
-    // CRITICAL: Clear localStorage to remove any cached data
-    console.log('🧹 Clearing localStorage to remove cached session data');
-    localStorage.clear();
-
-    // CRITICAL: Clear any existing session before attempting login
-    await supabase.auth.signOut();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Only sign out if there's an existing conflicting session
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    if (existingSession && existingSession.user?.email !== email) {
+      console.log('🧹 Different user session found - clearing before login');
+      localStorage.clear();
+      await supabase.auth.signOut();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
@@ -891,13 +893,14 @@ const clientSignUp = async (
     console.log('   Email:', email);
     console.log('   Clearing any existing session first...');
 
-    // CRITICAL: Clear localStorage to remove any cached data
-    console.log('🧹 Clearing localStorage to remove cached session data');
-    localStorage.clear();
-
-    // CRITICAL: Clear any existing session before attempting login
-    await supabase.auth.signOut();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Only sign out if there's an existing conflicting session
+    const { data: { session: existingSession } } = await supabase.auth.getSession();
+    if (existingSession && existingSession.user?.email !== email) {
+      console.log('🧹 Different user session found - clearing before login');
+      localStorage.clear();
+      await supabase.auth.signOut();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
 
     try {
       // ALWAYS use signInWithPassword for email/password auth
