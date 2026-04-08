@@ -33,7 +33,7 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    const { email, role, brokerageId } = JSON.parse(event.body || "{}");
+    const { email, role, brokerageId, brokerName } = JSON.parse(event.body || "{}");
 
     if (!email || !role || !brokerageId) {
       return {
@@ -112,9 +112,10 @@ export const handler: Handler = async (event) => {
       console.log("Auto-populating profiles for invited user:", linkData.user.id);
 
       // Determine role-based placeholder name (NEVER use email as full_name)
-      const placeholderName = role === 'super_admin' ? 'Admin' :
+      const placeholderName = brokerName?.trim() ||
+                              (role === 'super_admin' ? 'Admin' :
                               (role === 'broker' || role === 'main_broker' || role === 'admin') ? 'Broker' :
-                              'Client';
+                              'Client');
 
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
