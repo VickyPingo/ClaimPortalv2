@@ -1136,7 +1136,7 @@ export default function ClientPortal() {
                 Vehicle collision or road incident claim
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">5 steps • 10 min</span>
+                <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-blue-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
@@ -1157,7 +1157,7 @@ export default function ClientPortal() {
                 Water heater leak or damage claim
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">4 steps • 5 min</span>
+                <span className="text-xs font-medium text-gray-500">4 steps</span>
                 <span className="text-cyan-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
@@ -1174,7 +1174,7 @@ export default function ClientPortal() {
                 Vehicle theft or hijacking claim
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">5 steps • 15 min</span>
+                <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-orange-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
@@ -1191,7 +1191,7 @@ export default function ClientPortal() {
                 Property theft or burglary claim
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">5 steps • 15 min</span>
+                <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-green-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
@@ -1208,7 +1208,7 @@ export default function ClientPortal() {
                 Storm, water, fire, or impact damage
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">6 steps • 15 min</span>
+                <span className="text-xs font-medium text-gray-500">6 steps</span>
                 <span className="text-amber-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
@@ -1225,7 +1225,7 @@ export default function ClientPortal() {
                 Items lost or damaged outside your home
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">5 steps • 15 min</span>
+                <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-teal-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
