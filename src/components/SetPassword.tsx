@@ -5,6 +5,7 @@ import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
 export function SetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -143,6 +144,10 @@ export function SetPassword() {
   };
 
   const validatePassword = () => {
+    if (!fullName.trim()) {
+      setError('Please enter your full name');
+      return false;
+    }
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
       return false;
@@ -182,6 +187,17 @@ export function SetPassword() {
       }
 
       console.log('✅ Password set successfully for user:', updateData.user.id);
+
+      // After successful password update, save the name
+      if (fullName.trim()) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from('profiles')
+            .update({ full_name: fullName.trim() })
+            .eq('user_id', user.id);
+        }
+      }
 
       // Step 2: Get authenticated user
       console.log('🔐 Step 2: Getting authenticated user');
@@ -502,6 +518,21 @@ export function SetPassword() {
         </p>
 
         <form onSubmit={handleSetPassword} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Full Name *
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="John Smith"
+              required
+              disabled={loading}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
               New Password
