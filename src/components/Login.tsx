@@ -90,7 +90,10 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
   };
 
   // On any brokerage subdomain - always show ClientAuth
-  if (showSignup && (isOnBrokerageSubdomain() || isIndependiSubdomain())) {
+  const hostname = window.location.hostname;
+const isBrokerSubdomain = hostname.includes('.claimsportal.co.za') || hostname.includes('independi') || hostname === 'localhost';
+
+if (showSignup && isBrokerSubdomain) {
     return <ClientAuth onBackToRole={() => setShowSignup(false)} />;
   }
 
