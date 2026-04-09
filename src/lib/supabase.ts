@@ -50,7 +50,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     flowType: 'pkce',
     storageKey: 'sb-independi-auth',
-    storage: window.localStorage,
+    storage: window.sessionStorage, // ✅ Changed from localStorage — session ends when tab is closed
     redirectTo: `${window.location.origin}/auth/callback`
   },
   global: {
