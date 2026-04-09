@@ -86,7 +86,7 @@ export const handler: Handler = async (event) => {
       emailAttachments.map(a => a.filename).join(', '));
 
     const sendResult = await resend.emails.send({
-      from: 'Claims Portal <onboarding@resend.dev>',
+      from: 'Claims Portal <noreply@claimsportal.co.za>', // ✅ Fixed: was onboarding@resend.dev
       to: [to],
       subject,
       html: `
@@ -125,3 +125,4 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
