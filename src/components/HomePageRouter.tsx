@@ -18,12 +18,14 @@ export default function HomePageRouter() {
   console.log('🌐 Router state:');
   console.log('  User Type:', userType);
   console.log('  User Role:', userRole);
+  console.log('  Loading:', loading);
   console.log('  On Brokerage Subdomain:', onBrokerageSubdomain);
   console.log('  On Super Admin Domain:', onSuperAdminDomain);
   console.log('  Broker Profile:', brokerProfile);
   console.log('  Client Profile:', clientProfile);
 
   const currentPath = window.location.pathname;
+  const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
   // SET PASSWORD ROUTE: Show SetPassword component for Supabase invite flow
   // This MUST come before any auth checks to allow unauthenticated users to set their password
@@ -45,19 +47,17 @@ export default function HomePageRouter() {
   }
 
   // EMERGENCY: Direct /admin access for super admins
-  const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
   if ((currentPath === '/admin' || currentPath === '/dashboard/admin') && isSuperAdminEmail && userRole === 'super_admin') {
     console.log('🔓 EMERGENCY ADMIN ACCESS: Super admin accessing /admin directly');
     return (
       <>
-        <EmergencyLogoutButton />
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
         <BrokerAdminDashboard />
       </>
     );
   }
 
   useEffect(() => {
-    // CRITICAL: Wait for auth and profile to fully load before any redirects
     if (loading) {
       console.log('⏳ Auth still loading - skipping redirect logic');
       return;
@@ -65,72 +65,44 @@ export default function HomePageRouter() {
 
     if (!user) return;
 
-    // ADMIN OVERRIDE: vickypingo@gmail.com bypasses all subdomain restrictions
     const isSuperAdminEmail = user.email === 'vickypingo@gmail.com';
 
-    // CRITICAL: Clients should never access broker or admin routes - CHECK THIS FIRST
     const clientRestrictedPaths = ['/broker-dashboard', '/admin-dashboard', '/organisations', '/users-management', '/invitations', '/admin-settings'];
     const isClientRestrictedPath = clientRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
 
     if (isClientRestrictedPath && (userRole === 'client' || userType === 'client')) {
       console.log('❌ CLIENT ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
-      console.log('  Redirecting to claims portal');
       window.history.replaceState(null, '', '/claims-portal');
       return;
     }
 
-    // CRITICAL: On brokerage subdomain, FORCE broker dashboard
-    // EXCEPT for vickypingo@gmail.com who always has full super admin access
-    // EXCEPT for clients who should go to claims portal
     if (onBrokerageSubdomain && !isSuperAdminEmail && userRole !== 'client' && userType !== 'client') {
       console.log('🔒 BROKERAGE SUBDOMAIN - FORCING BROKER ACCESS ONLY');
-
-      if (currentPath !== '/broker-dashboard' && currentPath !== '/') {
-        console.log('  Redirecting to broker dashboard');
-        window.history.replaceState(null, '', '/broker-dashboard');
-      } else if (currentPath === '/') {
+      if (currentPath !== '/broker-dashboard') {
         window.history.replaceState(null, '', '/broker-dashboard');
       }
       return;
     }
 
-    // CRITICAL: Brokers should never access super admin routes
     const brokerRestrictedPaths = ['/organisations', '/users-management', '/invitations', '/admin-settings'];
     const isBrokerRestrictedPath = brokerRestrictedPaths.some(path => currentPath.toLowerCase().includes(path.toLowerCase()));
 
     if (isBrokerRestrictedPath && userRole === 'broker') {
       console.log('❌ BROKER ATTEMPTING TO ACCESS RESTRICTED PATH:', currentPath);
-      console.log('  Redirecting to broker dashboard');
       window.history.replaceState(null, '', '/broker-dashboard');
       return;
     }
 
-    // Determine the correct path based on role
     let targetPath = '/';
 
-    // ═══════════════════════════════════════════════════════════════
-    // SUPER ADMIN ROUTING - HIGHEST PRIORITY
-    // ═══════════════════════════════════════════════════════════════
     if (userRole === 'super_admin' || isSuperAdmin()) {
-      console.log('👑 SUPER ADMIN ROUTING: /admin-dashboard');
       targetPath = '/admin-dashboard';
-    }
-    // ═══════════════════════════════════════════════════════════════
-    // CLIENT ROUTING - SECOND PRIORITY (before broker)
-    // ═══════════════════════════════════════════════════════════════
-    else if (userType === 'client' || userRole === 'client') {
-      console.log('👤 CLIENT ROUTING: /claims-portal');
+    } else if (userType === 'client' || userRole === 'client') {
       targetPath = '/claims-portal';
-    }
-    // ═══════════════════════════════════════════════════════════════
-    // BROKER ROUTING - ONLY IF NOT SUPER ADMIN OR CLIENT
-    // ═══════════════════════════════════════════════════════════════
-    else if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') && userRole !== 'super_admin' && userRole !== 'client') {
-      console.log('🏢 BROKER ROUTING: /broker-dashboard');
+    } else if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') && userRole !== 'super_admin' && userRole !== 'client') {
       targetPath = '/broker-dashboard';
     }
 
-    // Redirect if not on the correct path - prevent redirect loops
     if (targetPath && currentPath !== targetPath) {
       console.log(`🔀 Redirecting from ${currentPath} to ${targetPath}`);
       window.history.replaceState(null, '', targetPath);
@@ -140,14 +112,12 @@ export default function HomePageRouter() {
     }
   }, [user, userType, userRole, currentPath, isSuperAdmin, onBrokerageSubdomain, onSuperAdminDomain, loading]);
 
-  // Profile wait timeout - show welcome page after 3 seconds if no profile
+  // Profile wait timeout
   useEffect(() => {
     if (!user) return;
-
     const timer = setInterval(() => {
       setProfileWaitTime(prev => prev + 1);
     }, 1000);
-
     return () => clearInterval(timer);
   }, [user]);
 
@@ -160,49 +130,20 @@ export default function HomePageRouter() {
     window.location.reload();
   };
 
-  const EmergencyLogoutButton = () => (
-    <button
-      onClick={handleForceLogout}
-      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-red-600 text-white text-sm rounded-lg shadow-lg hover:bg-red-700 transition-colors"
-      title="Clear cache and force logout"
-    >
-      <LogOut className="w-4 h-4" />
-      Force Logout
-    </button>
-  );
-
-  // STEP 1: If not logged in, show login
+  // ─────────────────────────────────────────────────────────────
+  // STEP 1: Not logged in → show sign in
+  // ─────────────────────────────────────────────────────────────
   if (!user) {
     return <Login roleType={null} />;
   }
 
-  // STEP 1.5: SUPER ADMIN BYPASS - Super admins skip password setup and go straight to dashboard
-  // CRITICAL: Check email ONLY - role may not be set yet in database
-  if (user.email === 'vickypingo@gmail.com') {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
-    console.log('✅ BYPASSING PASSWORD SETUP - FULL SUPER ADMIN ACCESS GRANTED');
-    console.log('   Subdomain:', window.location.hostname);
-    console.log('   User Role:', userRole);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    return (
-      <>
-        <EmergencyLogoutButton />
-        <BrokerAdminDashboard />
-      </>
-    );
-  }
-
-  // STEP 1.6: If user is invited and needs to set password (non-super-admins only)
-  if (needsPasswordSetup) {
-    console.log('🔐 User needs to set password - showing SetPassword component');
-    return <SetPassword />;
-  }
-
-  // STEP 1.7: CRITICAL - Wait for auth to load before routing
-  // If not loading and no userRole, user is not logged in - show login page
+  // ─────────────────────────────────────────────────────────────
+  // STEP 2: Auth still resolving → show spinner
+  // CRITICAL: This must come before ALL role-based routing so we
+  // never render a dashboard before the user's role is confirmed.
+  // ─────────────────────────────────────────────────────────────
   if (loading) {
-    console.log('⏳ Auth still loading - showing loading screen', { loading });
+    console.log('⏳ Auth still loading - showing loading screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
@@ -214,19 +155,33 @@ export default function HomePageRouter() {
     );
   }
 
-  // If not loading and no user/role - show login
-  if (!user && !userRole) {
-    console.log('🔓 Not loading, no user - showing login page');
-    return <Login roleType={null} />;
+  // ─────────────────────────────────────────────────────────────
+  // STEP 3: Super admin bypass (loading is confirmed false)
+  // ─────────────────────────────────────────────────────────────
+  if (isSuperAdminEmail) {
+    console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
+    return (
+      <>
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
+        <BrokerAdminDashboard />
+      </>
+    );
   }
 
-  // STEP 2: Check if client is trying to access broker/admin routes
+  // ─────────────────────────────────────────────────────────────
+  // STEP 4: Password setup for invited users
+  // ─────────────────────────────────────────────────────────────
+  if (needsPasswordSetup) {
+    console.log('🔐 User needs to set password - showing SetPassword component');
+    return <SetPassword />;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STEP 5: Client trying to access restricted routes
+  // ─────────────────────────────────────────────────────────────
   if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
       (userType === 'client' || userRole === 'client')) {
-    console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING TO CLAIMS PORTAL');
-    console.log('  User Role:', userRole);
-    console.log('  User Type:', userType);
-    console.log('  Current Path:', currentPath);
+    console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING');
     window.location.replace('/claims-portal');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
@@ -238,96 +193,82 @@ export default function HomePageRouter() {
     );
   }
 
-  // STEP 3: ADMIN OVERRIDE - Already handled in STEP 1.5 (moved up for priority)
-
-  // STEP 4: SUBDOMAIN ENFORCEMENT - Brokerage subdomain routing
+  // ─────────────────────────────────────────────────────────────
+  // STEP 6: Brokerage subdomain routing
+  // ─────────────────────────────────────────────────────────────
   if (onBrokerageSubdomain) {
-    // Clients → ClientPortal
     if (userType === 'client' || userRole === 'client') {
       return (
         <>
-          <EmergencyLogoutButton />
+          <EmergencyLogoutButton onLogout={handleForceLogout} />
           <ClientPortal />
         </>
       );
     }
 
-    // Brokers/admins → BrokerAdminDashboard
     if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'super_admin' || userType === 'broker') {
       return (
         <>
-          <EmergencyLogoutButton />
+          <EmergencyLogoutButton onLogout={handleForceLogout} />
           <BrokerAdminDashboard />
         </>
       );
     }
 
-    // No role yet — new visitor or profile still loading
-    // Default to client login on any brokerage subdomain
-    if (!userRole && !userType) {
-      return <Login roleType="client" />;
-    }
+    // No role resolved — default to client login on brokerage subdomain
+    return <Login roleType="client" />;
   }
 
-  // STEP 5: SUPER ADMIN ROUTING (only on super admin domain)
+  // ─────────────────────────────────────────────────────────────
+  // STEP 7: Super admin on admin domain
+  // ─────────────────────────────────────────────────────────────
   if ((isSuperAdmin() || userRole === 'super_admin') && onSuperAdminDomain) {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 SUPER ADMIN DETECTED ON ADMIN DOMAIN');
-    console.log('✅ ROUTING TO: /admin-dashboard');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('👑 SUPER ADMIN DETECTED ON ADMIN DOMAIN → /admin-dashboard');
     return (
       <>
-        <EmergencyLogoutButton />
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
         <BrokerAdminDashboard />
       </>
     );
   }
 
-  // STEP 6: CLIENT ROUTING - MUST COME BEFORE BROKER ROUTING
-  // CRITICAL: Check client role first to prevent clients from accessing broker dashboard
+  // ─────────────────────────────────────────────────────────────
+  // STEP 8: Client routing
+  // ─────────────────────────────────────────────────────────────
   if (userType === 'client' || userRole === 'client') {
-    console.log('✅ ROUTING TO: /claims-portal (userType: client, userRole: client)');
+    console.log('✅ ROUTING TO: /claims-portal');
     return (
       <>
-        <EmergencyLogoutButton />
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
         <ClientPortal />
       </>
     );
   }
 
-  // STEP 7: BROKER ROUTING
-  // CRITICAL: Super admins should NEVER be treated as brokers
-  // CRITICAL: Clients should NEVER reach this point
+  // ─────────────────────────────────────────────────────────────
+  // STEP 9: Broker routing
+  // ─────────────────────────────────────────────────────────────
   if ((userType === 'broker' || userRole === 'broker' || userRole === 'main_broker') &&
       userRole !== 'super_admin' &&
       userRole !== 'client' &&
       !isSuperAdmin()) {
-    console.log('✅ ROUTING TO: /broker-dashboard (userType: broker)');
+    console.log('✅ ROUTING TO: /broker-dashboard');
     return (
       <>
-        <EmergencyLogoutButton />
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
         <BrokerAdminDashboard />
       </>
     );
   }
 
-  // FALLBACK: Profile not found after 3 seconds - show welcome page
-  // CRITICAL: Super admins bypass this and get direct access to admin dashboard
+  // ─────────────────────────────────────────────────────────────
+  // FALLBACK: Profile not found after 3 seconds
+  // ─────────────────────────────────────────────────────────────
   if (profileWaitTime >= 3) {
-    if (isSuperAdminEmail) {
-      console.log('👑 SUPER ADMIN BYPASS: Profile not found but granting admin access anyway');
-      return (
-        <>
-          <EmergencyLogoutButton />
-          <BrokerAdminDashboard />
-        </>
-      );
-    }
-
     console.log('⚠️ Profile not found after 3 seconds - showing welcome page');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
-        <EmergencyLogoutButton />
+        <EmergencyLogoutButton onLogout={handleForceLogout} />
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <Building2 className="w-16 h-16 text-blue-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome!</h2>
@@ -354,19 +295,8 @@ export default function HomePageRouter() {
     );
   }
 
-  // FALLBACK: Still loading or no role detected
-  // CRITICAL: Super admins get access even without profile after 2 seconds
-  if (isSuperAdminEmail && profileWaitTime >= 2) {
-    console.log('👑 SUPER ADMIN BYPASS: Role not determined but granting admin access anyway');
-    return (
-      <>
-        <EmergencyLogoutButton />
-        <BrokerAdminDashboard />
-      </>
-    );
-  }
-
-  console.log('⚠️ UserType/Role not determined yet, showing loading state');
+  // Still waiting for profile to resolve
+  console.log('⚠️ Role not determined yet, showing loading state');
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
       <div className="text-center">
@@ -375,5 +305,19 @@ export default function HomePageRouter() {
         <p className="text-sm text-gray-500 mt-2">{profileWaitTime}s</p>
       </div>
     </div>
+  );
+}
+
+// Extracted as a proper component so it can be used before handleForceLogout is defined
+function EmergencyLogoutButton({ onLogout }: { onLogout: () => void }) {
+  return (
+    <button
+      onClick={onLogout}
+      className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 bg-red-600 text-white text-sm rounded-lg shadow-lg hover:bg-red-700 transition-colors"
+      title="Clear cache and force logout"
+    >
+      <LogOut className="w-4 h-4" />
+      Force Logout
+    </button>
   );
 }
