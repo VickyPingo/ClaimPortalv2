@@ -35,7 +35,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6 | 'success';
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 'success';
 type IncidentType = 'motor_accident' | 'burst_geyser' | null;
 type CarCondition = 'drivable' | 'not_drivable' | null;
 type ViewMode = 'home' | 'past-claims' | 'claim-detail' | 'admin-documents' | 'admin-details' | 'admin-contact';
@@ -118,6 +118,7 @@ export default function ClientPortal() {
   const [damagePhoto2, setDamagePhoto2] = useState<File | null>(null);
   const [damagePhoto3, setDamagePhoto3] = useState<File | null>(null);
   const [damagePhoto4, setDamagePhoto4] = useState<File | null>(null);
+  const [additionalDamagePhotos, setAdditionalDamagePhotos] = useState<File[]>([]);
 
   const [leakVideo, setLeakVideo] = useState<File | null>(null);
   const [serialPhoto, setSerialPhoto] = useState<File | null>(null);
@@ -126,6 +127,12 @@ export default function ClientPortal() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // New state for typed statement and police report
+  const [typedStatement, setTypedStatement] = useState('');
+  const [policeCaseNumber, setPoliceCaseNumber] = useState('');
+  const [policeStationName, setPoliceStationName] = useState('');
+  const [policeReportFile, setPoliceReportFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -302,6 +309,12 @@ export default function ClientPortal() {
           damagePhotoUrls.push(await uploadFile(damagePhoto4, 'claims', `${user.id}/${timestamp}/damage_4.jpg`));
         }
 
+        // Upload additional damage photos
+        for (let i = 0; i < additionalDamagePhotos.length; i++) {
+          const url = await uploadFile(additionalDamagePhotos[i], 'claims', `${user.id}/${timestamp}/damage_extra_${i + 1}.jpg`);
+          damagePhotoUrls.push(url);
+        }
+
         const driverLicenseUrl = driverLicensePhoto
           ? await uploadFile(driverLicensePhoto, 'claims', `${user.id}/${timestamp}/driver_license.jpg`)
           : null;
@@ -318,9 +331,7 @@ export default function ClientPortal() {
           ? await uploadFile(thirdPartyDiskPhoto, 'claims', `${user.id}/${timestamp}/third_party_disk.jpg`)
           : null;
 
-        const panelBeaterLocation = selectedProvince && selectedCity
-          ? `${selectedCity}, ${selectedProvince}`
-          : null;
+        const panelBeaterLoc = panelBeaterLocation || null;
 
         const thirdPartyDetails = (thirdPartyName || thirdPartyPhone || thirdPartyVehicle)
           ? {
@@ -357,13 +368,20 @@ export default function ClientPortal() {
           attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_disk.jpg`, url: thirdPartyDiskUrl, kind: 'third_party_disk', label: 'Third Party Disk' });
         }
 
+        // Upload police report if provided
+        if (policeReportFile) {
+          const ext = policeReportFile.name.toLowerCase().endsWith('.pdf') ? '.pdf' : '.jpg';
+          const policeUrl = await uploadFile(policeReportFile, 'claims', `${user.id}/${timestamp}/police_report${ext}`);
+          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/police_report${ext}`, url: policeUrl, kind: 'police_report', label: 'Police Report' });
+        }
+
         const completeClaimData = {
           accident_date_time: accidentDateTime || null,
           location_address: locationAddress || null,
           location_lat: location?.lat || null,
           location_lng: location?.lng || null,
           car_condition: carCondition,
-          panel_beater_location: panelBeaterLocation,
+          panel_beater_location: panelBeaterLoc,
           selected_province: selectedProvince,
           selected_city: selectedCity,
           third_party_details: thirdPartyDetails,
@@ -371,6 +389,9 @@ export default function ClientPortal() {
           third_party_phone: thirdPartyPhone,
           third_party_vehicle: thirdPartyVehicle,
           voice_transcript: voiceTranscript || null,
+          typed_statement: typedStatement || null,
+          police_case_number: policeCaseNumber || null,
+          police_station_name: policeStationName || null,
         };
 
         await submitClaimUnified({
@@ -441,7 +462,7 @@ export default function ClientPortal() {
   };
 
   const getStepCount = () => {
-    if (incidentType === 'motor_accident') return 6;
+    if (incidentType === 'motor_accident') return 7;
     if (incidentType === 'burst_geyser') return 4;
     return 3;
   };
@@ -540,7 +561,7 @@ export default function ClientPortal() {
                 type="text"
                 value={panelBeaterLocation}
                 onChange={(e) => setPanelBeaterLocation(e.target.value)}
-                placeholder="Type the nearest panel beater (name/town)"
+                placeholder="Enter the name or location of your preferred panel beater"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -586,7 +607,7 @@ export default function ClientPortal() {
                 <label htmlFor="driver-license" className="cursor-pointer">
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                   <p className="text-sm text-gray-600">
-                    {driverLicensePhoto ? driverLicensePhoto.name : 'Tap to upload driver\'s license'}
+                    {driverLicensePhoto ? driverLicensePhoto.name : "Tap to upload driver's license"}
                   </p>
                 </label>
               </div>
@@ -735,7 +756,7 @@ export default function ClientPortal() {
             Vehicle Damage Photos
           </h2>
           <p className="text-gray-600 mb-6">
-            Upload 4 photos showing the damage to your vehicle
+            Upload at least 2 photos showing the damage to your vehicle
           </p>
 
           <div className="space-y-6">
@@ -784,7 +805,7 @@ export default function ClientPortal() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 3 *
+                  Damage Photo 3 (Optional)
                 </label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                   <input
@@ -805,7 +826,7 @@ export default function ClientPortal() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 4 *
+                  Damage Photo 4 (Optional)
                 </label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                   <input
@@ -825,9 +846,34 @@ export default function ClientPortal() {
               </div>
             </div>
 
+            {/* Additional photos */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Photos (Optional)
+              </label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setAdditionalDamagePhotos(Array.from(e.target.files || []))}
+                  className="hidden"
+                  id="damage-extra"
+                />
+                <label htmlFor="damage-extra" className="cursor-pointer">
+                  <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                  <p className="text-xs text-gray-600">
+                    {additionalDamagePhotos.length > 0
+                      ? `${additionalDamagePhotos.length} additional photo(s) selected`
+                      : 'Tap to upload more photos (select multiple)'}
+                  </p>
+                </label>
+              </div>
+            </div>
+
             <button
               onClick={() => setStep(6)}
-              disabled={!damagePhoto1 || !damagePhoto2 || !damagePhoto3 || !damagePhoto4}
+              disabled={!damagePhoto1 || !damagePhoto2}
               className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
             >
               Continue
@@ -841,50 +887,133 @@ export default function ClientPortal() {
       return (
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Voice Statement
+            Your Statement
           </h2>
           <p className="text-gray-600 mb-6">
-            Record a detailed voice note describing what happened during the accident
+            Record a voice note OR type your statement. You can also provide police report details if available.
           </p>
 
-          <div className="text-center">
-            {!audioBlob ? (
-              <div>
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                    isRecording
-                      ? 'bg-red-500 animate-pulse'
-                      : 'bg-blue-700 hover:bg-blue-800'
-                  }`}
-                >
-                  <Mic className="w-16 h-16 text-white" />
-                </button>
-                <p className="text-sm text-gray-600">
-                  {isRecording ? 'Tap to stop recording' : 'Tap to start recording'}
-                </p>
+          <div className="space-y-6">
+            {/* Voice Note */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Voice Statement (Optional)
+              </label>
+              <div className="text-center">
+                {!audioBlob ? (
+                  <div>
+                    <button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                        isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'
+                      }`}
+                    >
+                      <Mic className="w-12 h-12 text-white" />
+                    </button>
+                    <p className="text-sm text-gray-600">
+                      {isRecording ? 'Tap to stop recording' : 'Tap to record voice note'}
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">Voice note recorded</p>
+                    <audio controls className="w-full mb-2">
+                      <source src={URL.createObjectURL(audioBlob)} type="audio/webm" />
+                    </audio>
+                    <button onClick={() => setAudioBlob(null)} className="text-blue-700 text-sm hover:underline">
+                      Record again
+                    </button>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div>
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <p className="text-sm text-gray-600 mb-4">Recording saved</p>
-                <button
-                  onClick={() => setAudioBlob(null)}
-                  className="text-blue-700 text-sm hover:underline"
-                >
-                  Record again
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
 
-          <button
-            onClick={() => setStep(7)}
-            disabled={!audioBlob}
-            className="w-full mt-6 bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-          >
-            Continue
-          </button>
+            {/* Typed Statement */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Written Statement (Optional)
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                If you can't record a voice note, type your statement here
+              </p>
+              <textarea
+                value={typedStatement}
+                onChange={(e) => setTypedStatement(e.target.value)}
+                rows={5}
+                placeholder="Describe what happened in detail..."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            {/* Police Report - Optional */}
+            <div className="border-t pt-6">
+              <h3 className="font-semibold text-gray-900 mb-1">Police Report (Optional)</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                If you have already reported this to the police, please provide the details below
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Case Number
+                  </label>
+                  <input
+                    type="text"
+                    value={policeCaseNumber}
+                    onChange={(e) => setPoliceCaseNumber(e.target.value)}
+                    placeholder="e.g. CAS 123/04/2026"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Police Station Name
+                  </label>
+                  <input
+                    type="text"
+                    value={policeStationName}
+                    onChange={(e) => setPoliceStationName(e.target.value)}
+                    placeholder="e.g. Sandton Police Station"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Upload Police Report (Optional)
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) => setPoliceReportFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                      id="police-report"
+                    />
+                    <label htmlFor="police-report" className="cursor-pointer">
+                      <Camera className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+                      <p className="text-xs text-gray-600">
+                        {policeReportFile ? policeReportFile.name : 'Tap to upload report or photo'}
+                      </p>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setStep(7)}
+              disabled={!audioBlob && !typedStatement.trim()}
+              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
+            >
+              Continue
+            </button>
+            <p className="text-xs text-center text-gray-500">
+              Please provide either a voice note or written statement to continue
+            </p>
+          </div>
         </div>
       );
     }
@@ -923,27 +1052,46 @@ export default function ClientPortal() {
             </div>
 
             <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">Statement</p>
+              <p className="text-sm text-gray-700">
+                {audioBlob && typedStatement ? 'Voice note + written statement' :
+                 audioBlob ? 'Voice note recorded' :
+                 typedStatement ? 'Written statement provided' : 'None'}
+              </p>
+            </div>
+
+            {(policeCaseNumber || policeStationName) && (
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">Police Report</p>
+                {policeCaseNumber && <p className="text-sm text-gray-700">Case: {policeCaseNumber}</p>}
+                {policeStationName && <p className="text-sm text-gray-700">Station: {policeStationName}</p>}
+              </div>
+            )}
+
+            <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Documentation</p>
               <p className="text-sm text-gray-700">
-                Driver license, License disk, 4 damage photos, Voice statement
+                Driver license, License disk, {[damagePhoto1, damagePhoto2, damagePhoto3, damagePhoto4].filter(Boolean).length + additionalDamagePhotos.length} damage photo(s)
               </p>
             </div>
           </div>
 
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-            <div className="flex">
-              <AlertCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-yellow-800 mb-1">
-                  Important: Police Case Number Required
-                </p>
-                <p className="text-sm text-yellow-700">
-                  Please visit your nearest police station to file a report. A police case
-                  number will be needed once this claim is registered with your broker.
-                </p>
+          {!policeCaseNumber && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+              <div className="flex">
+                <AlertCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-yellow-800 mb-1">
+                    Police Case Number
+                  </p>
+                  <p className="text-sm text-yellow-700">
+                    If you haven't reported to the police yet, please do so as soon as possible.
+                    A police case number will be needed to process your claim.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <button
             onClick={submitClaim}
@@ -1012,7 +1160,7 @@ export default function ClientPortal() {
           <p className="text-gray-600 mb-6">
             Your claim has been successfully submitted. A broker will review it shortly.
           </p>
-          {incidentType === 'motor_accident' && (
+          {incidentType === 'motor_accident' && !policeCaseNumber && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm font-semibold text-blue-900 mb-2">
                 Next Steps:
@@ -1136,7 +1284,7 @@ export default function ClientPortal() {
                 Vehicle collision or road incident claim
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">5 steps</span>
+                <span className="text-xs font-medium text-gray-500">6 steps</span>
                 <span className="text-blue-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
