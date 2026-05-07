@@ -21,34 +21,27 @@ export default function HomePageRouter() {
   console.log('  Loading:', loading);
   console.log('  On Brokerage Subdomain:', onBrokerageSubdomain);
   console.log('  On Super Admin Domain:', onSuperAdminDomain);
-  console.log('  Broker Profile:', brokerProfile);
-  console.log('  Client Profile:', clientProfile);
 
   const currentPath = window.location.pathname;
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
-  // SET PASSWORD ROUTE: Show SetPassword component for Supabase invite flow
-  // This MUST come before any auth checks to allow unauthenticated users to set their password
+  // SET PASSWORD ROUTE
   if (currentPath === '/set-password') {
-    console.log('🔐 Set password route - showing SetPassword for invite');
     return <SetPassword />;
   }
 
-  // SIGNUP ROUTE: Show SetPassword component for invitation flow
+  // SIGNUP ROUTE
   if (currentPath === '/signup') {
-    console.log('📝 Signup route - showing SetPassword for invitation');
     return <SetPassword />;
   }
 
   // EMERGENCY: Force session page
   if (currentPath === '/admin/force-session') {
-    console.log('🚨 EMERGENCY: Force session page accessed');
     return <ForceSession />;
   }
 
   // EMERGENCY: Direct /admin access for super admins
   if ((currentPath === '/admin' || currentPath === '/dashboard/admin') && isSuperAdminEmail && userRole === 'super_admin') {
-    console.log('🔓 EMERGENCY ADMIN ACCESS: Super admin accessing /admin directly');
     return (
       <>
         <EmergencyLogoutButton onLogout={handleForceLogout} />
@@ -76,8 +69,20 @@ export default function HomePageRouter() {
       return;
     }
 
-    if (onBrokerageSubdomain && !isSuperAdminEmail && userRole !== 'client' && userType !== 'client') {
-      console.log('🔒 BROKERAGE SUBDOMAIN - FORCING BROKER ACCESS ONLY');
+    // ─── FIX: Only force the broker URL when we have a CONFIRMED broker
+    // role. Previously this ran when roles were null (fresh sign-in before
+    // the profile loaded), which changed the URL to /broker-dashboard.
+    // On the next render currentPath read that URL, Step 5 triggered
+    // window.location.replace('/claims-portal') — causing the page reload
+    // "jump" the client was experiencing.
+    const isConfirmedBroker =
+      userRole === 'broker' ||
+      userRole === 'main_broker' ||
+      userRole === 'super_admin' ||
+      userType === 'broker';
+
+    if (onBrokerageSubdomain && !isSuperAdminEmail && isConfirmedBroker) {
+      console.log('🔒 BROKERAGE SUBDOMAIN - CONFIRMED BROKER ACCESS');
       if (currentPath !== '/broker-dashboard') {
         window.history.replaceState(null, '', '/broker-dashboard');
       }
@@ -156,7 +161,7 @@ export default function HomePageRouter() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STEP 3: Super admin bypass (loading is confirmed false)
+  // STEP 3: Super admin bypass
   // ─────────────────────────────────────────────────────────────
   if (isSuperAdminEmail) {
     console.log('👑 SUPER ADMIN OVERRIDE - vickypingo@gmail.com');
@@ -182,7 +187,8 @@ export default function HomePageRouter() {
   if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
       (userType === 'client' || userRole === 'client')) {
     console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING');
-    window.location.replace('/claims-portal');
+    // Use replaceState instead of location.replace to avoid a full page reload
+    window.history.replaceState(null, '', '/claims-portal');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
@@ -198,6 +204,7 @@ export default function HomePageRouter() {
   // ─────────────────────────────────────────────────────────────
   if (onBrokerageSubdomain) {
     if (userType === 'client' || userRole === 'client') {
+      console.log('✅ BROKERAGE SUBDOMAIN: routing client → ClientPortal');
       return (
         <>
           <EmergencyLogoutButton onLogout={handleForceLogout} />
@@ -207,6 +214,7 @@ export default function HomePageRouter() {
     }
 
     if (userRole === 'broker' || userRole === 'main_broker' || userRole === 'super_admin' || userType === 'broker') {
+      console.log('✅ BROKERAGE SUBDOMAIN: routing broker → BrokerAdminDashboard');
       return (
         <>
           <EmergencyLogoutButton onLogout={handleForceLogout} />
@@ -308,7 +316,6 @@ export default function HomePageRouter() {
   );
 }
 
-// Extracted as a proper component so it can be used before handleForceLogout is defined
 function EmergencyLogoutButton({ onLogout }: { onLogout: () => void }) {
   return (
     <button
