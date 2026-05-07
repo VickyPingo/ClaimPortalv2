@@ -155,31 +155,13 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
     }
   };
 
+  // ─── CLIENT-SIDE DOWNLOAD — bypasses Netlify 6MB function limit ───
   const handleDownloadPack = async () => {
     if (!claim) return;
 
     try {
       setDownloadLoading(true);
-      const response = await fetch('/.netlify/functions/download-claim-pack', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId: claim.id }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to download pack' }));
-        throw new Error(errorData.message || 'Failed to download pack');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `claim_${claim.id}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      await downloadClaimPack(claim);
     } catch (error: any) {
       console.error('Error downloading pack:', error);
       alert('Failed to download pack: ' + error.message);
@@ -232,10 +214,8 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
   const getAllEvidence = (): Attachment[] => {
     if (!claim) return [];
 
-    // Collect all evidence from multiple sources
     const allEvidence: Attachment[] = [];
 
-    // 1. Main attachments array
     if (claim.attachments) {
       const attachments = typeof claim.attachments === 'string'
         ? JSON.parse(claim.attachments)
@@ -243,7 +223,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       allEvidence.push(...(attachments || []));
     }
 
-    // 2. Documentation array (if exists)
     if (claim.claimant_snapshot?.documentation) {
       const docs = typeof claim.claimant_snapshot.documentation === 'string'
         ? JSON.parse(claim.claimant_snapshot.documentation)
@@ -251,7 +230,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       allEvidence.push(...(docs || []));
     }
 
-    // 3. Attachments from claimant_snapshot (if exists)
     if (claim.claimant_snapshot?.attachments) {
       const snapAttachments = typeof claim.claimant_snapshot.attachments === 'string'
         ? JSON.parse(claim.claimant_snapshot.attachments)
@@ -259,7 +237,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       allEvidence.push(...(snapAttachments || []));
     }
 
-    // Filter to items with URLs (exclude voice_note, we handle that separately)
     return allEvidence.filter(item =>
       item?.url &&
       item.kind !== 'voice_note' &&
@@ -292,7 +269,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       return evidence.map(item => item.url).filter(Boolean);
     }
 
-    // Fallback to legacy fields
     if (!claim) return [];
     const legacyUrls: string[] = [];
     if (claim.driver_license_photo_url) legacyUrls.push(claim.driver_license_photo_url);
@@ -311,19 +287,10 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
   const getDisplayLocation = (): string | null => {
     if (!claim) return null;
-
-    if (claim.location?.trim()) {
-      return claim.location;
-    }
-    if (claim.claim_data?.location_address) {
-      return claim.claim_data.location_address;
-    }
-    if (claim.claim_data?.locationAddress) {
-      return claim.claim_data.locationAddress;
-    }
-    if (claim.location_address) {
-      return claim.location_address;
-    }
+    if (claim.location?.trim()) return claim.location;
+    if (claim.claim_data?.location_address) return claim.claim_data.location_address;
+    if (claim.claim_data?.locationAddress) return claim.claim_data.locationAddress;
+    if (claim.location_address) return claim.location_address;
     return null;
   };
 
@@ -335,10 +302,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
         .from('claims')
         .update({
           voice_transcript: transcriptDraft,
-          claim_data: {
-            ...claim.claim_data,
-            voice_transcript: transcriptDraft,
-          }
+          claim_data: { ...claim.claim_data, voice_transcript: transcriptDraft },
         })
         .eq('id', claim.id);
 
@@ -347,10 +311,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       setClaim({
         ...claim,
         voice_transcript: transcriptDraft,
-        claim_data: {
-          ...claim.claim_data,
-          voice_transcript: transcriptDraft,
-        }
+        claim_data: { ...claim.claim_data, voice_transcript: transcriptDraft },
       });
       setEditingTranscript(false);
     } catch (err: any) {
@@ -433,11 +394,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                 disabled={emailLoading}
                 className="flex items-center gap-2 px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
               >
-                {emailLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Mail className="w-5 h-5" />
-                )}
+                {emailLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mail className="w-5 h-5" />}
                 Email Insurer
               </button>
 
@@ -446,11 +403,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                 disabled={downloadLoading}
                 className="flex items-center gap-2 px-6 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-800 disabled:opacity-50"
               >
-                {downloadLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Download className="w-5 h-5" />
-                )}
+                {downloadLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
                 Download Pack
               </button>
             </div>
@@ -489,8 +442,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                         : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
                     } disabled:opacity-50`}
                   >
-                    {updatingStatus && claim.status !== value ? label : label}
-                    {claim.status === value && ' ✓'}
+                    {label}{claim.status === value && ' ✓'}
                   </button>
                 ))}
               </div>
@@ -525,12 +477,9 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
 
               {editingTranscript ? (
                 <div className="mt-2">
-                  {/* Keep audio player visible while editing */}
                   {getVoiceNote() && (
                     <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <p className="text-xs font-medium text-blue-700 mb-2">
-                        🎧 Listen while you edit:
-                      </p>
+                      <p className="text-xs font-medium text-blue-700 mb-2">🎧 Listen while you edit:</p>
                       <audio controls className="w-full">
                         <source src={getVoiceNote()!.url} type="audio/webm" />
                         <source src={getVoiceNote()!.url} type="audio/mpeg" />
@@ -575,20 +524,12 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                     className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {transcribing ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Transcribing...
-                      </>
+                      <><Loader2 className="w-3 h-3 animate-spin" />Transcribing...</>
                     ) : (
-                      <>
-                        <Mic className="w-3 h-3" />
-                        Transcribe Voice Note
-                      </>
+                      <><Mic className="w-3 h-3" />Transcribe Voice Note</>
                     )}
                   </button>
-                  {transcriptError && (
-                    <p className="mt-1 text-xs text-red-600">{transcriptError}</p>
-                  )}
+                  {transcriptError && <p className="mt-1 text-xs text-red-600">{transcriptError}</p>}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">Not transcribed yet</p>
@@ -598,42 +539,12 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
             {claim.third_party_details && (
               <div className="mt-6 mb-6 p-4 bg-gray-50 border-l-4 border-blue-500 rounded">
                 <h3 className="font-semibold text-gray-900 mb-3">Third Party Details</h3>
-                {claim.third_party_details.name && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Name: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.name}</span>
-                  </div>
-                )}
-                {claim.third_party_details.phone && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Phone: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.phone}</span>
-                  </div>
-                )}
-                {claim.third_party_details.email && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Email: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.email}</span>
-                  </div>
-                )}
-                {claim.third_party_details.vehicle && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Vehicle: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.vehicle}</span>
-                  </div>
-                )}
-                {claim.third_party_details.registration && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Registration: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.registration}</span>
-                  </div>
-                )}
-                {claim.third_party_details.insurance && (
-                  <div className="mb-2">
-                    <span className="text-sm text-gray-600">Insurance: </span>
-                    <span className="text-sm font-medium text-gray-900">{claim.third_party_details.insurance}</span>
-                  </div>
-                )}
+                {claim.third_party_details.name && <div className="mb-2"><span className="text-sm text-gray-600">Name: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.name}</span></div>}
+                {claim.third_party_details.phone && <div className="mb-2"><span className="text-sm text-gray-600">Phone: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.phone}</span></div>}
+                {claim.third_party_details.email && <div className="mb-2"><span className="text-sm text-gray-600">Email: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.email}</span></div>}
+                {claim.third_party_details.vehicle && <div className="mb-2"><span className="text-sm text-gray-600">Vehicle: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.vehicle}</span></div>}
+                {claim.third_party_details.registration && <div className="mb-2"><span className="text-sm text-gray-600">Registration: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.registration}</span></div>}
+                {claim.third_party_details.insurance && <div className="mb-2"><span className="text-sm text-gray-600">Insurance: </span><span className="text-sm font-medium text-gray-900">{claim.third_party_details.insurance}</span></div>}
               </div>
             )}
 
@@ -688,7 +599,9 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                     {(claim.claim_data?.voice_transcript || claim.voice_transcript) ? (
                       <div className="mt-4 p-4 bg-white rounded-lg">
                         <p className="text-sm font-semibold text-gray-600 mb-2">Transcript</p>
-                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">{claim.claim_data?.voice_transcript || claim.voice_transcript}</p>
+                        <p className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap">
+                          {claim.claim_data?.voice_transcript || claim.voice_transcript}
+                        </p>
                       </div>
                     ) : (
                       <div className="mt-4">
@@ -698,20 +611,12 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                           {transcribing ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Transcribing...
-                            </>
+                            <><Loader2 className="w-4 h-4 animate-spin" />Transcribing...</>
                           ) : (
-                            <>
-                              <Mic className="w-4 h-4" />
-                              Transcribe Voice Note
-                            </>
+                            <><Mic className="w-4 h-4" />Transcribe Voice Note</>
                           )}
                         </button>
-                        {transcriptError && (
-                          <p className="mt-2 text-sm text-red-600">{transcriptError}</p>
-                        )}
+                        {transcriptError && <p className="mt-2 text-sm text-red-600">{transcriptError}</p>}
                       </div>
                     )}
                   </div>
@@ -730,14 +635,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                             onClick={() => setSelectedImage(url)}
                             className="aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:border-blue-500 transition-all"
                           >
-                            <img
-                              src={url}
-                              alt={label}
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs p-2">
-                              {label}
-                            </div>
+                            <img src={url} alt={label} className="w-full h-full object-cover" />
                           </div>
                         );
                       } else if (isVideoFile(url)) {
@@ -757,7 +655,6 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
                             <p className="text-sm font-medium text-gray-900 mb-2">{label}</p>
                             <audio controls className="w-full">
                               <source src={url} />
-                              Your browser does not support the audio element.
                             </audio>
                           </div>
                         );
@@ -800,10 +697,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedImage(null)}
         >
-          <button
-            onClick={() => setSelectedImage(null)}
-            className="absolute top-4 right-4 text-white hover:text-gray-300"
-          >
+          <button onClick={() => setSelectedImage(null)} className="absolute top-4 right-4 text-white hover:text-gray-300">
             <X className="w-8 h-8" />
           </button>
           <img
@@ -816,10 +710,7 @@ export default function ClaimMasterView({ claimId, onBack }: ClaimMasterViewProp
       )}
 
       {showEmailModal && (
-        <EmailModal
-          claim={claim}
-          onClose={() => setShowEmailModal(false)}
-        />
+        <EmailModal claim={claim} onClose={() => setShowEmailModal(false)} />
       )}
     </div>
   );
@@ -851,7 +742,6 @@ function EmailModal({ claim, onClose }: { claim: Claim; onClose: () => void }) {
       });
 
       const result = await response.json();
-
       if (!response.ok) throw new Error(result.error || 'Failed to send');
 
       alert(`Email sent successfully with ${result.attachmentCount} attachment(s)!`);
@@ -876,48 +766,27 @@ function EmailModal({ claim, onClose }: { claim: Claim; onClose: () => void }) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
-            <input
-              type="email"
-              value={toEmail}
-              onChange={(e) => setToEmail(e.target.value)}
+            <input type="email" value={toEmail} onChange={(e) => setToEmail(e.target.value)}
               placeholder="insurer@example.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Subject</label>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Message</label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={8}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
+            <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={8}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
           </div>
-
           <div className="flex gap-3 justify-end">
-            <button
-              onClick={onClose}
-              disabled={sending}
-              className="px-6 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+            <button onClick={onClose} disabled={sending}
+              className="px-6 py-2 border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
               Cancel
             </button>
-            <button
-              onClick={handleSendEmail}
-              disabled={!toEmail || sending}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-            >
+            <button onClick={handleSendEmail} disabled={!toEmail || sending}
+              className="flex items-center gap-2 px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               {sending && <Loader2 className="w-4 h-4 animate-spin" />}
               {sending ? 'Sending...' : 'Send Email'}
             </button>
