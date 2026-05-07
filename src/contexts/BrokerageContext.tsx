@@ -47,16 +47,12 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
 
         const response = await fetch('/.netlify/functions/get-brokerage-from-host', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
         });
 
         if (!response.ok) {
-          console.error('Brokerage lookup failed:', response.status);
-          console.log('⚠️ Brokerage lookup failed, treating as platform domain');
+          console.warn('⚠️ Brokerage lookup failed, treating as platform domain');
           setIsPlatformDomain(true);
-          setError(null);
           return;
         }
 
@@ -70,31 +66,54 @@ export function BrokerageProvider({ children }: { children: ReactNode }) {
 
         if (result.success && result.brokerage) {
           const brokerageData = result.brokerage;
-          setBrokerage(brokerageData);
+
+          // ─── FIX: The Netlify function may not include logo_url in its
+          // response (it predates the logo feature). Fetch logo_url directly
+          // from Supabase using the brokerage id so it's always up to date.
+          let logoUrl: string | null = brokerageData.logo_url ?? null;
+
+          if (brokerageData.id && !logoUrl) {
+            try {
+              const { data: logoData } = await supabase
+                .from('brokerages')
+                .select('logo_url')
+                .eq('id', brokerageData.id)
+                .maybeSingle();
+              if (logoData?.logo_url) {
+                logoUrl = logoData.logo_url;
+                console.log('✓ logo_url fetched from Supabase:', logoUrl);
+              }
+            } catch (logoErr) {
+              console.warn('⚠️ Could not fetch logo_url from Supabase:', logoErr);
+            }
+          }
+
+          const fullBrokerageData: BrokerageConfig = {
+            ...brokerageData,
+            logo_url: logoUrl,
+          };
+
+          setBrokerage(fullBrokerageData);
 
           if (brokerageData.brand_color) {
             document.documentElement.style.setProperty('--brand-color', brokerageData.brand_color);
           }
+
           console.log('✓ Brokerage configuration loaded:', brokerageData.name);
           console.log('  Subdomain:', brokerageData.subdomain);
+          console.log('  Logo URL:', logoUrl);
           setIsPlatformDomain(false);
         } else {
           console.log('⚠️ No brokerage found for domain:', hostname);
-          console.log('  Treating as platform domain');
           setIsPlatformDomain(true);
-          setError(null);
         }
       } catch (lookupError) {
         console.error('Brokerage lookup error:', lookupError);
-        console.log('⚠️ Error during lookup, treating as platform domain');
         setIsPlatformDomain(true);
-        setError(null);
       }
     } catch (err) {
       console.error('Fatal error loading brokerage config:', err);
-      console.log('⚠️ Fatal error, treating as platform domain');
       setIsPlatformDomain(true);
-      setError(null);
     } finally {
       setLoading(false);
     }
