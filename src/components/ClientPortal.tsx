@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
 import { useAuth } from '../contexts/AuthContext';
+import { useBrokerage } from '../contexts/BrokerageContext';
 import { safePersonName } from '../lib/display';
 import TheftClaimForm from './TheftClaimForm';
 import MotorVehicleTheftForm from './MotorVehicleTheftForm';
@@ -56,6 +57,7 @@ type ClaimType = 'motor' | 'geyser' | 'theft' | 'motor_vehicle_theft' | 'structu
 
 export default function ClientPortal() {
   const { user, signOut } = useAuth();
+  const { brokerage } = useBrokerage();
   const [claimType, setClaimType] = useState<ClaimType>(null);
   const [clientData, setClientData] = useState<any>(null);
   const [step, setStep] = useState<Step>(1);
@@ -128,7 +130,6 @@ export default function ClientPortal() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // New state for typed statement and police report
   const [typedStatement, setTypedStatement] = useState('');
   const [policeCaseNumber, setPoliceCaseNumber] = useState('');
   const [policeStationName, setPoliceStationName] = useState('');
@@ -248,10 +249,7 @@ export default function ClientPortal() {
         }
 
         clientData = {
-          data: {
-            id: profile.user_id,
-            brokerage_id: profile.brokerage_id,
-          },
+          data: { id: profile.user_id, brokerage_id: profile.brokerage_id },
           error: null,
         };
       }
@@ -262,14 +260,8 @@ export default function ClientPortal() {
       let voiceTranscript = null;
 
       if (audioBlob) {
-        const audioFile = new File([audioBlob], 'voice_note.webm', {
-          type: 'audio/webm',
-        });
-        voiceNoteUrl = await uploadFile(
-          audioFile,
-          'claims',
-          `${user.id}/${timestamp}/voice_note.webm`
-        );
+        const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
+        voiceNoteUrl = await uploadFile(audioFile, 'claims', `${user.id}/${timestamp}/voice_note.webm`);
 
         try {
           const transcriptionResponse = await fetch(
@@ -296,79 +288,35 @@ export default function ClientPortal() {
       if (incidentType === 'motor_accident') {
         const damagePhotoUrls = [];
 
-        if (damagePhoto1) {
-          damagePhotoUrls.push(await uploadFile(damagePhoto1, 'claims', `${user.id}/${timestamp}/damage_1.jpg`));
-        }
-        if (damagePhoto2) {
-          damagePhotoUrls.push(await uploadFile(damagePhoto2, 'claims', `${user.id}/${timestamp}/damage_2.jpg`));
-        }
-        if (damagePhoto3) {
-          damagePhotoUrls.push(await uploadFile(damagePhoto3, 'claims', `${user.id}/${timestamp}/damage_3.jpg`));
-        }
-        if (damagePhoto4) {
-          damagePhotoUrls.push(await uploadFile(damagePhoto4, 'claims', `${user.id}/${timestamp}/damage_4.jpg`));
-        }
+        if (damagePhoto1) damagePhotoUrls.push(await uploadFile(damagePhoto1, 'claims', `${user.id}/${timestamp}/damage_1.jpg`));
+        if (damagePhoto2) damagePhotoUrls.push(await uploadFile(damagePhoto2, 'claims', `${user.id}/${timestamp}/damage_2.jpg`));
+        if (damagePhoto3) damagePhotoUrls.push(await uploadFile(damagePhoto3, 'claims', `${user.id}/${timestamp}/damage_3.jpg`));
+        if (damagePhoto4) damagePhotoUrls.push(await uploadFile(damagePhoto4, 'claims', `${user.id}/${timestamp}/damage_4.jpg`));
 
-        // Upload additional damage photos
         for (let i = 0; i < additionalDamagePhotos.length; i++) {
           const url = await uploadFile(additionalDamagePhotos[i], 'claims', `${user.id}/${timestamp}/damage_extra_${i + 1}.jpg`);
           damagePhotoUrls.push(url);
         }
 
-        const driverLicenseUrl = driverLicensePhoto
-          ? await uploadFile(driverLicensePhoto, 'claims', `${user.id}/${timestamp}/driver_license.jpg`)
-          : null;
-
-        const licenseDiskUrl = licenseDiskPhoto
-          ? await uploadFile(licenseDiskPhoto, 'claims', `${user.id}/${timestamp}/license_disk.jpg`)
-          : null;
-
-        const thirdPartyLicenseUrl = thirdPartyLicensePhoto
-          ? await uploadFile(thirdPartyLicensePhoto, 'claims', `${user.id}/${timestamp}/third_party_license.jpg`)
-          : null;
-
-        const thirdPartyDiskUrl = thirdPartyDiskPhoto
-          ? await uploadFile(thirdPartyDiskPhoto, 'claims', `${user.id}/${timestamp}/third_party_disk.jpg`)
-          : null;
+        const driverLicenseUrl = driverLicensePhoto ? await uploadFile(driverLicensePhoto, 'claims', `${user.id}/${timestamp}/driver_license.jpg`) : null;
+        const licenseDiskUrl = licenseDiskPhoto ? await uploadFile(licenseDiskPhoto, 'claims', `${user.id}/${timestamp}/license_disk.jpg`) : null;
+        const thirdPartyLicenseUrl = thirdPartyLicensePhoto ? await uploadFile(thirdPartyLicensePhoto, 'claims', `${user.id}/${timestamp}/third_party_license.jpg`) : null;
+        const thirdPartyDiskUrl = thirdPartyDiskPhoto ? await uploadFile(thirdPartyDiskPhoto, 'claims', `${user.id}/${timestamp}/third_party_disk.jpg`) : null;
 
         const panelBeaterLoc = panelBeaterLocation || null;
-
         const thirdPartyDetails = (thirdPartyName || thirdPartyPhone || thirdPartyVehicle)
-          ? {
-              name: thirdPartyName || '',
-              phone: thirdPartyPhone || '',
-              vehicle: thirdPartyVehicle || '',
-            }
+          ? { name: thirdPartyName || '', phone: thirdPartyPhone || '', vehicle: thirdPartyVehicle || '' }
           : null;
 
-        // Build attachments array
         const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-        if (voiceNoteUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
-        }
+        if (voiceNoteUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
+        damagePhotoUrls.forEach((url, i) => attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/damage_${i + 1}.jpg`, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` }));
+        if (driverLicenseUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/driver_license.jpg`, url: driverLicenseUrl, kind: 'driver_license', label: 'Driver License' });
+        if (licenseDiskUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/license_disk.jpg`, url: licenseDiskUrl, kind: 'license_disk', label: 'License Disk' });
+        if (thirdPartyLicenseUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_license.jpg`, url: thirdPartyLicenseUrl, kind: 'third_party_license', label: 'Third Party License' });
+        if (thirdPartyDiskUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_disk.jpg`, url: thirdPartyDiskUrl, kind: 'third_party_disk', label: 'Third Party Disk' });
 
-        damagePhotoUrls.forEach((url, i) => {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/damage_${i + 1}.jpg`, url, kind: 'damage_photo', label: `Damage Photo ${i + 1}` });
-        });
-
-        if (driverLicenseUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/driver_license.jpg`, url: driverLicenseUrl, kind: 'driver_license', label: 'Driver License' });
-        }
-
-        if (licenseDiskUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/license_disk.jpg`, url: licenseDiskUrl, kind: 'license_disk', label: 'License Disk' });
-        }
-
-        if (thirdPartyLicenseUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_license.jpg`, url: thirdPartyLicenseUrl, kind: 'third_party_license', label: 'Third Party License' });
-        }
-
-        if (thirdPartyDiskUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/third_party_disk.jpg`, url: thirdPartyDiskUrl, kind: 'third_party_disk', label: 'Third Party Disk' });
-        }
-
-        // Upload police report if provided
         if (policeReportFile) {
           const ext = policeReportFile.name.toLowerCase().endsWith('.pdf') ? '.pdf' : '.jpg';
           const policeUrl = await uploadFile(policeReportFile, 'claims', `${user.id}/${timestamp}/police_report${ext}`);
@@ -394,37 +342,22 @@ export default function ClientPortal() {
           police_station_name: policeStationName || null,
         };
 
-        await submitClaimUnified({
-          claimType: 'motor_accident',
-          claimData: completeClaimData,
-          attachments: attachments,
-        });
+        await submitClaimUnified({ claimType: 'motor_accident', claimData: completeClaimData, attachments });
       } else if (incidentType === 'burst_geyser') {
         const mediaUrls: string[] = [];
 
         if (leakVideo) {
-          const url = await uploadFile(
-            leakVideo,
-            'claims',
-            `${user.id}/${timestamp}/leak_video.mp4`
-          );
+          const url = await uploadFile(leakVideo, 'claims', `${user.id}/${timestamp}/leak_video.mp4`);
           mediaUrls.push(url);
         }
         if (serialPhoto) {
-          const url = await uploadFile(
-            serialPhoto,
-            'claims',
-            `${user.id}/${timestamp}/serial.jpg`
-          );
+          const url = await uploadFile(serialPhoto, 'claims', `${user.id}/${timestamp}/serial.jpg`);
           mediaUrls.push(url);
         }
 
-        // Build attachments array
         const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
-        if (voiceNoteUrl) {
-          attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
-        }
+        if (voiceNoteUrl) attachments.push({ bucket: 'claims', path: `${user.id}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
 
         mediaUrls.forEach((url, i) => {
           const isVideo = url.includes('leak_video');
@@ -446,11 +379,7 @@ export default function ClientPortal() {
           media_count: mediaUrls.length,
         };
 
-        await submitClaimUnified({
-          claimType: 'burst_geyser',
-          claimData: completeClaimData,
-          attachments: attachments,
-        });
+        await submitClaimUnified({ claimType: 'burst_geyser', claimData: completeClaimData, attachments });
       }
 
       setStep('success');
@@ -471,82 +400,48 @@ export default function ClientPortal() {
     if (step === 2) {
       return (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Accident Details
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Provide details about when and where the accident occurred
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Accident Details</h2>
+          <p className="text-gray-600 mb-6">Provide details about when and where the accident occurred</p>
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date and Time of Accident *
-              </label>
-              <input
-                type="datetime-local"
-                value={accidentDateTime}
-                onChange={(e) => setAccidentDateTime(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date and Time of Accident *</label>
+              <input type="datetime-local" value={accidentDateTime} onChange={(e) => setAccidentDateTime(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-start mb-2">
                   <MapPin className="w-5 h-5 text-gray-600 mr-2 mt-0.5" />
                   <div className="flex-1">
                     {location ? (
                       <>
-                        <p className="text-sm text-gray-700">
-                          {locationAddress || 'Fetching address...'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                        </p>
+                        <p className="text-sm text-gray-700">{locationAddress || 'Fetching address...'}</p>
+                        <p className="text-xs text-gray-500 mt-1">{location.lat.toFixed(6)}, {location.lng.toFixed(6)}</p>
                       </>
                     ) : (
                       <p className="text-sm text-gray-500">Location unavailable</p>
                     )}
                   </div>
                 </div>
-                <input
-                  type="text"
-                  value={locationAddress}
-                  onChange={(e) => setLocationAddress(e.target.value)}
+                <input type="text" value={locationAddress} onChange={(e) => setLocationAddress(e.target.value)}
                   placeholder="Enter or edit street address"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm" />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Car Condition *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Car Condition *</label>
               <div className="space-y-2">
-                <button
-                  onClick={() => setCarCondition('drivable')}
-                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                    carCondition === 'drivable'
-                      ? 'border-blue-700 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
+                <button onClick={() => setCarCondition('drivable')}
+                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${carCondition === 'drivable' ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                   <p className="font-semibold text-gray-900">Drivable</p>
                   <p className="text-sm text-gray-600">Vehicle can be driven safely</p>
                 </button>
-                <button
-                  onClick={() => setCarCondition('not_drivable')}
-                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
-                    carCondition === 'not_drivable'
-                      ? 'border-blue-700 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
-                  }`}
-                >
+                <button onClick={() => setCarCondition('not_drivable')}
+                  className={`w-full p-4 border-2 rounded-lg text-left transition-all ${carCondition === 'not_drivable' ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                   <p className="font-semibold text-gray-900">Not Drivable</p>
                   <p className="text-sm text-gray-600">Vehicle needs to be towed</p>
                 </button>
@@ -554,26 +449,14 @@ export default function ClientPortal() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Panel Beater Location *
-              </label>
-              <input
-                type="text"
-                value={panelBeaterLocation}
-                onChange={(e) => setPanelBeaterLocation(e.target.value)}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Panel Beater Location *</label>
+              <input type="text" value={panelBeaterLocation} onChange={(e) => setPanelBeaterLocation(e.target.value)}
                 placeholder="Enter the name or location of your preferred panel beater"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter the name or location of your preferred panel beater
-              </p>
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
             </div>
 
-            <button
-              onClick={() => setStep(3)}
-              disabled={!accidentDateTime || !carCondition || !panelBeaterLocation}
-              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-            >
+            <button onClick={() => setStep(3)} disabled={!accidentDateTime || !carCondition || !panelBeaterLocation}
+              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               Continue
             </button>
           </div>
@@ -584,61 +467,34 @@ export default function ClientPortal() {
     if (step === 3) {
       return (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Driver & Vehicle Documentation
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Upload photos of your driver's license and vehicle license disk
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Driver & Vehicle Documentation</h2>
+          <p className="text-gray-600 mb-6">Upload photos of your driver's license and vehicle license disk</p>
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Driver's License Photo *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Driver's License Photo *</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setDriverLicensePhoto(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="driver-license"
-                />
+                <input type="file" accept="image/*" onChange={(e) => setDriverLicensePhoto(e.target.files?.[0] || null)} className="hidden" id="driver-license" />
                 <label htmlFor="driver-license" className="cursor-pointer">
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    {driverLicensePhoto ? driverLicensePhoto.name : "Tap to upload driver's license"}
-                  </p>
+                  <p className="text-sm text-gray-600">{driverLicensePhoto ? driverLicensePhoto.name : "Tap to upload driver's license"}</p>
                 </label>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Vehicle License Disk Photo *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle License Disk Photo *</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setLicenseDiskPhoto(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="license-disk"
-                />
+                <input type="file" accept="image/*" onChange={(e) => setLicenseDiskPhoto(e.target.files?.[0] || null)} className="hidden" id="license-disk" />
                 <label htmlFor="license-disk" className="cursor-pointer">
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    {licenseDiskPhoto ? licenseDiskPhoto.name : 'Tap to upload license disk'}
-                  </p>
+                  <p className="text-sm text-gray-600">{licenseDiskPhoto ? licenseDiskPhoto.name : 'Tap to upload license disk'}</p>
                 </label>
               </div>
             </div>
 
-            <button
-              onClick={() => setStep(4)}
-              disabled={!driverLicensePhoto || !licenseDiskPhoto}
-              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-            >
+            <button onClick={() => setStep(4)} disabled={!driverLicensePhoto || !licenseDiskPhoto}
+              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               Continue
             </button>
           </div>
@@ -649,101 +505,49 @@ export default function ClientPortal() {
     if (step === 4) {
       return (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Third Party Details
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Provide information about the other party involved
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Third Party Details</h2>
+          <p className="text-gray-600 mb-6">Provide information about the other party involved</p>
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Third Party Name
-              </label>
-              <input
-                type="text"
-                value={thirdPartyName}
-                onChange={(e) => setThirdPartyName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Full name"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-2">Third Party Name</label>
+              <input type="text" value={thirdPartyName} onChange={(e) => setThirdPartyName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Full name" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Third Party Phone</label>
+              <input type="tel" value={thirdPartyPhone} onChange={(e) => setThirdPartyPhone(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Phone number" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Third Party Vehicle Details</label>
+              <input type="text" value={thirdPartyVehicle} onChange={(e) => setThirdPartyVehicle(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Make, model, registration" />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Third Party Phone
-              </label>
-              <input
-                type="tel"
-                value={thirdPartyPhone}
-                onChange={(e) => setThirdPartyPhone(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Phone number"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Third Party Vehicle Details
-              </label>
-              <input
-                type="text"
-                value={thirdPartyVehicle}
-                onChange={(e) => setThirdPartyVehicle(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Make, model, registration"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Third Party Driver's License Photo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Third Party Driver's License Photo</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setThirdPartyLicensePhoto(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="third-party-license"
-                />
+                <input type="file" accept="image/*" onChange={(e) => setThirdPartyLicensePhoto(e.target.files?.[0] || null)} className="hidden" id="third-party-license" />
                 <label htmlFor="third-party-license" className="cursor-pointer">
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    {thirdPartyLicensePhoto ? thirdPartyLicensePhoto.name : 'Tap to upload (optional)'}
-                  </p>
+                  <p className="text-sm text-gray-600">{thirdPartyLicensePhoto ? thirdPartyLicensePhoto.name : 'Tap to upload (optional)'}</p>
                 </label>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Third Party License Disk Photo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Third Party License Disk Photo</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setThirdPartyDiskPhoto(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="third-party-disk"
-                />
+                <input type="file" accept="image/*" onChange={(e) => setThirdPartyDiskPhoto(e.target.files?.[0] || null)} className="hidden" id="third-party-disk" />
                 <label htmlFor="third-party-disk" className="cursor-pointer">
                   <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">
-                    {thirdPartyDiskPhoto ? thirdPartyDiskPhoto.name : 'Tap to upload (optional)'}
-                  </p>
+                  <p className="text-sm text-gray-600">{thirdPartyDiskPhoto ? thirdPartyDiskPhoto.name : 'Tap to upload (optional)'}</p>
                 </label>
               </div>
             </div>
 
-            <button
-              onClick={() => setStep(5)}
-              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
-            >
-              Continue
-            </button>
+            <button onClick={() => setStep(5)} className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800">Continue</button>
           </div>
         </div>
       );
@@ -752,130 +556,45 @@ export default function ClientPortal() {
     if (step === 5) {
       return (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Vehicle Damage Photos
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Upload at least 2 photos showing the damage to your vehicle
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Vehicle Damage Photos</h2>
+          <p className="text-gray-600 mb-6">Upload at least 2 photos showing the damage to your vehicle</p>
 
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 1 *
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setDamagePhoto1(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="damage-1"
-                  />
-                  <label htmlFor="damage-1" className="cursor-pointer">
-                    <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-600">
-                      {damagePhoto1 ? damagePhoto1.name : 'Upload photo'}
-                    </p>
-                  </label>
+              {[
+                { label: 'Damage Photo 1 *', state: damagePhoto1, setter: setDamagePhoto1, id: 'damage-1' },
+                { label: 'Damage Photo 2 *', state: damagePhoto2, setter: setDamagePhoto2, id: 'damage-2' },
+                { label: 'Damage Photo 3 (Optional)', state: damagePhoto3, setter: setDamagePhoto3, id: 'damage-3' },
+                { label: 'Damage Photo 4 (Optional)', state: damagePhoto4, setter: setDamagePhoto4, id: 'damage-4' },
+              ].map(({ label, state, setter, id }) => (
+                <div key={id}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                    <input type="file" accept="image/*" onChange={(e) => setter(e.target.files?.[0] || null)} className="hidden" id={id} />
+                    <label htmlFor={id} className="cursor-pointer">
+                      <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs text-gray-600">{state ? state.name : 'Upload photo'}</p>
+                    </label>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 2 *
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setDamagePhoto2(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="damage-2"
-                  />
-                  <label htmlFor="damage-2" className="cursor-pointer">
-                    <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-600">
-                      {damagePhoto2 ? damagePhoto2.name : 'Upload photo'}
-                    </p>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 3 (Optional)
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setDamagePhoto3(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="damage-3"
-                  />
-                  <label htmlFor="damage-3" className="cursor-pointer">
-                    <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-600">
-                      {damagePhoto3 ? damagePhoto3.name : 'Upload photo'}
-                    </p>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photo 4 (Optional)
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setDamagePhoto4(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="damage-4"
-                  />
-                  <label htmlFor="damage-4" className="cursor-pointer">
-                    <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                    <p className="text-xs text-gray-600">
-                      {damagePhoto4 ? damagePhoto4.name : 'Upload photo'}
-                    </p>
-                  </label>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Additional photos */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Additional Photos (Optional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Additional Photos (Optional)</label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => setAdditionalDamagePhotos(Array.from(e.target.files || []))}
-                  className="hidden"
-                  id="damage-extra"
-                />
+                <input type="file" accept="image/*" multiple onChange={(e) => setAdditionalDamagePhotos(Array.from(e.target.files || []))} className="hidden" id="damage-extra" />
                 <label htmlFor="damage-extra" className="cursor-pointer">
                   <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
                   <p className="text-xs text-gray-600">
-                    {additionalDamagePhotos.length > 0
-                      ? `${additionalDamagePhotos.length} additional photo(s) selected`
-                      : 'Tap to upload more photos (select multiple)'}
+                    {additionalDamagePhotos.length > 0 ? `${additionalDamagePhotos.length} additional photo(s) selected` : 'Tap to upload more photos'}
                   </p>
                 </label>
               </div>
             </div>
 
-            <button
-              onClick={() => setStep(6)}
-              disabled={!damagePhoto1 || !damagePhoto2}
-              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-            >
+            <button onClick={() => setStep(6)} disabled={!damagePhoto1 || !damagePhoto2}
+              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               Continue
             </button>
           </div>
@@ -886,133 +605,72 @@ export default function ClientPortal() {
     if (step === 6) {
       return (
         <div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">
-            Your Statement
-          </h2>
-          <p className="text-gray-600 mb-6">
-            Record a voice note OR type your statement. You can also provide police report details if available.
-          </p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Your Statement</h2>
+          <p className="text-gray-600 mb-6">Record a voice note OR type your statement.</p>
 
           <div className="space-y-6">
-            {/* Voice Note */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Voice Statement (Optional)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Voice Statement (Optional)</label>
               <div className="text-center">
                 {!audioBlob ? (
                   <div>
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                        isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'
-                      }`}
-                    >
+                    <button onClick={isRecording ? stopRecording : startRecording}
+                      className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'}`}>
                       <Mic className="w-12 h-12 text-white" />
                     </button>
-                    <p className="text-sm text-gray-600">
-                      {isRecording ? 'Tap to stop recording' : 'Tap to record voice note'}
-                    </p>
+                    <p className="text-sm text-gray-600">{isRecording ? 'Tap to stop recording' : 'Tap to record voice note'}</p>
                   </div>
                 ) : (
                   <div>
                     <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
                     <p className="text-sm text-gray-600 mb-2">Voice note recorded</p>
-                    <audio controls className="w-full mb-2">
-                      <source src={URL.createObjectURL(audioBlob)} type="audio/webm" />
-                    </audio>
-                    <button onClick={() => setAudioBlob(null)} className="text-blue-700 text-sm hover:underline">
-                      Record again
-                    </button>
+                    <audio controls className="w-full mb-2"><source src={URL.createObjectURL(audioBlob)} type="audio/webm" /></audio>
+                    <button onClick={() => setAudioBlob(null)} className="text-blue-700 text-sm hover:underline">Record again</button>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Typed Statement */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Written Statement (Optional)
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                If you can't record a voice note, type your statement here
-              </p>
-              <textarea
-                value={typedStatement}
-                onChange={(e) => setTypedStatement(e.target.value)}
-                rows={5}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Written Statement (Optional)</label>
+              <textarea value={typedStatement} onChange={(e) => setTypedStatement(e.target.value)} rows={5}
                 placeholder="Describe what happened in detail..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
-              />
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none" />
             </div>
 
-            {/* Police Report - Optional */}
             <div className="border-t pt-6">
               <h3 className="font-semibold text-gray-900 mb-1">Police Report (Optional)</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                If you have already reported this to the police, please provide the details below
-              </p>
-
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Case Number
-                  </label>
-                  <input
-                    type="text"
-                    value={policeCaseNumber}
-                    onChange={(e) => setPoliceCaseNumber(e.target.value)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Case Number</label>
+                  <input type="text" value={policeCaseNumber} onChange={(e) => setPoliceCaseNumber(e.target.value)}
                     placeholder="e.g. CAS 123/04/2026"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Police Station Name
-                  </label>
-                  <input
-                    type="text"
-                    value={policeStationName}
-                    onChange={(e) => setPoliceStationName(e.target.value)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Police Station Name</label>
+                  <input type="text" value={policeStationName} onChange={(e) => setPoliceStationName(e.target.value)}
                     placeholder="e.g. Sandton Police Station"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" />
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Upload Police Report (Optional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload Police Report (Optional)</label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => setPoliceReportFile(e.target.files?.[0] || null)}
-                      className="hidden"
-                      id="police-report"
-                    />
+                    <input type="file" accept="image/*,.pdf" onChange={(e) => setPoliceReportFile(e.target.files?.[0] || null)} className="hidden" id="police-report" />
                     <label htmlFor="police-report" className="cursor-pointer">
                       <Camera className="w-8 h-8 text-gray-400 mx-auto mb-1" />
-                      <p className="text-xs text-gray-600">
-                        {policeReportFile ? policeReportFile.name : 'Tap to upload report or photo'}
-                      </p>
+                      <p className="text-xs text-gray-600">{policeReportFile ? policeReportFile.name : 'Tap to upload'}</p>
                     </label>
                   </div>
                 </div>
               </div>
             </div>
 
-            <button
-              onClick={() => setStep(7)}
-              disabled={!audioBlob && !typedStatement.trim()}
-              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-            >
+            <button onClick={() => setStep(7)} disabled={!audioBlob && !typedStatement.trim()}
+              className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               Continue
             </button>
-            <p className="text-xs text-center text-gray-500">
-              Please provide either a voice note or written statement to continue
-            </p>
+            <p className="text-xs text-center text-gray-500">Please provide either a voice note or written statement to continue</p>
           </div>
         </div>
       );
@@ -1022,35 +680,25 @@ export default function ClientPortal() {
       return (
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Review & Submit</h2>
-          <p className="text-gray-600 mb-6">
-            Please review your claim details before submitting
-          </p>
+          <p className="text-gray-600 mb-6">Please review your claim details before submitting</p>
 
           <div className="space-y-4 mb-6">
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Accident Date</p>
-              <p className="font-semibold">
-                {new Date(accidentDateTime).toLocaleString()}
-              </p>
+              <p className="font-semibold">{new Date(accidentDateTime).toLocaleString()}</p>
             </div>
-
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Location</p>
               <p className="text-sm text-gray-700">{locationAddress || 'Not provided'}</p>
             </div>
-
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Car Condition</p>
-              <p className="font-semibold">
-                {carCondition === 'drivable' ? 'Drivable' : 'Not Drivable'}
-              </p>
+              <p className="font-semibold">{carCondition === 'drivable' ? 'Drivable' : 'Not Drivable'}</p>
             </div>
-
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Panel Beater</p>
               <p className="text-sm text-gray-700">{panelBeaterLocation}</p>
             </div>
-
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Statement</p>
               <p className="text-sm text-gray-700">
@@ -1059,7 +707,6 @@ export default function ClientPortal() {
                  typedStatement ? 'Written statement provided' : 'None'}
               </p>
             </div>
-
             {(policeCaseNumber || policeStationName) && (
               <div className="p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">Police Report</p>
@@ -1067,7 +714,6 @@ export default function ClientPortal() {
                 {policeStationName && <p className="text-sm text-gray-700">Station: {policeStationName}</p>}
               </div>
             )}
-
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Documentation</p>
               <p className="text-sm text-gray-700">
@@ -1081,31 +727,16 @@ export default function ClientPortal() {
               <div className="flex">
                 <AlertCircle className="w-5 h-5 text-yellow-400 mr-3 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-yellow-800 mb-1">
-                    Police Case Number
-                  </p>
-                  <p className="text-sm text-yellow-700">
-                    If you haven't reported to the police yet, please do so as soon as possible.
-                    A police case number will be needed to process your claim.
-                  </p>
+                  <p className="text-sm font-semibold text-yellow-800 mb-1">Police Case Number</p>
+                  <p className="text-sm text-yellow-700">If you haven't reported to the police yet, please do so as soon as possible.</p>
                 </div>
               </div>
             </div>
           )}
 
-          <button
-            onClick={submitClaim}
-            disabled={loading}
-            className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              'Submit Claim'
-            )}
+          <button onClick={submitClaim} disabled={loading}
+            className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center">
+            {loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Submitting...</> : 'Submit Claim'}
           </button>
         </div>
       );
@@ -1116,40 +747,24 @@ export default function ClientPortal() {
   if (viewMode === 'past-claims') {
     return (
       <ClientPastClaims
-        onViewClaim={(claimId) => {
-          setSelectedClaimId(claimId);
-          setViewMode('claim-detail');
-        }}
+        onViewClaim={(claimId) => { setSelectedClaimId(claimId); setViewMode('claim-detail'); }}
         onBack={() => setViewMode('home')}
       />
     );
   }
 
-  // Handle Claim Detail view
   if (viewMode === 'claim-detail' && selectedClaimId) {
     return (
       <ClientClaimDetail
         claimId={selectedClaimId}
-        onBack={() => {
-          setSelectedClaimId(null);
-          setViewMode('past-claims');
-        }}
+        onBack={() => { setSelectedClaimId(null); setViewMode('past-claims'); }}
       />
     );
   }
 
-  // Handle Client Admin views
-  if (viewMode === 'admin-documents') {
-    return <ClientDocuments onBack={() => setViewMode('home')} />;
-  }
-
-  if (viewMode === 'admin-details') {
-    return <ClientDetails onBack={() => setViewMode('home')} />;
-  }
-
-  if (viewMode === 'admin-contact') {
-    return <ContactBroker onBack={() => setViewMode('home')} />;
-  }
+  if (viewMode === 'admin-documents') return <ClientDocuments onBack={() => setViewMode('home')} />;
+  if (viewMode === 'admin-details') return <ClientDetails onBack={() => setViewMode('home')} />;
+  if (viewMode === 'admin-contact') return <ContactBroker onBack={() => setViewMode('home')} />;
 
   if (step === 'success') {
     return (
@@ -1157,14 +772,10 @@ export default function ClientPortal() {
         <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Claim Submitted!</h2>
-          <p className="text-gray-600 mb-6">
-            Your claim has been successfully submitted. A broker will review it shortly.
-          </p>
+          <p className="text-gray-600 mb-6">Your claim has been successfully submitted. A broker will review it shortly.</p>
           {incidentType === 'motor_accident' && !policeCaseNumber && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-              <p className="text-sm font-semibold text-blue-900 mb-2">
-                Next Steps:
-              </p>
+              <p className="text-sm font-semibold text-blue-900 mb-2">Next Steps:</p>
               <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
                 <li>Visit your nearest police station to file a report</li>
                 <li>Obtain a police case number</li>
@@ -1172,10 +783,7 @@ export default function ClientPortal() {
               </ol>
             </div>
           )}
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800"
-          >
+          <button onClick={() => window.location.reload()} className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800">
             Submit Another Claim
           </button>
         </div>
@@ -1183,67 +791,38 @@ export default function ClientPortal() {
     );
   }
 
-  if (claimType === 'theft' && clientData) {
-    return (
-      <TheftClaimForm
-        clientId={clientData.id}
-        brokerageId={clientData.brokerage_id}
-        onBack={() => setClaimType(null)}
-      />
-    );
-  }
-
-  if (claimType === 'motor_vehicle_theft' && clientData) {
-    return (
-      <MotorVehicleTheftForm
-        clientId={clientData.id}
-        brokerageId={clientData.brokerage_id}
-        onBack={() => setClaimType(null)}
-      />
-    );
-  }
-
-  if (claimType === 'structural_damage' && clientData) {
-    return (
-      <StructuralDamageForm
-        clientId={clientData.id}
-        brokerageId={clientData.brokerage_id}
-        onBack={() => setClaimType(null)}
-      />
-    );
-  }
-
-  if (claimType === 'all_risk' && clientData) {
-    return (
-      <AllRiskForm
-        clientId={clientData.id}
-        brokerageId={clientData.brokerage_id}
-        onBack={() => setClaimType(null)}
-      />
-    );
-  }
+  if (claimType === 'theft' && clientData) return <TheftClaimForm clientId={clientData.id} brokerageId={clientData.brokerage_id} onBack={() => setClaimType(null)} />;
+  if (claimType === 'motor_vehicle_theft' && clientData) return <MotorVehicleTheftForm clientId={clientData.id} brokerageId={clientData.brokerage_id} onBack={() => setClaimType(null)} />;
+  if (claimType === 'structural_damage' && clientData) return <StructuralDamageForm clientId={clientData.id} brokerageId={clientData.brokerage_id} onBack={() => setClaimType(null)} />;
+  if (claimType === 'all_risk' && clientData) return <AllRiskForm clientId={clientData.id} brokerageId={clientData.brokerage_id} onBack={() => setClaimType(null)} />;
 
   if (!claimType) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
         <div className="max-w-6xl mx-auto p-4 py-8">
+
+          {/* ─── HEADER WITH BROKERAGE LOGO ─── */}
           <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Client Portal</h1>
-              <p className="text-gray-600 mt-1">Manage your claims, documents, and profile</p>
+            <div className="flex items-center gap-3">
+              {brokerage?.logo_url && (
+                <img
+                  src={brokerage.logo_url}
+                  alt={brokerage.name}
+                  className="h-12 object-contain"
+                />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Client Portal</h1>
+                <p className="text-gray-600 mt-1">Manage your claims, documents, and profile</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setViewMode('past-claims')}
-                className="flex items-center px-4 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium"
-              >
+              <button onClick={() => setViewMode('past-claims')}
+                className="flex items-center px-4 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium">
                 <History className="w-5 h-5 mr-2" />
                 Past Claims
               </button>
-              <button
-                onClick={signOut}
-                className="flex items-center px-4 py-2 text-gray-700 hover:bg-white rounded-lg transition"
-              >
+              <button onClick={signOut} className="flex items-center px-4 py-2 text-gray-700 hover:bg-white rounded-lg transition">
                 <LogOut className="w-5 h-5 mr-2" />
                 Sign Out
               </button>
@@ -1251,127 +830,91 @@ export default function ClientPortal() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <button
-              onClick={() => setViewMode('past-claims')}
-              className="group bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border-2 border-blue-500"
-            >
+            <button onClick={() => setViewMode('past-claims')}
+              className="group bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border-2 border-blue-500">
               <div className="bg-white/20 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-white/30 transition-colors">
                 <History className="w-9 h-9 text-white" />
               </div>
               <h3 className="text-xl font-bold text-white mb-2">Past Claims</h3>
-              <p className="text-sm text-blue-50 mb-8 leading-relaxed">
-                View and update documents for your submitted claims
-              </p>
+              <p className="text-sm text-blue-50 mb-8 leading-relaxed">View and update documents for your submitted claims</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-blue-100">View your claims</span>
                 <span className="text-white text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => {
-                setClaimType('motor');
-                setIncidentType('motor_accident');
-                setStep(2);
-              }}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-            >
+            <button onClick={() => { setClaimType('motor'); setIncidentType('motor_accident'); setStep(2); }}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100">
               <div className="bg-blue-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-blue-100 transition-colors">
                 <Car className="w-9 h-9 text-blue-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Motor Accident</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Vehicle collision or road incident claim
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Vehicle collision or road incident claim</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">6 steps</span>
                 <span className="text-blue-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => {
-                setClaimType('geyser');
-                setIncidentType('burst_geyser');
-                setStep(2);
-              }}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-            >
+            <button onClick={() => { setClaimType('geyser'); setIncidentType('burst_geyser'); setStep(2); }}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100">
               <div className="bg-cyan-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-cyan-100 transition-colors">
                 <Droplet className="w-9 h-9 text-cyan-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Burst Geyser</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Water heater leak or damage claim
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Water heater leak or damage claim</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">4 steps</span>
                 <span className="text-cyan-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => setClaimType('motor_vehicle_theft')}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-orange-100"
-            >
+            <button onClick={() => setClaimType('motor_vehicle_theft')}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-orange-100">
               <div className="bg-orange-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-orange-100 transition-colors">
                 <CarFront className="w-9 h-9 text-orange-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Motor Vehicle Theft</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Vehicle theft or hijacking claim
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Vehicle theft or hijacking claim</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-orange-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => setClaimType('theft')}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-green-100"
-            >
+            <button onClick={() => setClaimType('theft')}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-green-100">
               <div className="bg-green-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-green-100 transition-colors">
                 <Shield className="w-9 h-9 text-green-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Theft Claim</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Property theft or burglary claim
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Property theft or burglary claim</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-green-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => setClaimType('structural_damage')}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-amber-100"
-            >
+            <button onClick={() => setClaimType('structural_damage')}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-amber-100">
               <div className="bg-amber-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-amber-100 transition-colors">
                 <Home className="w-9 h-9 text-amber-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Structural Damage</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Storm, water, fire, or impact damage
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Storm, water, fire, or impact damage</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">6 steps</span>
                 <span className="text-amber-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
               </div>
             </button>
 
-            <button
-              onClick={() => setClaimType('all_risk')}
-              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-teal-100"
-            >
+            <button onClick={() => setClaimType('all_risk')}
+              className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-teal-100">
               <div className="bg-teal-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-teal-100 transition-colors">
                 <Briefcase className="w-9 h-9 text-teal-700" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">All-Risk Items</h3>
-              <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                Items lost or damaged outside your home
-              </p>
+              <p className="text-sm text-gray-600 mb-8 leading-relaxed">Items lost or damaged outside your home</p>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-500">5 steps</span>
                 <span className="text-teal-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Start →</span>
@@ -1384,51 +927,39 @@ export default function ClientPortal() {
             <p className="text-gray-600 mb-6">Manage your account, documents, and broker communications</p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <button
-                onClick={() => setViewMode('admin-documents')}
-                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-              >
+              <button onClick={() => setViewMode('admin-documents')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100">
                 <div className="bg-emerald-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-emerald-100 transition-colors">
                   <FileText className="w-9 h-9 text-emerald-700" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Documents</h3>
-                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                  View and upload invoices, receipts, and contracts
-                </p>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">View and upload invoices, receipts, and contracts</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-500">Manage files</span>
                   <span className="text-emerald-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
                 </div>
               </button>
 
-              <button
-                onClick={() => setViewMode('admin-details')}
-                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-              >
+              <button onClick={() => setViewMode('admin-details')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100">
                 <div className="bg-violet-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-violet-100 transition-colors">
                   <User className="w-9 h-9 text-violet-700" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">My Details</h3>
-                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                  Update your personal information and address
-                </p>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">Update your personal information and address</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-500">Edit profile</span>
                   <span className="text-violet-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
                 </div>
               </button>
 
-              <button
-                onClick={() => setViewMode('admin-contact')}
-                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100"
-              >
+              <button onClick={() => setViewMode('admin-contact')}
+                className="group bg-white rounded-2xl shadow-md hover:shadow-2xl p-8 text-left transition-all duration-300 hover:-translate-y-1 border border-gray-100">
                 <div className="bg-rose-50 rounded-xl w-16 h-16 flex items-center justify-center mb-5 group-hover:bg-rose-100 transition-colors">
                   <MessageSquare className="w-9 h-9 text-rose-700" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Contact Broker</h3>
-                <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-                  Send voice messages or request meetings
-                </p>
+                <p className="text-sm text-gray-600 mb-8 leading-relaxed">Send voice messages or request meetings</p>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-500">Get in touch</span>
                   <span className="text-rose-700 text-sm font-semibold group-hover:translate-x-1 transition-transform">Open →</span>
@@ -1448,21 +979,12 @@ export default function ClientPortal() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
       <div className="max-w-2xl mx-auto p-4 py-8">
         <div className="flex items-center justify-between mb-8">
-          <button
-            onClick={() => {
-              setClaimType(null);
-              setStep(1);
-              setIncidentType(null);
-            }}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-2"
-          >
+          <button onClick={() => { setClaimType(null); setStep(1); setIncidentType(null); }}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-2">
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Claim Types
           </button>
-          <button
-            onClick={signOut}
-            className="flex items-center text-gray-600 hover:text-gray-900"
-          >
+          <button onClick={signOut} className="flex items-center text-gray-600 hover:text-gray-900">
             <LogOut className="w-5 h-5 mr-2" />
             Sign Out
           </button>
@@ -1472,21 +994,11 @@ export default function ClientPortal() {
           <div className="flex items-center justify-between">
             {Array.from({ length: Math.min(totalSteps, 7) }, (_, i) => i + 1).map((s) => (
               <div key={s} className="flex-1 flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    currentStepNum >= s
-                      ? 'bg-blue-700 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${currentStepNum >= s ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-500'}`}>
                   {s}
                 </div>
                 {s < Math.min(totalSteps, 7) && (
-                  <div
-                    className={`flex-1 h-1 mx-1 ${
-                      currentStepNum > s ? 'bg-blue-700' : 'bg-gray-200'
-                    }`}
-                  />
+                  <div className={`flex-1 h-1 mx-1 ${currentStepNum > s ? 'bg-blue-700' : 'bg-gray-200'}`} />
                 )}
               </div>
             ))}
@@ -1496,50 +1008,26 @@ export default function ClientPortal() {
         <div className="bg-white rounded-xl shadow-lg p-6">
           {step === 1 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Choose Incident Type
-              </h2>
-              <p className="text-gray-600 mb-6">
-                What type of incident are you reporting?
-              </p>
-
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Choose Incident Type</h2>
+              <p className="text-gray-600 mb-6">What type of incident are you reporting?</p>
               <div className="space-y-4">
-                <button
-                  onClick={() => {
-                    setIncidentType('motor_accident');
-                    setStep(2);
-                  }}
-                  className="w-full p-6 border-2 border-gray-200 rounded-lg hover:border-blue-700 hover:bg-blue-50 transition-all text-left"
-                >
+                <button onClick={() => { setIncidentType('motor_accident'); setStep(2); }}
+                  className="w-full p-6 border-2 border-gray-200 rounded-lg hover:border-blue-700 hover:bg-blue-50 transition-all text-left">
                   <div className="flex items-start">
                     <Car className="w-8 h-8 text-blue-700 mr-4" />
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        Motor Accident
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Vehicle collision or road incident
-                      </p>
+                      <h3 className="font-semibold text-gray-900 mb-1">Motor Accident</h3>
+                      <p className="text-sm text-gray-600">Vehicle collision or road incident</p>
                     </div>
                   </div>
                 </button>
-
-                <button
-                  onClick={() => {
-                    setIncidentType('burst_geyser');
-                    setStep(2);
-                  }}
-                  className="w-full p-6 border-2 border-gray-200 rounded-lg hover:border-blue-700 hover:bg-blue-50 transition-all text-left"
-                >
+                <button onClick={() => { setIncidentType('burst_geyser'); setStep(2); }}
+                  className="w-full p-6 border-2 border-gray-200 rounded-lg hover:border-blue-700 hover:bg-blue-50 transition-all text-left">
                   <div className="flex items-start">
                     <Droplet className="w-8 h-8 text-blue-700 mr-4" />
                     <div>
-                      <h3 className="font-semibold text-gray-900 mb-1">
-                        Burst Geyser
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Water heater leak or damage
-                      </p>
+                      <h3 className="font-semibold text-gray-900 mb-1">Burst Geyser</h3>
+                      <p className="text-sm text-gray-600">Water heater leak or damage</p>
                     </div>
                   </div>
                 </button>
@@ -1551,61 +1039,31 @@ export default function ClientPortal() {
 
           {incidentType === 'burst_geyser' && step === 2 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Geyser Details
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Upload a video of the leak and photo of serial number
-              </p>
-
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Geyser Details</h2>
+              <p className="text-gray-600 mb-6">Upload a video of the leak and photo of serial number</p>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Leak Video *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Leak Video *</label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <input
-                      type="file"
-                      accept="video/*"
-                      onChange={(e) => setLeakVideo(e.target.files?.[0] || null)}
-                      className="hidden"
-                      id="leak-video"
-                    />
+                    <input type="file" accept="video/*" onChange={(e) => setLeakVideo(e.target.files?.[0] || null)} className="hidden" id="leak-video" />
                     <label htmlFor="leak-video" className="cursor-pointer">
                       <Video className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        {leakVideo ? leakVideo.name : 'Tap to upload video'}
-                      </p>
+                      <p className="text-sm text-gray-600">{leakVideo ? leakVideo.name : 'Tap to upload video'}</p>
                     </label>
                   </div>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Serial Number Photo *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Serial Number Photo *</label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setSerialPhoto(e.target.files?.[0] || null)}
-                      className="hidden"
-                      id="serial-photo"
-                    />
+                    <input type="file" accept="image/*" onChange={(e) => setSerialPhoto(e.target.files?.[0] || null)} className="hidden" id="serial-photo" />
                     <label htmlFor="serial-photo" className="cursor-pointer">
                       <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        {serialPhoto ? serialPhoto.name : 'Tap to upload photo'}
-                      </p>
+                      <p className="text-sm text-gray-600">{serialPhoto ? serialPhoto.name : 'Tap to upload photo'}</p>
                     </label>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setStep(3)}
-                  disabled={!leakVideo || !serialPhoto}
-                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-                >
+                <button onClick={() => setStep(3)} disabled={!leakVideo || !serialPhoto}
+                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
                   Continue
                 </button>
               </div>
@@ -1614,49 +1072,27 @@ export default function ClientPortal() {
 
           {incidentType === 'burst_geyser' && step === 3 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Voice Statement
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Record a voice note describing the incident
-              </p>
-
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Voice Statement</h2>
+              <p className="text-gray-600 mb-6">Record a voice note describing the incident</p>
               <div className="text-center">
                 {!audioBlob ? (
                   <div>
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                        isRecording
-                          ? 'bg-red-500 animate-pulse'
-                          : 'bg-blue-700 hover:bg-blue-800'
-                      }`}
-                    >
+                    <button onClick={isRecording ? stopRecording : startRecording}
+                      className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'}`}>
                       <Mic className="w-16 h-16 text-white" />
                     </button>
-                    <p className="text-sm text-gray-600">
-                      {isRecording ? 'Tap to stop recording' : 'Tap to start recording'}
-                    </p>
+                    <p className="text-sm text-gray-600">{isRecording ? 'Tap to stop recording' : 'Tap to start recording'}</p>
                   </div>
                 ) : (
                   <div>
                     <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                     <p className="text-sm text-gray-600 mb-4">Recording saved</p>
-                    <button
-                      onClick={() => setAudioBlob(null)}
-                      className="text-blue-700 text-sm hover:underline"
-                    >
-                      Record again
-                    </button>
+                    <button onClick={() => setAudioBlob(null)} className="text-blue-700 text-sm hover:underline">Record again</button>
                   </div>
                 )}
               </div>
-
-              <button
-                onClick={() => setStep(4)}
-                disabled={!audioBlob}
-                className="w-full mt-6 bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
-              >
+              <button onClick={() => setStep(4)} disabled={!audioBlob}
+                className="w-full mt-6 bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
                 Continue
               </button>
             </div>
@@ -1665,52 +1101,33 @@ export default function ClientPortal() {
           {incidentType === 'burst_geyser' && step === 4 && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Review & Submit</h2>
-              <p className="text-gray-600 mb-6">
-                Please review your claim details before submitting
-              </p>
-
+              <p className="text-gray-600 mb-6">Please review your claim details before submitting</p>
               <div className="space-y-4 mb-6">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">Incident Type</p>
                   <p className="font-semibold">Burst Geyser</p>
                 </div>
-
                 {location && (
                   <div className="p-4 bg-gray-50 rounded-lg">
                     <p className="text-sm text-gray-600 mb-2">Location</p>
                     <div className="flex items-center text-sm">
                       <MapPin className="w-4 h-4 text-gray-600 mr-2" />
-                      <span>
-                        {locationAddress || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}
-                      </span>
+                      <span>{locationAddress || `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`}</span>
                     </div>
                   </div>
                 )}
-
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">Media</p>
                   <p className="font-semibold">1 video, 1 photo</p>
                 </div>
-
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">Voice Statement</p>
                   <p className="font-semibold">Recorded</p>
                 </div>
               </div>
-
-              <button
-                onClick={submitClaim}
-                disabled={loading}
-                className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Claim'
-                )}
+              <button onClick={submitClaim} disabled={loading}
+                className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center">
+                {loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Submitting...</> : 'Submit Claim'}
               </button>
             </div>
           )}
