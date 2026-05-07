@@ -64,22 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const detectInviteFlow = () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const queryParams = new URLSearchParams(window.location.search);
-
       const hasAccessToken = hashParams.has('access_token');
       const hasType = hashParams.has('type') || queryParams.has('type');
       const type = hashParams.get('type') || queryParams.get('type');
-
       const isInviteOrRecovery = type === 'recovery' || type === 'invite' || type === 'magiclink';
-
-      console.log('🔍 Checking for invite/recovery flow:', {
-        hasAccessToken,
-        hasType,
-        type,
-        isInviteOrRecovery,
-        hash: window.location.hash,
-        search: window.location.search
-      });
-
+      console.log('🔍 Checking for invite/recovery flow:', { hasAccessToken, hasType, type, isInviteOrRecovery });
       return hasAccessToken || isInviteOrRecovery;
     };
 
@@ -89,10 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         console.log('📦 Session found');
         setUser(session.user);
-
-        // CRITICAL: Super admins bypass password setup entirely
         const userIsSuperAdmin = isSuperAdmin(session.user.email);
-
         if (isInviteFlow && !userIsSuperAdmin) {
           console.log('🔐 Invite/Recovery flow detected on init - showing password setup');
           setNeedsPasswordSetup(true);
@@ -124,11 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (event === 'PASSWORD_RECOVERY') {
-        console.log('🔐 PASSWORD_RECOVERY event detected - user from invite link');
+        console.log('🔐 PASSWORD_RECOVERY event detected');
         if (session?.user) {
           setUser(session.user);
-
-          // CRITICAL: Super admins bypass password setup
           const userIsSuperAdmin = isSuperAdmin(session.user.email);
           if (!userIsSuperAdmin) {
             setNeedsPasswordSetup(true);
@@ -146,12 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           const hashParams = new URLSearchParams(window.location.hash.substring(1));
           const queryParams = new URLSearchParams(window.location.search);
-
           const hasAccessToken = hashParams.has('access_token');
           const type = hashParams.get('type') || queryParams.get('type');
           const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
-
-          // CRITICAL: Super admins bypass password setup
           const userIsSuperAdmin = isSuperAdmin(session.user.email);
 
           if (isInviteFlow && !userIsSuperAdmin) {
@@ -171,15 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (session?.user) {
         setUser(session.user);
-
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const queryParams = new URLSearchParams(window.location.search);
-
         const hasAccessToken = hashParams.has('access_token');
         const type = hashParams.get('type') || queryParams.get('type');
         const isInviteFlow = hasAccessToken || type === 'recovery' || type === 'invite' || type === 'magiclink';
-
-        // CRITICAL: Super admins bypass password setup
         const userIsSuperAdmin = isSuperAdmin(session.user.email);
 
         if (isInviteFlow && !userIsSuperAdmin) {
@@ -200,24 +177,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string, userEmail: string | undefined) => {
     try {
+      // ─── FIX: Always reset loading=true at the start of profile loading.
+      // This prevents HomePageRouter from attempting to route while the
+      // profile is still being fetched — which caused the broker-portal
+      // redirect bug on fresh sign-in (loading was already false from
+      // the initial getSession that found no session).
+      setLoading(true);
+
       console.log('Loading profile for userId:', userId);
 
-      // Get current user to access metadata
       const { data: { user } } = await supabase.auth.getUser();
 
-      // CRITICAL: Force super_admin role for vickypingo@gmail.com regardless of database
+      // CRITICAL: Force super_admin role for vickypingo@gmail.com
       if (userEmail === 'vickypingo@gmail.com') {
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('👑 SUPER ADMIN OVERRIDE: vickypingo@gmail.com detected');
-        console.log('✅ FORCING super_admin ROLE - BYPASSING DATABASE CHECK');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
         setUserType('broker');
         setUserRole('super_admin');
         setBrokerageId(null);
         setLoading(false);
 
-        // Update database in background
         const { data: profileCheck } = await supabase
           .from('profiles')
           .select('*')
@@ -227,19 +205,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (profileCheck) {
           setBrokerProfile(profileCheck);
           if (profileCheck.role !== 'super_admin') {
-            await supabase
-              .from('profiles')
-              .update({ role: 'super_admin' })
-              .eq('user_id', userId);
+            await supabase.from('profiles').update({ role: 'super_admin' }).eq('user_id', userId);
           }
         }
         return;
       }
 
-      // Check if user is super admin by email
       const isUserSuperAdmin = isSuperAdmin(userEmail);
 
-      // Try to load profile from profiles table (without role filter to catch all users)
       let { data: brokerProfileData } = await supabase
         .from('profiles')
         .select('*')
@@ -247,18 +220,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (brokerProfileData) {
-        // CRITICAL: If profile is incomplete (missing brokerage_id, email, or full_name), update it
+        // Patch incomplete profiles (preserve role — not included in updatePayload)
         if (!brokerProfileData.brokerage_id || !brokerProfileData.email || !brokerProfileData.full_name) {
-          console.log('📝 Profile incomplete - updating with subdomain brokerage and user data');
-          console.log('   Current profile:', {
-            id: brokerProfileData.id,
-            brokerage_id: brokerProfileData.brokerage_id,
-            email: brokerProfileData.email,
-            full_name: brokerProfileData.full_name
-          });
-
+          console.log('📝 Profile incomplete - patching with subdomain brokerage data');
           const subdomain = getSubdomain();
-
           if (subdomain) {
             const { data: brokerage, error: brokerageError } = await supabase
               .from('brokerages')
@@ -266,137 +231,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               .or(`subdomain.eq.${subdomain},slug.eq.${subdomain}`)
               .maybeSingle();
 
-            if (brokerageError) {
-              console.error('❌ Error fetching brokerage:', brokerageError);
-            } else if (brokerage) {
-              console.log('✓ Found brokerage for subdomain:', subdomain, '→', brokerage.id);
-
+            if (!brokerageError && brokerage) {
               const updatePayload = {
                 brokerage_id: brokerage.id,
                 email: userEmail || user?.email || '',
                 full_name: user?.user_metadata?.full_name || brokerProfileData?.full_name || '',
-                is_active: true
+                is_active: true,
               };
-
-              console.log('📤 Updating profile with:', updatePayload);
 
               const { error: updateErr } = await supabase
                 .from('profiles')
                 .update(updatePayload)
                 .eq('user_id', userId);
 
-              if (updateErr) {
-                console.error('❌ PROFILE UPDATE FAILED:', updateErr);
-              } else {
-                console.log('✓ Profile update successful');
-
-                // Reload profile with updated data
-                const { data: updatedProfile, error: reloadErr } = await supabase
+              if (!updateErr) {
+                const { data: updatedProfile } = await supabase
                   .from('profiles')
                   .select('*')
                   .eq('user_id', userId)
                   .single();
-
-                if (reloadErr) {
-                  console.error('❌ Error reloading profile:', reloadErr);
-                } else if (updatedProfile) {
-                  brokerProfileData = updatedProfile;
-                  console.log('✓ Profile reloaded successfully:', {
-                    brokerage_id: updatedProfile.brokerage_id,
-                    email: updatedProfile.email,
-                    full_name: updatedProfile.full_name
-                  });
-                }
+                if (updatedProfile) brokerProfileData = updatedProfile;
+              } else {
+                console.error('❌ PROFILE UPDATE FAILED:', updateErr);
               }
             } else {
               console.warn('⚠️ No brokerage found for subdomain:', subdomain);
             }
-          } else {
-            console.warn('⚠️ No subdomain detected');
           }
         }
 
-        // CRITICAL: Check if user is deactivated
+        // Check deactivated
         if (brokerProfileData.is_active === false) {
           console.log('🚫 User account is deactivated');
           await supabase.auth.signOut();
-          setUser(null);
-          setUserType(null);
-          setUserRole(null);
-          setBrokerageId(null);
-          setBrokerProfile(null);
-          setClientProfile(null);
+          setUser(null); setUserType(null); setUserRole(null);
+          setBrokerageId(null); setBrokerProfile(null); setClientProfile(null);
           setError('Your account has been deactivated. Please contact your broker administrator.');
           setLoading(false);
           return;
         }
 
-        // Get brokerage_id from profile
         const brokerageId = brokerProfileData.brokerage_id;
         const profileWithBrokerageId = brokerProfileData;
 
-        console.log('Profile found', brokerageId);
+        console.log('Profile found, role:', profileWithBrokerageId.role, 'brokerage_id:', brokerageId);
 
-        // Force super_admin role if email is in SUPER_ADMINS list
+        // Promote to super_admin if email is in SUPER_ADMINS list
         if (isUserSuperAdmin && brokerProfileData.role !== 'super_admin') {
-          await supabase
-            .from('profiles')
-            .update({ role: 'super_admin' })
-            .eq('user_id', userId);
+          await supabase.from('profiles').update({ role: 'super_admin' }).eq('user_id', userId);
           profileWithBrokerageId.role = 'super_admin';
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // SUPER ADMIN LOGIC - HIGHEST PRIORITY
-        // ═══════════════════════════════════════════════════════════════
+        // ── SUPER ADMIN ──────────────────────────────────────────────
         if (profileWithBrokerageId.role === 'super_admin') {
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
           console.log('👑 SUPER ADMIN DETECTED');
-          console.log('  ⭐ Full system access granted');
-          console.log('  🚫 NO tenant subdomain redirect');
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
           setUserType('broker');
           setUserRole('super_admin');
           setBrokerageId(null);
           setBrokerProfile(profileWithBrokerageId);
           setLoading(false);
 
-          // CRITICAL: If super admin is on a tenant subdomain, redirect to root domain
           const currentHostname = window.location.hostname;
-          const isOnSubdomain = currentHostname.endsWith('.claimsportal.co.za') &&
-                                currentHostname !== 'claimsportal.co.za';
-
+          const isOnSubdomain = currentHostname.endsWith('.claimsportal.co.za') && currentHostname !== 'claimsportal.co.za';
           if (isOnSubdomain && currentHostname !== 'localhost' && currentHostname !== '127.0.0.1') {
-            const rootUrl = `https://claimsportal.co.za/dashboard/admin`;
-            console.log('🚀 SUPER ADMIN REDIRECT: From subdomain to root domain');
-            console.log('  Current hostname:', currentHostname);
-            console.log('  Target URL:', rootUrl);
-            window.location.href = rootUrl;
-            return;
+            console.log('🚀 SUPER ADMIN REDIRECT to root domain');
+            window.location.href = `https://claimsportal.co.za/dashboard/admin`;
           }
-
-          console.log('✓ Super admin on correct domain (root domain or localhost)');
           return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // BROKER/MAIN BROKER LOGIC - NORMAL PRIORITY
-        // ═══════════════════════════════════════════════════════════════
+        // ── BROKER / MAIN BROKER ─────────────────────────────────────
         if (profileWithBrokerageId.role === 'broker' || profileWithBrokerageId.role === 'main_broker') {
-          console.log('✓ Broker/Main Broker profile found');
-          console.log('  🔒 BROKER: Restricted to brokerage_id:', brokerageId);
-
+          console.log('✓ Broker profile found');
           setUserType('broker');
           setUserRole(profileWithBrokerageId.role);
           setBrokerageId(brokerageId);
           setBrokerProfile(profileWithBrokerageId);
           setLoading(false);
 
-          // BROKER SUBDOMAIN REDIRECT: Redirect brokers to their brokerage subdomain
           if (brokerageId) {
-            console.log('🔍 Fetching brokerage subdomain for redirect...');
-
             const { data: brokerageData, error: brokerageError } = await supabase
               .from('brokerages')
               .select('subdomain, slug')
@@ -405,39 +318,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (!brokerageError && brokerageData) {
               const brokerageSubdomain = brokerageData.subdomain || brokerageData.slug;
-              console.log('  Found subdomain:', brokerageSubdomain);
-
               if (brokerageSubdomain) {
                 const currentHostname = window.location.hostname;
                 const expectedHostname = `${brokerageSubdomain}.claimsportal.co.za`;
-
-                // Only redirect if not on localhost and not already on the correct subdomain
                 if (currentHostname !== 'localhost' && currentHostname !== '127.0.0.1' && currentHostname !== expectedHostname) {
-                  const targetUrl = `https://${expectedHostname}/dashboard/broker`;
-                  console.log('🚀 BROKER SUBDOMAIN REDIRECT:', targetUrl);
-                  console.log('  Current hostname:', currentHostname);
-                  console.log('  Expected hostname:', expectedHostname);
-                  window.location.href = targetUrl;
+                  console.log('🚀 BROKER SUBDOMAIN REDIRECT:', expectedHostname);
+                  window.location.href = `https://${expectedHostname}/dashboard/broker`;
                   return;
-                } else {
-                  console.log('✓ Already on correct subdomain or localhost');
                 }
               }
-            } else {
-              console.warn('⚠️ Could not fetch brokerage subdomain:', brokerageError);
             }
           }
-
           return;
         }
 
-        // ═══════════════════════════════════════════════════════════════
-        // CLIENT LOGIC - Handle clients in profiles table
-        // ═══════════════════════════════════════════════════════════════
+        // ── CLIENT (in profiles table) ───────────────────────────────
         if (profileWithBrokerageId.role === 'client') {
           console.log('✓ Client profile found in profiles table');
-          console.log('  🔒 CLIENT: Restricted to brokerage_id:', brokerageId);
-
           setUserType('client');
           setUserRole('client');
           setBrokerageId(brokerageId);
@@ -447,13 +344,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: profileWithBrokerageId.email || '',
             cell_number: profileWithBrokerageId.cell_number || '',
             brokerage_id: brokerageId,
-            role: 'client'
+            role: 'client',
           });
           setLoading(false);
           return;
         }
 
-        // If profile exists but role is not recognized, set basic info
+        // Unrecognised role — preserve whatever is in DB but default type to broker
+        console.warn('⚠️ Unrecognised role:', profileWithBrokerageId.role);
         setUserType('broker');
         setUserRole(profileWithBrokerageId.role || 'broker');
         setBrokerageId(brokerageId);
@@ -462,7 +360,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Try to load client profile from client_profiles table
+      // ── CLIENT (in legacy client_profiles table) ─────────────────
       const { data: clientProfileData } = await supabase
         .from('client_profiles')
         .select('*')
@@ -474,22 +372,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (clientProfileData) {
-        // CRITICAL: Check if client is deactivated
         if (clientProfileData.is_active === false) {
           console.log('🚫 Client account is deactivated');
           await supabase.auth.signOut();
-          setUser(null);
-          setUserType(null);
-          setUserRole(null);
-          setBrokerageId(null);
-          setBrokerProfile(null);
-          setClientProfile(null);
+          setUser(null); setUserType(null); setUserRole(null);
+          setBrokerageId(null); setBrokerProfile(null); setClientProfile(null);
           setError('Your account has been deactivated. Please contact your broker administrator.');
           setLoading(false);
           return;
         }
 
-        console.log('✓ Client profile found');
+        console.log('✓ Client profile found in client_profiles table');
         setUserType('client');
         setBrokerageId(clientProfileData.brokerage_id);
         setClientProfile(clientProfileData);
@@ -498,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      console.warn('No profile found');
+      console.warn('No profile found for user:', userId);
       setLoading(false);
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -509,20 +402,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log('🚪 Signing out');
     await supabase.auth.signOut();
-
-    setUser(null);
-    setUserType(null);
-    setUserRole(null);
-    setBrokerageId(null);
-    setBrokerProfile(null);
-    setClientProfile(null);
+    setUser(null); setUserType(null); setUserRole(null);
+    setBrokerageId(null); setBrokerProfile(null); setClientProfile(null);
     setError(null);
   };
 
   const completePasswordSetup = async () => {
     console.log('✅ Completing password setup flow');
     setNeedsPasswordSetup(false);
-
     if (user) {
       console.log('🔄 Reloading user profile after password setup');
       await loadUserProfile(user.id, user.email);
@@ -535,105 +422,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    console.log('🔐 Signing in with password');
-    console.log('   Email:', email);
-    console.log('   Clearing any existing session first...');
-
-    // Only sign out if there's an existing conflicting session
+    console.log('🔐 Signing in:', email);
     const { data: { session: existingSession } } = await supabase.auth.getSession();
     if (existingSession && existingSession.user?.email !== email) {
-      console.log('🧹 Different user session found - clearing before login');
       localStorage.clear();
       await supabase.auth.signOut();
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     try {
-      // CRITICAL: ONLY use signInWithPassword - NO OAuth or social providers
-      // This prevents "Auth session missing" and OAuth-related errors
-      const response = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      // Check if response exists before destructuring
-      if (!response) {
-        console.error('❌ No response from auth service');
-        await supabase.auth.signOut();
-        throw new Error('Authentication service error');
-      }
+      const response = await supabase.auth.signInWithPassword({ email, password });
+      if (!response) { await supabase.auth.signOut(); throw new Error('Authentication service error'); }
 
       const { data, error } = response;
 
       if (error) {
-        console.error('❌ Password login failed:', error.message);
-
-        // SESSION RESET: Immediately sign out to prevent session conflicts
-        console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
-
-        // Handle OAuth conflict by linking email identity
         if (error.message.includes('Invalid login credentials')) {
-          console.log('🔗 Attempting to link email identity for OAuth user...');
-
           try {
             const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
-            const linkResponse = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ email, password }),
-            });
-
-            const linkResult = await linkResponse.json();
-
+            const linkResult = await (await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })).json();
             if (linkResult.success) {
-              console.log('✓ Email identity linked successfully, retrying login...');
-
-              // Retry login after linking identity
-              const retryResponse = await supabase.auth.signInWithPassword({
-                email,
-                password,
-              });
-
-              if (retryResponse.error) {
-                throw new Error('Login failed after linking identity. Please try again.');
-              }
-
-              if (!retryResponse.data || !retryResponse.data.user) {
-                throw new Error('Sign in failed - no user data returned');
-              }
-
-              console.log('✓ Password login successful after identity linking');
-              setUser(retryResponse.data.user);
-              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
+              const retry = await supabase.auth.signInWithPassword({ email, password });
+              if (retry.error || !retry.data?.user) throw new Error('Login failed after linking identity.');
+              setUser(retry.data.user);
+              await loadUserProfile(retry.data.user.id, retry.data.user.email);
               return;
-            } else {
-              throw new Error(linkResult.error || 'Failed to enable password login');
-            }
-          } catch (linkError) {
-            console.error('❌ Identity linking failed:', linkError);
-            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
-          }
+            } else { throw new Error(linkResult.error || 'Failed to enable password login'); }
+          } catch { throw new Error('Invalid email or password.'); }
         }
-
         throw error;
       }
 
-      if (!data || !data.user) {
-        await supabase.auth.signOut();
-        throw new Error('Sign in failed - no user data returned');
-      }
-
+      if (!data?.user) { await supabase.auth.signOut(); throw new Error('Sign in failed - no user data returned'); }
       console.log('✓ Password login successful');
       setUser(data.user);
       await loadUserProfile(data.user.id, data.user.email);
-    } catch (error) {
-      // Ensure session is cleared on any error
-      await supabase.auth.signOut();
-      throw error;
-    }
+    } catch (error) { await supabase.auth.signOut(); throw error; }
   };
 
   const brokerSignUp = async (
@@ -641,376 +466,124 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
     profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }
   ) => {
-    console.log('🔵 BROKER SIGNUP - Manual profile creation');
-    console.log('   Email:', email);
-    console.log('   Is Independi Subdomain:', isIndependiSubdomain());
+    console.log('🔵 BROKER SIGNUP:', email);
+    const { data: existingInvite } = await supabase.from('invitations').select('role, brokerage_id, is_active').eq('email', email).eq('is_active', true).maybeSingle();
+    if (existingInvite) throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
 
-    // CRITICAL: Check if user has an existing invitation first
-    const { data: existingInvite } = await supabase
-      .from('invitations')
-      .select('role, brokerage_id, is_active')
-      .eq('email', email)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (existingInvite) {
-      console.log('⚠️ User has pending invitation with role:', existingInvite.role);
-      console.log('❌ BLOCKING broker signup - user should complete invite flow instead');
-      throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
-    }
-
-    // CRITICAL: Determine role based on email and subdomain
     let assignedRole = 'broker';
+    if (email === 'vickypingo@gmail.com') { assignedRole = 'super_admin'; }
+    else if (isIndependiSubdomain()) { assignedRole = 'broker'; }
 
-    // Only vickypingo@gmail.com can be super_admin
-    if (email === 'vickypingo@gmail.com') {
-      assignedRole = 'super_admin';
-      console.log('   ⭐ Super Admin signup detected');
-    } else if (isIndependiSubdomain()) {
-      // FORCE broker role for Independi subdomain
-      assignedRole = 'broker';
-      console.log('   🔒 Independi subdomain: forcing broker role');
-    }
-
-    console.log('   Assigned Role:', assignedRole);
-
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    console.log('✅ Auth user created:', authData.user.id);
-
-    // MANUAL PROFILE CREATION
     const brokerageId = profile.brokerage_id;
     if (!brokerageId) throw new Error('No brokerage found for this account.');
 
-    // Insert into profiles
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        id: authData.user.id,
-        user_id: authData.user.id,
-        brokerage_id: brokerageId,
-        full_name: profile.full_name || email,
-        email: email,
-        id_number: profile.id_number || '',
-        cell_number: profile.cell_number || '',
-        policy_number: profile.policy_number || null,
-        role: assignedRole,
-      });
-
-    if (profileError) {
-      console.error('❌ Failed to create profile:', profileError);
-      throw new Error(`Failed to create profile: ${profileError.message}`);
-    }
-
-    console.log('✅ Profile created with role:', assignedRole);
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: authData.user.id, user_id: authData.user.id, brokerage_id: brokerageId,
+      full_name: profile.full_name || email, email, id_number: profile.id_number || '',
+      cell_number: profile.cell_number || '', policy_number: profile.policy_number || null, role: assignedRole,
+    });
+    if (profileError) throw new Error(`Failed to create profile: ${profileError.message}`);
     return authData.user;
   };
 
   const brokerSignIn = async (email: string, password: string) => {
-    console.log('🔐 Broker signing in with password');
-    console.log('   Email:', email);
-    console.log('   Clearing any existing session first...');
-
-    // Only sign out if there's an existing conflicting session
+    console.log('🔐 Broker signing in:', email);
     const { data: { session: existingSession } } = await supabase.auth.getSession();
     if (existingSession && existingSession.user?.email !== email) {
-      console.log('🧹 Different user session found - clearing before login');
-      localStorage.clear();
-      await supabase.auth.signOut();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      localStorage.clear(); await supabase.auth.signOut(); await new Promise(r => setTimeout(r, 100));
     }
-
     try {
-      // ALWAYS use signInWithPassword for email/password auth
-      const response = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      // Check if response exists before destructuring
-      if (!response) {
-        console.error('❌ No response from auth service');
-        await supabase.auth.signOut();
-        throw new Error('Authentication service error');
-      }
-
+      const response = await supabase.auth.signInWithPassword({ email, password });
+      if (!response) { await supabase.auth.signOut(); throw new Error('Authentication service error'); }
       const { data, error } = response;
-
       if (error) {
-        console.error('❌ Password login failed:', error.message);
-
-        // SESSION RESET: Immediately sign out to prevent session conflicts
-        console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
-
-        // Handle OAuth conflict by linking email identity
         if (error.message.includes('Invalid login credentials')) {
-          console.log('🔗 Attempting to link email identity for OAuth user...');
-
           try {
             const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
-            const linkResponse = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ email, password }),
-            });
-
-            const linkResult = await linkResponse.json();
-
+            const linkResult = await (await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })).json();
             if (linkResult.success) {
-              console.log('✓ Email identity linked successfully, retrying login...');
-
-              // Retry login after linking identity
-              const retryResponse = await supabase.auth.signInWithPassword({
-                email,
-                password,
-              });
-
-              if (retryResponse.error) {
-                throw new Error('Login failed after linking identity. Please try again.');
-              }
-
-              if (!retryResponse.data || !retryResponse.data.user) {
-                throw new Error('Sign in failed - no user data returned');
-              }
-
-              console.log('✓ Broker password login successful after identity linking');
-              setUser(retryResponse.data.user);
-              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
-              return;
-            } else {
-              throw new Error(linkResult.error || 'Failed to enable password login');
-            }
-          } catch (linkError) {
-            console.error('❌ Identity linking failed:', linkError);
-            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
-          }
+              const retry = await supabase.auth.signInWithPassword({ email, password });
+              if (retry.error || !retry.data?.user) throw new Error('Login failed after linking identity.');
+              setUser(retry.data.user); await loadUserProfile(retry.data.user.id, retry.data.user.email); return;
+            } else { throw new Error(linkResult.error || 'Failed to enable password login'); }
+          } catch { throw new Error('Invalid email or password.'); }
         }
-
         throw error;
       }
-
-      if (!data || !data.user) {
-        await supabase.auth.signOut();
-        throw new Error('Sign in failed - no user data returned');
-      }
-
-      console.log('✓ Broker password login successful');
-      setUser(data.user);
-      await loadUserProfile(data.user.id, data.user.email);
-    } catch (error) {
-      // Ensure session is cleared on any error
-      await supabase.auth.signOut();
-      throw error;
-    }
+      if (!data?.user) { await supabase.auth.signOut(); throw new Error('Sign in failed - no user data returned'); }
+      console.log('✓ Broker login successful');
+      setUser(data.user); await loadUserProfile(data.user.id, data.user.email);
+    } catch (error) { await supabase.auth.signOut(); throw error; }
   };
 
-const clientSignUp = async (
-  email: string,
-  password: string,
-  profile: Omit<ClientProfile, 'id' | 'brokerage_id'>,
-) => {
-  console.log('🔵 CLIENT SIGNUP - Subdomain brokerage linking');
+  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>) => {
+    console.log('🔵 CLIENT SIGNUP:', email);
+    const brokerageSlug = getBrokerageSlug();
+    if (!brokerageSlug) throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
 
-  const brokerageSlug = getBrokerageSlug();
+    const { data: existingInvite } = await supabase.from('invitations').select('role, brokerage_id, is_active').eq('email', email).eq('is_active', true).maybeSingle();
+    if (existingInvite) throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
 
-  if (!brokerageSlug) {
-    throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
-  }
+    const { data: brokerageData, error: brokerageError } = await supabase.from('brokerages').select('id').or(`subdomain.eq.${brokerageSlug},slug.eq.${brokerageSlug}`).maybeSingle();
+    if (brokerageError || !brokerageData) throw new Error('Could not find brokerage for this domain. Please contact your broker.');
 
-  const { data: existingInvite } = await supabase
-    .from('invitations')
-    .select('role, brokerage_id, is_active')
-    .eq('email', email)
-    .eq('is_active', true)
-    .maybeSingle();
+    const brokerageId = brokerageData.id;
+    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password, options: { data: { full_name: profile.full_name, cell_number: profile.cell_number, role: 'client' } } });
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('User creation failed');
 
-  if (existingInvite) {
-    throw new Error('You have a pending invitation. Please check your email and use the invitation link to set up your account.');
-  }
-
-  const { data: brokerageData, error: brokerageError } = await supabase
-    .from('brokerages')
-    .select('id')
-    .or(`subdomain.eq.${brokerageSlug},slug.eq.${brokerageSlug}`)
-    .maybeSingle();
-
-  if (brokerageError || !brokerageData) {
-    throw new Error('Could not find brokerage for this domain. Please contact your broker.');
-  }
-
-  const brokerageId = brokerageData.id;
-
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: profile.full_name,
-        cell_number: profile.cell_number,
-        role: 'client',
-      },
-    },
-  });
-
-  if (authError) throw authError;
-  if (!authData.user) throw new Error('User creation failed');
-
-  console.log('✅ Client auth user created:', authData.user.id);
-
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .upsert({
-      user_id: authData.user.id,
-      brokerage_id: brokerageId,
-      full_name: profile.full_name,
-      email: email,
-      cell_number: profile.cell_number || '',
-      role: 'client',
-      is_active: true,
+    const { error: profileError } = await supabase.from('profiles').upsert({
+      user_id: authData.user.id, brokerage_id: brokerageId, full_name: profile.full_name,
+      email, cell_number: profile.cell_number || '', role: 'client', is_active: true,
     }, { onConflict: 'user_id' });
+    if (profileError) throw new Error(`Failed to create profile: ${profileError.message}`);
 
-  if (profileError) {
-    console.error('❌ Failed to create client profile:', profileError);
-    throw new Error(`Failed to create profile: ${profileError.message}`);
-  }
-
-  console.log('✅ Client profile created with name:', profile.full_name);
-  return authData.user;
-};
+    console.log('✅ Client profile created');
+    return authData.user;
+  };
 
   const clientSignIn = async (email: string, password: string) => {
-    console.log('🔐 Client signing in with password');
-    console.log('   Email:', email);
-    console.log('   Clearing any existing session first...');
-
-    // Only sign out if there's an existing conflicting session
+    console.log('🔐 Client signing in:', email);
     const { data: { session: existingSession } } = await supabase.auth.getSession();
     if (existingSession && existingSession.user?.email !== email) {
-      console.log('🧹 Different user session found - clearing before login');
-      localStorage.clear();
-      await supabase.auth.signOut();
-      await new Promise(resolve => setTimeout(resolve, 100));
+      localStorage.clear(); await supabase.auth.signOut(); await new Promise(r => setTimeout(r, 100));
     }
-
     try {
-      // ALWAYS use signInWithPassword for email/password auth
-      const response = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      // Check if response exists before destructuring
-      if (!response) {
-        console.error('❌ No response from auth service');
-        await supabase.auth.signOut();
-        throw new Error('Authentication service error');
-      }
-
+      const response = await supabase.auth.signInWithPassword({ email, password });
+      if (!response) { await supabase.auth.signOut(); throw new Error('Authentication service error'); }
       const { data, error } = response;
-
       if (error) {
-        console.error('❌ Password login failed:', error.message);
-
-        // SESSION RESET: Immediately sign out to prevent session conflicts
-        console.log('🧹 Clearing session after failed login attempt');
         await supabase.auth.signOut();
-
-        // Handle OAuth conflict by linking email identity
         if (error.message.includes('Invalid login credentials')) {
-          console.log('🔗 Attempting to link email identity for OAuth user...');
-
           try {
             const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/link-email-identity`;
-            const linkResponse = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ email, password }),
-            });
-
-            const linkResult = await linkResponse.json();
-
+            const linkResult = await (await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })).json();
             if (linkResult.success) {
-              console.log('✓ Email identity linked successfully, retrying login...');
-
-              // Retry login after linking identity
-              const retryResponse = await supabase.auth.signInWithPassword({
-                email,
-                password,
-              });
-
-              if (retryResponse.error) {
-                throw new Error('Login failed after linking identity. Please try again.');
-              }
-
-              if (!retryResponse.data || !retryResponse.data.user) {
-                throw new Error('Sign in failed - no user data returned');
-              }
-
-              console.log('✓ Client password login successful after identity linking');
-              setUser(retryResponse.data.user);
-              await loadUserProfile(retryResponse.data.user.id, retryResponse.data.user.email);
-              return;
-            } else {
-              throw new Error(linkResult.error || 'Failed to enable password login');
-            }
-          } catch (linkError) {
-            console.error('❌ Identity linking failed:', linkError);
-            throw new Error('Invalid email or password. If this account uses OAuth, please contact your administrator to set up password login.');
-          }
+              const retry = await supabase.auth.signInWithPassword({ email, password });
+              if (retry.error || !retry.data?.user) throw new Error('Login failed after linking identity.');
+              setUser(retry.data.user); await loadUserProfile(retry.data.user.id, retry.data.user.email); return;
+            } else { throw new Error(linkResult.error || 'Failed to enable password login'); }
+          } catch { throw new Error('Invalid email or password.'); }
         }
-
         throw error;
       }
-
-      if (!data || !data.user) {
-        await supabase.auth.signOut();
-        throw new Error('Sign in failed - no user data returned');
-      }
-
-      console.log('✓ Client password login successful');
-      setUser(data.user);
-      await loadUserProfile(data.user.id, data.user.email);
-    } catch (error) {
-      // Ensure session is cleared on any error
-      await supabase.auth.signOut();
-      throw error;
-    }
+      if (!data?.user) { await supabase.auth.signOut(); throw new Error('Sign in failed - no user data returned'); }
+      console.log('✓ Client login successful');
+      setUser(data.user); await loadUserProfile(data.user.id, data.user.email);
+    } catch (error) { await supabase.auth.signOut(); throw error; }
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userType,
-        userRole,
-        brokerageId,
-        brokerProfile,
-        clientProfile,
-        loading,
-        needsPasswordSetup,
-        error,
-        signOut,
-        signIn,
-        brokerSignUp,
-        brokerSignIn,
-        clientSignUp,
-        clientSignIn,
-        completePasswordSetup,
-        isSuperAdmin: isSuperAdminFunc,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, userType, userRole, brokerageId, brokerProfile, clientProfile,
+      loading, needsPasswordSetup, error, signOut, signIn, brokerSignUp,
+      brokerSignIn, clientSignUp, clientSignIn, completePasswordSetup, isSuperAdmin: isSuperAdminFunc,
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -1018,8 +591,6 @@ const clientSignUp = async (
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
