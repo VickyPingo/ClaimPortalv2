@@ -1,6 +1,7 @@
 import { ReactNode, useState, useMemo } from 'react';
 import { LayoutDashboard, Inbox, Users, Settings, LogOut, Menu, X, Building2, UserCog, Link, UsersRound, FileText, MessageSquare, FolderOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBrokerage } from '../../contexts/BrokerageContext';
 import { isIndependiSubdomain, isSuperAdminDomain } from '../../utils/subdomain';
 
 interface AdminLayoutProps {
@@ -11,17 +12,14 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children, currentView, onNavigate }: AdminLayoutProps) {
   const { signOut, isSuperAdmin, userRole, user } = useAuth();
+  const { brokerage } = useBrokerage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const onIndependiSubdomain = isIndependiSubdomain();
   const onSuperAdminDomain = isSuperAdminDomain();
 
-  // ADMIN OVERRIDE: vickypingo@gmail.com always gets super admin menu items
   const isSuperAdminEmail = user?.email === 'vickypingo@gmail.com';
 
-  // CRITICAL: On Independi subdomain, NEVER show super admin menu items
-  // EXCEPT for vickypingo@gmail.com who always has full access
-  // Only show super admin items if on super admin domain AND role is super_admin
   const isActualSuperAdmin = isSuperAdmin() && userRole === 'super_admin' && (onSuperAdminDomain || isSuperAdminEmail) && (!onIndependiSubdomain || isSuperAdminEmail);
 
   const navItems = useMemo(() => {
@@ -34,14 +32,6 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       { id: 'client-documents' as const, icon: FileText, label: 'Client Documents' },
       { id: 'team' as const, icon: UsersRound, label: 'Team' },
     ];
-
-    console.log('AdminLayout - Menu Items Calculation:');
-    console.log('  Is Actual Super Admin:', isActualSuperAdmin);
-    console.log('  Is Super Admin Email:', isSuperAdminEmail);
-    console.log('  User Email:', user?.email);
-    console.log('  User Role:', userRole);
-    console.log('  On Independi Subdomain:', onIndependiSubdomain);
-    console.log('  On Super Admin Domain:', onSuperAdminDomain);
 
     if (isActualSuperAdmin) {
       baseItems.push({ id: 'brokerages' as const, icon: Building2, label: 'Organisations' });
@@ -58,18 +48,44 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
     setMobileMenuOpen(false);
   };
 
+  const SidebarHeader = () => (
+    <div className="p-6 border-b border-gray-200">
+      {/* Brokerage logo */}
+      {brokerage?.logo_url && (
+        <div className="flex justify-center mb-3">
+          <img
+            src={brokerage.logo_url}
+            alt={brokerage.name}
+            className="h-12 object-contain"
+          />
+        </div>
+      )}
+      <h1 className="text-xl font-bold text-gray-900">
+        {isActualSuperAdmin ? 'Super Admin' : (brokerage?.name || 'Claims Portal')}
+      </h1>
+      <p className="text-sm text-gray-600 mt-1">
+        {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
+      </p>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Header */}
       <header className="md:hidden bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">
-              {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
-            </h1>
-            <p className="text-xs text-gray-600">
-              {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
-            </p>
+          <div className="flex items-center gap-3">
+            {brokerage?.logo_url && (
+              <img src={brokerage.logo_url} alt={brokerage.name} className="h-8 object-contain" />
+            )}
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">
+                {isActualSuperAdmin ? 'Super Admin' : (brokerage?.name || 'Claims Portal')}
+              </h1>
+              <p className="text-xs text-gray-600">
+                {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -91,14 +107,7 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
       <div className="flex">
         {/* Desktop Sidebar */}
         <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-screen">
-          <div className="p-6 border-b border-gray-200">
-            <h1 className="text-xl font-bold text-gray-900">
-              {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
-            </p>
-          </div>
+          <SidebarHeader />
 
           <nav className="flex-1 p-4 space-y-2">
             {navItems.map((item) => {
@@ -140,9 +149,14 @@ export default function AdminLayout({ children, currentView, onNavigate }: Admin
           }`}
         >
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-            <div>
+            <div className="flex-1">
+              {brokerage?.logo_url && (
+                <div className="flex justify-center mb-2">
+                  <img src={brokerage.logo_url} alt={brokerage.name} className="h-10 object-contain" />
+                </div>
+              )}
               <h1 className="text-xl font-bold text-gray-900">
-                {isActualSuperAdmin ? 'Super Admin' : 'Claims Portal'}
+                {isActualSuperAdmin ? 'Super Admin' : (brokerage?.name || 'Claims Portal')}
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 {isActualSuperAdmin ? 'Organisational Management' : 'Claims Management'}
