@@ -1,766 +1,429 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
-import { Building2, Plus, CreditCard as Edit, Trash2, Search, Globe, Mail, Copy, Check, Link as LinkIcon, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useBrokerage } from '../contexts/BrokerageContext';
+import { Mail, Lock, AlertCircle, Loader, User, Phone, CreditCard } from 'lucide-react';
+import { clearSupabaseSession, shouldResetSession } from '../utils/sessionClear';
+import { isIndependiSubdomain, isOnBrokerageSubdomain } from '../utils/subdomain';
+import ClientAuth from './ClientAuth';
 
-interface Brokerage {
-  id: string;
-  name: string;
-  subdomain: string;
-  custom_domain: string | null;
-  logo_url: string | null;
-  brand_color: string;
-  notification_email: string | null;
-  created_at: string;
-}
+// BROKERAGE ID FOR INDEPENDI
+const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 
-interface Invitation {
-  id: string;
-  token: string;
-  brokerage_id: string;
-  expires_at: string;
-  used_count: number;
-}
-
-export default function BrokeragesManager() {
-  const { isSuperAdmin, brokerProfile } = useAuth();
-  const [brokerages, setBrokerages] = useState<Brokerage[]>([]);
-  const [invitations, setInvitations] = useState<Record<string, Invitation>>({});
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingBrokerage, setEditingBrokerage] = useState<Brokerage | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    slug: '',
-    notification_email: '',
-    broker_name: '',
-  });
-  const [formError, setFormError] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
+export default function Login({ roleType }: { roleType?: 'client' | 'broker' | null }) {
+  const { signIn, userType, user, error: authError } = useAuth();
+  const { brokerage } = useBrokerage();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [sessionCleared, setSessionCleared] = useState(false);
 
   useEffect(() => {
-    console.log('🏢 BrokeragesManager component mounted - fetching brokerages');
-    console.log('  Is Super Admin:', isSuperAdmin());
-    console.log('  Broker Profile:', brokerProfile);
-    fetchBrokerages();
-  }, []);
-
-  const fetchBrokerages = async () => {
-    try {
-      console.log('📊 Fetching brokerages with access control');
-
-      let query = supabase.from('brokerages').select('*');
-
-      // ACCESS CONTROL:
-      // - Super Admin (role: 'super_admin'): See ALL brokerages
-      // - Broker (role: 'broker'): ONLY see their specific brokerage
-      if (isSuperAdmin()) {
-        console.log('  ⭐ SUPER ADMIN: Loading ALL brokerages');
-      } else if (brokerProfile?.brokerage_id) {
-        console.log('  🔒 BROKER: Filtering to brokerage_id:', brokerProfile.brokerage_id);
-        query = query.eq('id', brokerProfile.brokerage_id);
-      } else {
-        console.warn('  ⚠️ No access to brokerages');
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      console.log('  ✓ Brokerages loaded:', data?.length || 0);
-      setBrokerages(data || []);
-
-      if (data) {
-        const inviteMap: Record<string, Invitation> = {};
-        for (const brokerage of data) {
-          const { data: inviteData } = await supabase
-            .from('invitations')
-            .select('*')
-            .eq('brokerage_id', brokerage.id)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (inviteData) {
-            inviteMap[brokerage.id] = inviteData;
-          }
-        }
-        setInvitations(inviteMap);
-      }
-    } catch (error) {
-      console.error('Error fetching brokerages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateBrokerage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError('');
-    setFormLoading(true);
-
-    try {
-      // Auto-generate slug from name if empty
-      let slug = formData.slug.trim();
-      if (!slug && formData.name) {
-        slug = formData.name
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
-          .replace(/\s+/g, '-') // Replace spaces with hyphens
-          .replace(/-+/g, '-') // Replace multiple hyphens with single
-          .trim();
-      }
-
-      if (!slug) {
-        setFormError('Subdomain is required');
-        setFormLoading(false);
-        return;
-      }
-
-      // Validate slug format
-      const slugPattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-      if (!slugPattern.test(slug)) {
-        setFormError('Invalid subdomain format. Use lowercase letters, numbers, and hyphens only');
-        setFormLoading(false);
-        return;
-      }
-
-      const { data: existingBrokerage } = await supabase
-        .from('brokerages')
-        .select('id')
-        .eq('slug', slug)
-        .maybeSingle();
-
-      if (existingBrokerage) {
-        setFormError('This subdomain is already taken');
-        setFormLoading(false);
-        return;
-      }
-
-      const { data: newBrokerage, error: brokerageError } = await supabase
-        .from('brokerages')
-        .insert({
-          name: formData.name.trim(),
-          slug: slug,
-          signup_code: slug,
-          subdomain: slug, // Keep for backward compatibility
-          notification_email: formData.notification_email.trim() || null,
-          brand_color: '#1e40af'
-        })
-        .select()
-        .single();
-
-      if (brokerageError) throw brokerageError;
-
-      // Generate token for invitation
-      const invitationToken = crypto.randomUUID();
-
-      console.log('Creating invitation for new brokerage:', {
-        email: formData.notification_email.trim() || 'admin@example.com',
-        brokerage_id: newBrokerage.id
-      });
-
-      const { data: newInvitation, error: inviteError } = await supabase
-        .from('invitations')
-        .insert({
-          email: formData.notification_email.trim() || 'admin@example.com',
-          brokerage_id: newBrokerage.id,
-          role: 'broker',
-          token: invitationToken,
-          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          max_uses: null,
-          is_active: true,
-          used_count: 0
-        })
-        .select()
-        .single();
-
-      if (inviteError) {
-        console.error('Failed to create invitation:', inviteError);
-        throw inviteError;
-      }
-
-      // Send activation email to the broker
-      if (newInvitation && formData.notification_email) {
-        try {
-          console.log('📧 Sending activation email to:', formData.notification_email);
-
-          const emailResponse = await fetch('/.netlify/functions/send-invite', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: formData.notification_email.trim(),
-              role: 'broker',
-              brokerageId: newBrokerage.id,
-              brokerName: formData.broker_name.trim(),
-            }),
-          });
-
-          const emailResult = await emailResponse.json();
-
-          if (!emailResponse.ok) {
-            console.error('❌ Failed to send activation email:', emailResult);
-            // Don't block brokerage creation — just warn
-            alert(`Brokerage created successfully, but the activation email failed to send. Please invite the broker manually.\n\nError: ${emailResult.error}`);
-          } else {
-            console.log('✅ Activation email sent to:', formData.notification_email);
-          }
-        } catch (emailErr: any) {
-          console.error('❌ Activation email error:', emailErr);
-          // Don't block brokerage creation
-        }
-      }
-
-      await fetchBrokerages();
-      setShowCreateModal(false);
-      setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-    } catch (error: any) {
-      console.error('Error creating brokerage:', error);
-      setFormError(error.message || 'Failed to create brokerage');
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleEditBrokerage = (brokerage: Brokerage) => {
-    setEditingBrokerage(brokerage);
-    setFormData({
-      name: brokerage.name,
-      slug: brokerage.subdomain,
-      notification_email: brokerage.notification_email || '',
-      broker_name: '',
-    });
-    setShowEditModal(true);
-  };
-
-  const handleUpdateBrokerage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingBrokerage) return;
-
-    setFormError('');
-    setFormLoading(true);
-
-    try {
-      const { error } = await supabase
-        .from('brokerages')
-        .update({
-          name: formData.name.trim(),
-          notification_email: formData.notification_email.trim() || null,
-        })
-        .eq('id', editingBrokerage.id);
-
-      if (error) throw error;
-
-      await fetchBrokerages();
-      setShowEditModal(false);
-      setEditingBrokerage(null);
-      setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-    } catch (error: any) {
-      console.error('Error updating brokerage:', error);
-      setFormError(error.message || 'Failed to update brokerage');
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleDeleteBrokerage = async (brokerageId: string, brokerageName: string) => {
-    if (!confirm(`Are you sure you want to delete "${brokerageName}"? This action cannot be undone.`)) {
-      return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('signup') === 'true') {
+      setShowSignup(true);
     }
 
-    try {
-      const { error } = await supabase
-        .from('brokerages')
-        .delete()
-        .eq('id', brokerageId);
+    if (shouldResetSession() && !sessionCleared) {
+      console.log('🔄 Reset flag detected - clearing session');
+      clearSupabaseSession();
+      setSessionCleared(true);
 
-      if (error) throw error;
-
-      await fetchBrokerages();
-    } catch (error: any) {
-      console.error('Error deleting brokerage:', error);
-      alert(`Failed to delete brokerage: ${error.message}`);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset');
+      window.history.replaceState({}, '', url.toString());
     }
-  };
+  }, [sessionCleared]);
 
-  const copyInviteLink = (brokerageId: string, token: string) => {
-    const baseUrl = window.location.origin;
-    const inviteLink = `${baseUrl}/signup?token=${token}&brokerId=${brokerageId}`;
-    navigator.clipboard.writeText(inviteLink);
-    setCopiedId(brokerageId);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const filteredBrokerages = brokerages.filter(b =>
-    b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.subdomain.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) {
+  // Redirect authenticated users
+  if (user && userType) {
+    console.log('✅ User authenticated, redirecting');
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-blue-700 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p className="text-gray-600">Connecting to server...</p>
+          <p className="text-gray-600 font-medium">Account authorised. Redirecting to your dashboard...</p>
         </div>
       </div>
     );
   }
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Login timeout - resetting button state');
+      setLoading(false);
+    }, 15000);
+
+    console.log('🔐 Starting login attempt...');
+    clearSupabaseSession();
+    console.log('✓ Session cleared before login');
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    try {
+      await signIn(email, password);
+      clearTimeout(safetyTimeout);
+      console.log('✓ Sign-in successful');
+    } catch (err: any) {
+      clearTimeout(safetyTimeout);
+      console.error('❌ Login failed:', err);
+      setError(err.message || 'Sign-in failed');
+      setLoading(false);
+
+      console.log('🧹 Clearing session after failed login');
+      clearSupabaseSession();
+
+      setTimeout(() => {
+        const currentPath = window.location.pathname;
+        const currentSearch = window.location.search;
+        if (!currentSearch.includes('reset=true')) {
+          console.log('🔄 Redirecting with reset flag');
+          window.location.href = `${currentPath}?reset=true`;
+        }
+      }, 2000);
+    }
+  };
+
+  // On any brokerage subdomain - always show ClientAuth
+  const hostname = window.location.hostname;
+  const isBrokerSubdomain = hostname.includes('.claimsportal.co.za') || hostname.includes('independi') || hostname === 'localhost';
+
+  if (showSignup && isBrokerSubdomain) {
+    return <ClientAuth onBackToRole={() => setShowSignup(false)} />;
+  }
+
+  if (showSignup) {
+    return <Signup onBackToLogin={() => setShowSignup(false)} />;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <Building2 className="w-8 h-8 text-blue-700" />
-                Organisations Management
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Manage all organisation accounts and configurations
-              </p>
-            </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800 transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Organisation
-            </button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
 
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search brokerages by name or domain..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
+        {/* Brokerage Logo */}
+        {brokerage?.logo_url && (
+          <div className="flex justify-center mb-6">
+            <img
+              src={brokerage.logo_url}
+              alt={brokerage.name}
+              className="h-16 object-contain"
             />
-          </div>
-        </div>
-
-        {filteredBrokerages.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {searchTerm ? 'No brokerages found' : 'No brokerages yet'}
-            </h3>
-            <p className="text-gray-600 mb-6">
-              {searchTerm
-                ? 'Try adjusting your search term'
-                : 'Get started by creating your first brokerage'}
-            </p>
-            {!searchTerm && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-800"
-              >
-                Create First Brokerage
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredBrokerages.map((brokerage) => (
-              <div
-                key={brokerage.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200 relative"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {brokerage.logo_url ? (
-                      <img
-                        src={brokerage.logo_url}
-                        alt={brokerage.name}
-                        className="w-12 h-12 object-contain rounded"
-                      />
-                    ) : (
-                      <div
-                        className="w-12 h-12 rounded flex items-center justify-center"
-                        style={{ backgroundColor: brokerage.brand_color }}
-                      >
-                        <Building2 className="w-6 h-6 text-white" />
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="font-bold text-gray-900 text-lg">
-                        {brokerage.name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-gray-500">
-                        <Globe className="w-3 h-3" />
-                        {brokerage.subdomain}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  {brokerage.custom_domain && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Globe className="w-4 h-4" />
-                      <span>{brokerage.custom_domain}</span>
-                    </div>
-                  )}
-                  {brokerage.notification_email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="w-4 h-4" />
-                      <span className="truncate">{brokerage.notification_email}</span>
-                    </div>
-                  )}
-                  <div className="text-xs text-gray-500">
-                    Created {new Date(brokerage.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-
-                {invitations[brokerage.id] && (
-                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <LinkIcon className="w-4 h-4 text-green-700" />
-                      <span className="text-sm font-semibold text-green-900">Active Invite Link</span>
-                    </div>
-                    <button
-                      onClick={() => copyInviteLink(brokerage.id, invitations[brokerage.id].token)}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-green-300 rounded text-sm text-green-700 hover:bg-green-50 transition-colors"
-                    >
-                      {copiedId === brokerage.id ? (
-                        <>
-                          <Check className="w-4 h-4" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy Invite Link
-                        </>
-                      )}
-                    </button>
-                    <p className="text-xs text-green-600 mt-2">
-                      Used {invitations[brokerage.id].used_count} times
-                    </p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4 border-t border-gray-200 relative z-20">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('✏️ Edit button clicked for:', brokerage.name);
-                      handleEditBrokerage(brokerage);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer font-medium"
-                    style={{ position: 'relative', zIndex: 30 }}
-                  >
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('🗑️ Delete button clicked for:', brokerage.name);
-                      handleDeleteBrokerage(brokerage.id, brokerage.name);
-                    }}
-                    className="px-4 py-2 border border-red-300 rounded-lg text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors cursor-pointer font-medium"
-                    style={{ position: 'relative', zIndex: 30 }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
           </div>
         )}
 
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-            <Building2 className="w-5 h-5" />
-            Total Brokerages
-          </h3>
-          <p className="text-3xl font-bold text-blue-700">{brokerages.length}</p>
-          <p className="text-sm text-blue-600 mt-1">
-            {searchTerm && `${filteredBrokerages.length} matching search`}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {brokerage?.name || 'Claims'} Portal
+          </h1>
+          <p className="text-gray-600">
+            Sign in to your organisation's portal
+          </p>
+        </div>
+
+        {loading && !error && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">
+              Authorising account...
+            </p>
+          </div>
+        )}
+
+        {(error || authError) && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error || authError}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email Address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+          >
+            {loading && <Loader className="w-4 h-4 animate-spin" />}
+            Sign In
+          </button>
+        </form>
+
+        <div className="mt-6">
+          <p className="text-center text-gray-600">
+            Don't have an account?{' '}
+            <button
+              onClick={() => setShowSignup(true)}
+              className="text-blue-600 font-semibold hover:text-blue-700"
+            >
+              Sign-up
+            </button>
           </p>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {showEditModal && editingBrokerage && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Building2 className="w-6 h-6 text-blue-700" />
-                Edit Organisation
-              </h2>
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditingBrokerage(null);
-                  setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-                  setFormError('');
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
+function Signup({ onBackToLogin }: { onBackToLogin: () => void }) {
+  const { brokerSignUp } = useAuth();
+  const { brokerage } = useBrokerage();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    fullName: '',
+    idNumber: '',
+    cellNumber: '',
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-            <form onSubmit={handleUpdateBrokerage} className="p-6 space-y-6">
-              {formError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-                  {formError}
-                </div>
-              )}
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Organisation Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Independi Insurance Brokers"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
-              </div>
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subdomain (slug)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    disabled
-                    value={formData.slug}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                  />
-                  <span className="text-gray-500 text-sm whitespace-nowrap">.claimsportal.co.za</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Subdomain cannot be changed after creation
-                </p>
-              </div>
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contact Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.notification_email}
-                  onChange={(e) => setFormData({ ...formData, notification_email: e.target.value })}
-                  placeholder="e.g., admin@independi.co.za"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This email will receive claim notifications
-                </p>
-              </div>
+    setLoading(true);
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingBrokerage(null);
-                    setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-                    setFormError('');
-                  }}
-                  className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="flex-1 px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {formLoading ? 'Updating...' : 'Update Brokerage'}
-                </button>
-              </div>
-            </form>
+    console.log('🧹 Clearing session before signup');
+    clearSupabaseSession();
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Signup timeout - resetting button state');
+      setLoading(false);
+    }, 15000);
+
+    // 3-SECOND TIMEOUT: Redirect regardless of database response
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ 3-second timeout reached - redirecting anyway');
+      clearTimeout(safetyTimeout);
+      if (formData.email === 'vickypingo@gmail.com') {
+        window.location.href = '/admin-dashboard';
+      } else {
+        window.location.href = '/broker-dashboard';
+      }
+    }, 3000);
+
+    try {
+      console.log('🔵 SIGNUP - Creating account with manual profile insert');
+      await brokerSignUp(formData.email, formData.password, {
+        full_name: formData.fullName,
+        id_number: formData.idNumber,
+        cell_number: formData.cellNumber,
+        brokerage_id: INDEPENDI_BROKERAGE_ID,
+      });
+
+      console.log('✅ Sign-up complete, redirecting');
+      clearTimeout(timeoutId);
+      clearTimeout(safetyTimeout);
+
+      if (formData.email === 'vickypingo@gmail.com') {
+        window.location.href = '/admin-dashboard';
+      } else {
+        window.location.href = '/broker-dashboard';
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      clearTimeout(safetyTimeout);
+      console.error('❌ SIGN-UP ERROR:', err);
+      setError(err.message || 'Sign-up failed');
+      setLoading(false);
+      clearSupabaseSession();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
+
+        {brokerage?.logo_url && (
+          <div className="flex justify-center mb-6">
+            <img src={brokerage.logo_url} alt={brokerage.name} className="h-16 object-contain" />
           </div>
+        )}
+
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
+          <p className="text-gray-600 text-sm">
+            Register with {brokerage?.name || 'Independi'}
+          </p>
         </div>
-      )}
 
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Building2 className="w-6 h-6 text-blue-700" />
-                Add New Organisation
-              </h2>
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-                  setFormError('');
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateBrokerage} className="p-6 space-y-6">
-              {formError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
-                  {formError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Organisation Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => {
-                    const newName = e.target.value;
-                    setFormData({ ...formData, name: newName });
-                    // Auto-generate slug if slug is empty
-                    if (!formData.slug) {
-                      const autoSlug = newName
-                        .toLowerCase()
-                        .replace(/[^a-z0-9\s-]/g, '')
-                        .replace(/\s+/g, '-')
-                        .replace(/-+/g, '-')
-                        .trim();
-                      setFormData({ ...formData, name: newName, slug: autoSlug });
-                    }
-                  }}
-                  placeholder="e.g., Timo Marketing"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Main Broker Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.broker_name}
-                  onChange={(e) => setFormData({ ...formData, broker_name: e.target.value })}
-                  placeholder="e.g., John Smith"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  The primary broker who will manage this organisation
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Subdomain (slug)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={formData.slug}
-                    onChange={(e) => {
-                      const value = e.target.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9-]/g, '')
-                        .replace(/-+/g, '-');
-                      setFormData({ ...formData, slug: value });
-                    }}
-                    placeholder="e.g., independi"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                  />
-                  <span className="text-gray-500 text-sm whitespace-nowrap">.claimsportal.co.za</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  This will create the URL: https://{formData.slug || 'subdomain'}.claimsportal.co.za
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Contact Email
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.notification_email}
-                  onChange={(e) => setFormData({ ...formData, notification_email: e.target.value })}
-                  placeholder="e.g., admin@independi.co.za"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-700 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  This email will receive claim notifications
-                </p>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <Mail className="w-5 h-5" />
-                  What happens next?
-                </h3>
-                <ul className="text-sm text-blue-800 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
-                    <span>An activation email will be sent to <strong>{formData.notification_email || 'the contact email'}</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">2.</span>
-                    <span>The broker clicks the link in the email to set their password</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">3.</span>
-                    <span>They log in at <strong>{formData.slug ? `${formData.slug}.claimsportal.co.za` : 'their subdomain'}</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">4.</span>
-                    <span>They can immediately start adding clients and managing claims</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setFormData({ name: '', slug: '', notification_email: '', broker_name: '' });
-                    setFormError('');
-                  }}
-                  className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="flex-1 px-6 py-3 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {formLoading ? 'Authorising...' : 'Authorise Organisation'}
-                </button>
-              </div>
-            </form>
+        {loading && !error && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <Loader className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+            <p className="text-sm text-blue-800 font-medium">Creating account...</p>
           </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                placeholder="John Smith"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="your@email.com"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cell Number</label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="tel"
+                value={formData.cellNumber}
+                onChange={(e) => setFormData({ ...formData, cellNumber: e.target.value })}
+                placeholder="+27 82 123 4567"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ID Number</label>
+            <div className="relative">
+              <CreditCard className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={formData.idNumber}
+                onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                placeholder="0000000000000"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              <input
+                type="password"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+          >
+            {loading && <Loader className="w-4 h-4 animate-spin" />}
+            Create Account
+          </button>
+        </form>
+
+        <div className="mt-6">
+          <p className="text-center text-gray-600">
+            Already have an account?{' '}
+            <button
+              onClick={onBackToLogin}
+              className="text-blue-600 font-semibold hover:text-blue-700"
+            >
+              Sign In
+            </button>
+          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
