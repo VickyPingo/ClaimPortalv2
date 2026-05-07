@@ -105,20 +105,28 @@ export default function BrokeragesManager() {
     reader.readAsDataURL(file);
   };
 
-  const uploadLogo = async (file: File, slug: string): Promise<string | null> => {
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${slug}/logo.${fileExt}`;
-      const { data, error } = await supabase.storage
-        .from('branding')
-        .upload(fileName, file, { upsert: true });
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from('branding').getPublicUrl(data.path);
-      return urlData.publicUrl;
-    } catch (err) {
-      console.error('Logo upload failed:', err);
-      return null;
+  // ─── FIX: No longer catches errors silently. If the bucket doesn't exist,
+  // is private, or RLS blocks the upload, the error now surfaces to the user
+  // instead of returning null and wiping the existing logo_url from the DB.
+  const uploadLogo = async (file: File, slug: string): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${slug}/logo.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from('branding')
+      .upload(fileName, file, { upsert: true });
+
+    if (error) {
+      console.error('Logo upload failed:', error);
+      throw new Error(`Logo upload failed: ${error.message}. Make sure the "branding" storage bucket exists and is public in Supabase.`);
     }
+
+    const { data: urlData } = supabase.storage.from('branding').getPublicUrl(data.path);
+    if (!urlData?.publicUrl) {
+      throw new Error('Logo uploaded but could not get public URL. Check that the "branding" bucket is set to public.');
+    }
+
+    return urlData.publicUrl;
   };
 
   const handleCreateBrokerage = async (e: React.FormEvent) => {
@@ -154,7 +162,6 @@ export default function BrokeragesManager() {
         return;
       }
 
-      // Upload logo first if provided
       let logoUrl: string | null = null;
       if (logoFile) {
         logoUrl = await uploadLogo(logoFile, slug);
@@ -237,6 +244,7 @@ export default function BrokeragesManager() {
     });
     setEditLogoFile(null);
     setEditLogoPreview(brokerage.logo_url || null);
+    setFormError('');
     setShowEditModal(true);
   };
 
@@ -247,9 +255,12 @@ export default function BrokeragesManager() {
     setFormLoading(true);
 
     try {
-      let logoUrl = editingBrokerage.logo_url;
+      // Start with the existing logo URL so we never accidentally null it out
+      let logoUrl: string | null = editingBrokerage.logo_url;
 
       if (editLogoFile) {
+        // uploadLogo now throws on failure so any storage/bucket error is
+        // shown to the user instead of silently writing null to the DB
         logoUrl = await uploadLogo(editLogoFile, editingBrokerage.subdomain);
       }
 
@@ -467,7 +478,7 @@ export default function BrokeragesManager() {
                 <Building2 className="w-6 h-6 text-blue-700" />
                 Edit Organisation
               </h2>
-              <button onClick={() => { setShowEditModal(false); setEditingBrokerage(null); setFormError(''); }}
+              <button onClick={() => { setShowEditModal(false); setEditingBrokerage(null); setFormError(''); setEditLogoFile(null); setEditLogoPreview(null); }}
                 className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
               </button>
@@ -475,7 +486,9 @@ export default function BrokeragesManager() {
 
             <form onSubmit={handleUpdateBrokerage} className="p-6 space-y-6">
               {formError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">{formError}</div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  <strong>Error:</strong> {formError}
+                </div>
               )}
 
               {/* Logo Upload */}
@@ -485,9 +498,22 @@ export default function BrokeragesManager() {
                 </label>
                 <div className="flex items-center gap-4">
                   {editLogoPreview ? (
-                    <img src={editLogoPreview} alt="Logo preview" className="h-16 object-contain border border-gray-200 rounded-lg p-1" />
+                    <div className="relative">
+                      <img src={editLogoPreview} alt="Logo preview" className="h-16 object-contain border border-gray-200 rounded-lg p-1 bg-gray-50" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditLogoFile(null);
+                          setEditLogoPreview(null);
+                        }}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        title="Remove logo"
+                      >
+                        ×
+                      </button>
+                    </div>
                   ) : (
-                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
                       <Image className="w-6 h-6 text-gray-400" />
                     </div>
                   )}
@@ -507,6 +533,9 @@ export default function BrokeragesManager() {
                       {editLogoFile ? 'Change Logo' : editingBrokerage.logo_url ? 'Update Logo' : 'Upload Logo'}
                     </label>
                     <p className="text-xs text-gray-500 mt-1">PNG or SVG recommended</p>
+                    {editLogoFile && (
+                      <p className="text-xs text-green-600 mt-1">✓ New logo selected — click Save Changes to upload</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -523,7 +552,7 @@ export default function BrokeragesManager() {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Subdomain</label>
                 <div className="flex items-center gap-2">
                   <input type="text" disabled value={formData.slug}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed text-gray-500"
                   />
                   <span className="text-gray-500 text-sm whitespace-nowrap">.claimsportal.co.za</span>
                 </div>
@@ -540,7 +569,7 @@ export default function BrokeragesManager() {
 
               <div className="flex gap-3 pt-4">
                 <button type="button"
-                  onClick={() => { setShowEditModal(false); setEditingBrokerage(null); setFormError(''); }}
+                  onClick={() => { setShowEditModal(false); setEditingBrokerage(null); setFormError(''); setEditLogoFile(null); setEditLogoPreview(null); }}
                   className="flex-1 px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -575,7 +604,9 @@ export default function BrokeragesManager() {
 
             <form onSubmit={handleCreateBrokerage} className="p-6 space-y-6">
               {formError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">{formError}</div>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+                  <strong>Error:</strong> {formError}
+                </div>
               )}
 
               <div>
@@ -583,10 +614,11 @@ export default function BrokeragesManager() {
                 <input type="text" required value={formData.name}
                   onChange={(e) => {
                     const newName = e.target.value;
-                    setFormData({ ...formData, name: newName });
                     if (!formData.slug) {
                       const autoSlug = newName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim();
                       setFormData({ ...formData, name: newName, slug: autoSlug });
+                    } else {
+                      setFormData({ ...formData, name: newName });
                     }
                   }}
                   placeholder="e.g., Timo Marketing"
@@ -632,7 +664,6 @@ export default function BrokeragesManager() {
                 <p className="text-xs text-gray-500 mt-1">This email will receive claim notifications</p>
               </div>
 
-              {/* ─── LOGO UPLOAD ─── */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Organisation Logo <span className="text-gray-400 font-normal">(optional)</span>
@@ -640,7 +671,7 @@ export default function BrokeragesManager() {
                 <div className="flex items-center gap-4">
                   {logoPreview ? (
                     <div className="relative">
-                      <img src={logoPreview} alt="Logo preview" className="h-16 object-contain border border-gray-200 rounded-lg p-1" />
+                      <img src={logoPreview} alt="Logo preview" className="h-16 object-contain border border-gray-200 rounded-lg p-1 bg-gray-50" />
                       <button
                         type="button"
                         onClick={() => { setLogoFile(null); setLogoPreview(null); }}
@@ -650,7 +681,7 @@ export default function BrokeragesManager() {
                       </button>
                     </div>
                   ) : (
-                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50">
                       <Image className="w-6 h-6 text-gray-400" />
                     </div>
                   )}
@@ -680,22 +711,10 @@ export default function BrokeragesManager() {
                   What happens next?
                 </h3>
                 <ul className="text-sm text-blue-800 space-y-2">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
-                    <span>An activation email will be sent to <strong>{formData.notification_email || 'the contact email'}</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">2.</span>
-                    <span>The broker clicks the link to set their password</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">3.</span>
-                    <span>They log in at <strong>{formData.slug ? `${formData.slug}.claimsportal.co.za` : 'their subdomain'}</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">4.</span>
-                    <span>Their logo shows automatically on the login screen and throughout the app</span>
-                  </li>
+                  <li className="flex items-start gap-2"><span className="text-blue-500 font-bold mt-0.5">1.</span><span>An activation email will be sent to <strong>{formData.notification_email || 'the contact email'}</strong></span></li>
+                  <li className="flex items-start gap-2"><span className="text-blue-500 font-bold mt-0.5">2.</span><span>The broker clicks the link to set their password</span></li>
+                  <li className="flex items-start gap-2"><span className="text-blue-500 font-bold mt-0.5">3.</span><span>They log in at <strong>{formData.slug ? `${formData.slug}.claimsportal.co.za` : 'their subdomain'}</strong></span></li>
+                  <li className="flex items-start gap-2"><span className="text-blue-500 font-bold mt-0.5">4.</span><span>Their logo shows automatically on the login screen and throughout the app</span></li>
                 </ul>
               </div>
 
