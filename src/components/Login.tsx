@@ -5,6 +5,7 @@ import { Mail, Lock, AlertCircle, Loader, User, Phone, CreditCard } from 'lucide
 import { clearSupabaseSession, shouldResetSession } from '../utils/sessionClear';
 import { isIndependiSubdomain, isOnBrokerageSubdomain } from '../utils/subdomain';
 import ClientAuth from './ClientAuth';
+import ForgotPassword from './ForgotPassword';
 
 const INDEPENDI_BROKERAGE_ID = 'f67b67c8-086b-4b42-8d27-917a0783e9b0';
 
@@ -16,6 +17,7 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [sessionCleared, setSessionCleared] = useState(false);
 
   useEffect(() => {
@@ -100,6 +102,10 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
     return <Signup onBackToLogin={() => setShowSignup(false)} />;
   }
 
+  if (showForgotPassword) {
+    return <ForgotPassword onBack={() => setShowForgotPassword(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
@@ -171,6 +177,16 @@ export default function Login({ roleType }: { roleType?: 'client' | 'broker' | n
                 required
               />
             </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Forgot password?
+            </button>
           </div>
 
           <button
