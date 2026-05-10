@@ -126,7 +126,7 @@ export default function BrokeragesManager() {
       throw new Error('Logo uploaded but could not get public URL. Check that the "branding" bucket is set to public.');
     }
 
-    return urlData.publicUrl;
+    return `${urlData.publicUrl}?t=${Date.now()}`;
   };
 
   const handleCreateBrokerage = async (e: React.FormEvent) => {
