@@ -4,6 +4,7 @@ import Login from './Login';
 import BrokerAdminDashboard from './admin/BrokerAdminDashboard';
 import ClientPortal from './ClientPortal';
 import { SetPassword } from './SetPassword';
+import ForgotPassword from './ForgotPassword';
 import ForceSession from './ForceSession';
 import { LogOut, AlertCircle, Building2 } from 'lucide-react';
 import { isIndependiSubdomain, isSuperAdminDomain, isOnBrokerageSubdomain } from '../utils/subdomain';
@@ -33,6 +34,11 @@ export default function HomePageRouter() {
   // SIGNUP ROUTE
   if (currentPath === '/signup') {
     return <SetPassword />;
+  }
+
+  // FORGOT PASSWORD ROUTE
+  if (currentPath === '/forgot-password') {
+    return <ForgotPassword onBack={() => window.history.replaceState(null, '', '/')} />;
   }
 
   // EMERGENCY: Force session page
@@ -69,12 +75,6 @@ export default function HomePageRouter() {
       return;
     }
 
-    // ─── FIX: Only force the broker URL when we have a CONFIRMED broker
-    // role. Previously this ran when roles were null (fresh sign-in before
-    // the profile loaded), which changed the URL to /broker-dashboard.
-    // On the next render currentPath read that URL, Step 5 triggered
-    // window.location.replace('/claims-portal') — causing the page reload
-    // "jump" the client was experiencing.
     const isConfirmedBroker =
       userRole === 'broker' ||
       userRole === 'main_broker' ||
@@ -144,8 +144,6 @@ export default function HomePageRouter() {
 
   // ─────────────────────────────────────────────────────────────
   // STEP 2: Auth still resolving → show spinner
-  // CRITICAL: This must come before ALL role-based routing so we
-  // never render a dashboard before the user's role is confirmed.
   // ─────────────────────────────────────────────────────────────
   if (loading) {
     console.log('⏳ Auth still loading - showing loading screen');
@@ -187,7 +185,6 @@ export default function HomePageRouter() {
   if ((currentPath === '/broker-dashboard' || currentPath === '/admin-dashboard') &&
       (userType === 'client' || userRole === 'client')) {
     console.log('❌ CLIENT TRYING TO ACCESS RESTRICTED ROUTE - REDIRECTING');
-    // Use replaceState instead of location.replace to avoid a full page reload
     window.history.replaceState(null, '', '/claims-portal');
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
