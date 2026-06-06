@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
-import { Mail, Lock, Phone, User, AlertCircle, Loader, ArrowLeft, FileText } from 'lucide-react';
+import { Mail, Lock, Phone, User, AlertCircle, Loader, ArrowLeft, FileText, CreditCard } from 'lucide-react';
 
 export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void }) {
   const { clientSignIn, clientSignUp } = useAuth();
@@ -12,6 +12,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [cellNumber, setCellNumber] = useState('');
+  const [idNumber, setIdNumber] = useState('');
   const [policyNumber, setPolicyNumber] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
@@ -45,6 +46,11 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
       return;
     }
 
+    if (!idNumber.trim()) {
+      setError('ID Number is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -52,6 +58,7 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
         full_name: fullName,
         email: email,
         cell_number: cellNumber,
+        id_number: idNumber,
       });
     } catch (err: any) {
       setError(err.message || 'Sign up failed');
@@ -135,6 +142,24 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
                     value={cellNumber}
                     onChange={(e) => setCellNumber(e.target.value)}
                     placeholder="+27 71 123 4567"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  ID Number *
+                </label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={idNumber}
+                    onChange={(e) => setIdNumber(e.target.value)}
+                    placeholder="0000000000000"
+                    maxLength={13}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     required
                   />
