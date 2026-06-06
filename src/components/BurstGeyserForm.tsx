@@ -49,6 +49,13 @@ export default function BurstGeyserForm({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  // Step 4: voice + written statement
+  const [isStatementRecording, setIsStatementRecording] = useState(false);
+  const [statementAudioBlob, setStatementAudioBlob] = useState<Blob | null>(null);
+  const statementMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const statementAudioChunksRef = useRef<Blob[]>([]);
+  const [typedStatement, setTypedStatement] = useState('');
+
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -112,6 +119,38 @@ export default function BurstGeyserForm({
     setIsRecording(false);
   };
 
+  const startStatementRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      statementMediaRecorderRef.current = mediaRecorder;
+      statementAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        statementAudioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(statementAudioChunksRef.current, { type: 'audio/webm' });
+        setStatementAudioBlob(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsStatementRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Could not access microphone. Please check permissions.');
+    }
+  };
+
+  const stopStatementRecording = () => {
+    if (statementMediaRecorderRef.current && isStatementRecording) {
+      statementMediaRecorderRef.current.stop();
+      setIsStatementRecording(false);
+    }
+  };
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -143,12 +182,6 @@ export default function BurstGeyserForm({
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email, cell_number')
-        .eq('user_id', user.id)
-        .maybeSingle();
 
       const timestamp = Date.now();
       const uploadDir = `${user.id}/${timestamp}`;
@@ -192,6 +225,36 @@ export default function BurstGeyserForm({
         attachments.push({ bucket: 'claims', path, url, kind: 'extra_voice_note', label: 'Additional Voice Note' });
       }
 
+      // Upload statement voice note if recorded
+      let statementVoiceUrl = null;
+      let statementVoiceTranscript = null;
+      if (statementAudioBlob) {
+        const path = `${uploadDir}/statement_voice.webm`;
+        const file = new File([statementAudioBlob], 'statement_voice.webm', { type: 'audio/webm' });
+        statementVoiceUrl = await uploadFile(file, path);
+        attachments.push({ bucket: 'claims', path, url: statementVoiceUrl, kind: 'voice_note', label: 'Voice Statement' });
+
+        try {
+          const transcriptionResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-claim-voice`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({ audioUrl: statementVoiceUrl }),
+            }
+          );
+          if (transcriptionResponse.ok) {
+            const transcriptionResult = await transcriptionResponse.json();
+            statementVoiceTranscript = transcriptionResult.transcript || transcriptionResult.text || null;
+          }
+        } catch (err) {
+          console.error('Transcription error:', err);
+        }
+      }
+
       if (repairQuote) {
         const path = `${uploadDir}/repair_quote.pdf`;
         const url = await uploadFile(repairQuote, path);
@@ -206,6 +269,8 @@ export default function BurstGeyserForm({
         location_lat: location?.lat || null,
         location_lng: location?.lng || null,
         estimated_repair_cost: estimatedRepairCost ? parseFloat(estimatedRepairCost) : null,
+        voice_transcript: statementVoiceTranscript,
+        typed_statement: typedStatement || null,
       };
 
       console.log('[GeyserClaim] Submitting with', attachments.length, 'attachments');
@@ -274,7 +339,7 @@ export default function BurstGeyserForm({
             {step === 1 && 'When did the geyser burst?'}
             {step === 2 && 'Geyser Details'}
             {step === 3 && 'Damage & Documentation'}
-            {step === 4 && 'Review & Submit'}
+            {step === 4 && 'Your Statement'}
           </h2>
 
           {error && (
@@ -526,37 +591,68 @@ export default function BurstGeyserForm({
                   onClick={() => setStep(4)}
                   className="flex-1 px-4 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 font-semibold"
                 >
-                  Review
+                  Continue
                 </button>
               </div>
             </div>
           )}
 
           {step === 4 && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Burst Date & Time:</span>
-                  <span className="font-semibold">{burstDate} {burstTime}</span>
+            <div className="space-y-6">
+              <p className="text-gray-600">
+                Record a voice note OR type your statement about the incident (optional).
+              </p>
+
+              {/* Voice Statement */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Voice Statement (Optional)
+                </label>
+                <div className="text-center">
+                  {!statementAudioBlob ? (
+                    <div>
+                      <button
+                        onClick={isStatementRecording ? stopStatementRecording : startStatementRecording}
+                        className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                          isStatementRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'
+                        }`}
+                      >
+                        <Mic className="w-12 h-12 text-white" />
+                      </button>
+                      <p className="text-sm text-gray-600">
+                        {isStatementRecording ? 'Tap to stop recording' : 'Tap to record voice note'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600 mb-2">Voice note recorded</p>
+                      <audio controls className="w-full mb-2">
+                        <source src={URL.createObjectURL(statementAudioBlob)} type="audio/webm" />
+                      </audio>
+                      <button
+                        onClick={() => setStatementAudioBlob(null)}
+                        className="text-blue-700 text-sm hover:underline"
+                      >
+                        Record again
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Geyser Type:</span>
-                  <span className="font-semibold">{geyserType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Property Damage:</span>
-                  <span className="font-semibold">{hasResultingDamage ? 'Yes' : 'No'}</span>
-                </div>
-                {estimatedRepairCost && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Est. Repair Cost:</span>
-                    <span className="font-semibold">R{parseFloat(estimatedRepairCost).toFixed(2)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Location:</span>
-                  <span className="font-semibold text-right text-sm">{locationAddress}</span>
-                </div>
+              </div>
+
+              {/* Written Statement */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Written Statement (Optional)
+                </label>
+                <textarea
+                  value={typedStatement}
+                  onChange={(e) => setTypedStatement(e.target.value)}
+                  rows={5}
+                  placeholder="Describe what happened in detail..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                />
               </div>
 
               <div className="flex gap-3">
