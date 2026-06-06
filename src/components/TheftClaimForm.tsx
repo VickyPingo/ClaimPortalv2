@@ -75,7 +75,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
   const [cellphoneStolen, setCellphoneStolen] = useState(false);
   const [itcRefNumber, setItcRefNumber] = useState('');
 
-  // Step 5: Documents
+  // Step 5: Documents + voice + written statement
   const [sapsCaseSlip, setSapsCaseSlip] = useState<File | null>(null);
   const [proofOfOwnership, setProofOfOwnership] = useState<File | null>(null);
   const [replacementQuote, setReplacementQuote] = useState<File | null>(null);
@@ -85,6 +85,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<any>(null);
+  const [typedStatement, setTypedStatement] = useState('');
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -232,7 +233,6 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
       const timestamp = Date.now();
       const uploadDir = `${clientId}/${timestamp}`;
 
-      // Helper to get file extension
       const getFileExt = (file: File) => {
         const name = file.name;
         const lastDot = name.lastIndexOf('.');
@@ -259,7 +259,6 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         forcedEntryPhotoUrl = await uploadFile(forcedEntryPhoto, 'claims', `${uploadDir}/forced_entry_photo${forcedEntryPhotoExt}`);
       }
 
-      // Build attachments array
       const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
       attachments.push({ bucket: 'claims', path: `${uploadDir}/saps_case_slip${sapsCaseSlipExt}`, url: sapsCaseSlipUrl, kind: 'saps_case_slip', label: 'SAPS Case Slip' });
@@ -301,6 +300,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         itc_reference_number: cellphoneStolen ? itcRefNumber : null,
         total_claim_value: totalClaimValue,
         stolen_items: items,
+        typed_statement: typedStatement || null,
       };
 
       await submitClaimUnified({
@@ -627,9 +627,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                     <input
                       type="text"
                       value={newItem.description}
-                      onChange={(e) =>
-                        setNewItem({ ...newItem, description: e.target.value })
-                      }
+                      onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                       placeholder="e.g., MacBook Pro 16-inch"
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
@@ -643,9 +641,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       <input
                         type="text"
                         value={newItem.makeModel}
-                        onChange={(e) =>
-                          setNewItem({ ...newItem, makeModel: e.target.value })
-                        }
+                        onChange={(e) => setNewItem({ ...newItem, makeModel: e.target.value })}
                         placeholder="e.g., Apple"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
@@ -658,9 +654,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       <input
                         type="text"
                         value={newItem.serialNumber}
-                        onChange={(e) =>
-                          setNewItem({ ...newItem, serialNumber: e.target.value })
-                        }
+                        onChange={(e) => setNewItem({ ...newItem, serialNumber: e.target.value })}
                         placeholder="Optional"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
@@ -675,9 +669,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       <input
                         type="number"
                         value={newItem.purchaseYear}
-                        onChange={(e) =>
-                          setNewItem({ ...newItem, purchaseYear: e.target.value })
-                        }
+                        onChange={(e) => setNewItem({ ...newItem, purchaseYear: e.target.value })}
                         placeholder="e.g., 2023"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       />
@@ -690,12 +682,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       <input
                         type="number"
                         value={newItem.replacementValue}
-                        onChange={(e) =>
-                          setNewItem({
-                            ...newItem,
-                            replacementValue: e.target.value,
-                          })
-                        }
+                        onChange={(e) => setNewItem({ ...newItem, replacementValue: e.target.value })}
                         placeholder="0.00"
                         step="0.01"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -709,12 +696,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                     </label>
                     <select
                       value={newItem.proofType}
-                      onChange={(e) =>
-                        setNewItem({
-                          ...newItem,
-                          proofType: e.target.value as ProofType,
-                        })
-                      }
+                      onChange={(e) => setNewItem({ ...newItem, proofType: e.target.value as ProofType })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="invoice">Invoice/Receipt (Best)</option>
@@ -742,18 +724,10 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       <table className="w-full text-sm">
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Description
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Value (R)
-                            </th>
-                            <th className="px-4 py-3 text-left font-semibold text-gray-700">
-                              Proof
-                            </th>
-                            <th className="px-4 py-3 text-center font-semibold text-gray-700">
-                              Action
-                            </th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Description</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Value (R)</th>
+                            <th className="px-4 py-3 text-left font-semibold text-gray-700">Proof</th>
+                            <th className="px-4 py-3 text-center font-semibold text-gray-700">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -973,11 +947,11 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                   </div>
                 </div>
 
-                {/* Optional Voice Note */}
+                {/* Voice Statement */}
                 <div className="border-t pt-6">
                   <h3 className="font-semibold text-gray-900 mb-1">Voice Statement (Optional)</h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    Want to add anything else? Record a short voice note with any additional details about the incident.
+                    Record a short voice note with any additional details about the incident.
                   </p>
 
                   {!voiceBlob ? (
@@ -994,21 +968,33 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                       {isRecording ? `Stop Recording (${recordingSeconds}s)` : 'Start Recording'}
                     </button>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-800">Voice note recorded ({recordingSeconds}s)</p>
-                          <audio controls className="mt-2 w-full">
-                            <source src={URL.createObjectURL(voiceBlob)} type="audio/webm" />
-                          </audio>
-                        </div>
-                        <button onClick={clearRecording} className="text-gray-400 hover:text-gray-600">
-                          <X className="w-5 h-5" />
-                        </button>
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800">Voice note recorded ({recordingSeconds}s)</p>
+                        <audio controls className="mt-2 w-full">
+                          <source src={URL.createObjectURL(voiceBlob)} type="audio/webm" />
+                        </audio>
                       </div>
+                      <button onClick={clearRecording} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
                   )}
+                </div>
+
+                {/* Written Statement */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Written Statement (Optional)
+                  </label>
+                  <textarea
+                    value={typedStatement}
+                    onChange={(e) => setTypedStatement(e.target.value)}
+                    rows={5}
+                    placeholder="Describe what happened in detail..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
