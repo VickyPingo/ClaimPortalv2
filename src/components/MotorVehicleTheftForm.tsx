@@ -67,7 +67,6 @@ export default function MotorVehicleTheftForm({
   const [reportedToTracker, setReportedToTracker] = useState<boolean | null>(null);
   const [trackerCompanyName, setTrackerCompanyName] = useState('');
 
-
   const [driverLicenseFront, setDriverLicenseFront] = useState<File | null>(null);
   const [driverLicenseBack, setDriverLicenseBack] = useState<File | null>(null);
   const [sapsCaseSlip, setSapsCaseSlip] = useState<File | null>(null);
@@ -78,6 +77,7 @@ export default function MotorVehicleTheftForm({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<any>(null);
+  const [typedStatement, setTypedStatement] = useState('');
 
   const [sapsCaseNumber, setSapsCaseNumber] = useState('');
   const [policeStationName, setPoliceStationName] = useState('');
@@ -287,7 +287,6 @@ export default function MotorVehicleTheftForm({
         );
       }
 
-      // Build attachments array
       const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
 
       attachments.push({ bucket: 'claims', path: `${uploadDir}/driver_license_front`, url: driverLicenseFrontUrl, kind: 'driver_license_front', label: 'Driver License (Front)' });
@@ -339,6 +338,7 @@ export default function MotorVehicleTheftForm({
         police_station_name: policeStationName,
         date_reported: new Date(dateReported).toISOString(),
         incident_date_time: new Date(incidentDateTime).toISOString(),
+        typed_statement: typedStatement || null,
       };
 
       await submitClaimUnified({
@@ -817,7 +817,7 @@ export default function MotorVehicleTheftForm({
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                           />
                           <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Your account number will be needed to process the settlement. Please provide it if available.
+                            Your account number will be needed to process the settlement. Please provide it if available.
                           </p>
                         </div>
 
@@ -1075,11 +1075,11 @@ export default function MotorVehicleTheftForm({
                   </p>
                 </div>
 
-                {/* Optional Voice Note */}
+                {/* Voice Statement */}
                 <div className="border-t pt-6">
                   <h3 className="font-semibold text-gray-900 mb-1">Voice Statement (Optional)</h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    Want to add anything else? Record a short voice note with any additional details about the incident.
+                    Record a short voice note with any additional details about the incident.
                   </p>
 
                   {!voiceBlob ? (
@@ -1096,21 +1096,33 @@ export default function MotorVehicleTheftForm({
                       {isRecording ? `Stop Recording (${recordingSeconds}s)` : 'Start Recording'}
                     </button>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-green-600" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-green-800">Voice note recorded ({recordingSeconds}s)</p>
-                          <audio controls className="mt-2 w-full">
-                            <source src={URL.createObjectURL(voiceBlob)} type="audio/webm" />
-                          </audio>
-                        </div>
-                        <button onClick={clearRecording} className="text-gray-400 hover:text-gray-600">
-                          <X className="w-5 h-5" />
-                        </button>
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800">Voice note recorded ({recordingSeconds}s)</p>
+                        <audio controls className="mt-2 w-full">
+                          <source src={URL.createObjectURL(voiceBlob)} type="audio/webm" />
+                        </audio>
                       </div>
+                      <button onClick={clearRecording} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
                   )}
+                </div>
+
+                {/* Written Statement */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Written Statement (Optional)
+                  </label>
+                  <textarea
+                    value={typedStatement}
+                    onChange={(e) => setTypedStatement(e.target.value)}
+                    rows={5}
+                    placeholder="Describe what happened in detail..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
                 </div>
 
                 <button
