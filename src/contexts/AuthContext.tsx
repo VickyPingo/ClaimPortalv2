@@ -38,7 +38,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   brokerSignUp: (email: string, password: string, profile: Omit<BrokerProfile, 'id' | 'brokerage_id'> & { brokerage_id?: string }) => Promise<User>;
   brokerSignIn: (email: string, password: string) => Promise<void>;
-  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>) => Promise<User>;
+  clientSignUp: (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'> & { id_number?: string }) => Promise<User>;
   clientSignIn: (email: string, password: string) => Promise<void>;
   completePasswordSetup: () => Promise<void>;
   isSuperAdmin: () => boolean;
@@ -177,11 +177,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string, userEmail: string | undefined) => {
     try {
-      // ─── FIX: Always reset loading=true at the start of profile loading.
-      // This prevents HomePageRouter from attempting to route while the
-      // profile is still being fetched — which caused the broker-portal
-      // redirect bug on fresh sign-in (loading was already false from
-      // the initial getSession that found no session).
       setLoading(true);
 
       console.log('Loading profile for userId:', userId);
@@ -521,7 +516,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) { await supabase.auth.signOut(); throw error; }
   };
 
-  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'>) => {
+  const clientSignUp = async (email: string, password: string, profile: Omit<ClientProfile, 'id' | 'brokerage_id'> & { id_number?: string }) => {
     console.log('🔵 CLIENT SIGNUP:', email);
     const brokerageSlug = getBrokerageSlug();
     if (!brokerageSlug) throw new Error('Please sign up from your brokerage link (e.g. independi.claimsportal.co.za).');
@@ -539,7 +534,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { error: profileError } = await supabase.from('profiles').upsert({
       user_id: authData.user.id, brokerage_id: brokerageId, full_name: profile.full_name,
-      email, cell_number: profile.cell_number || '', role: 'client', is_active: true,
+      email, cell_number: profile.cell_number || '', id_number: profile.id_number || null,
+      role: 'client', is_active: true,
     }, { onConflict: 'user_id' });
     if (profileError) throw new Error(`Failed to create profile: ${profileError.message}`);
 
