@@ -72,10 +72,12 @@ export default function StructuralDamageForm({
   const [repairQuote2, setRepairQuote2] = useState<File | null>(null);
   const [contractorReport, setContractorReport] = useState<File | null>(null);
 
+  // Step 6: voice + written statement
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const [typedStatement, setTypedStatement] = useState('');
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -246,6 +248,7 @@ export default function StructuralDamageForm({
         location_lat: location?.lat || null,
         location_lng: location?.lng || null,
         voice_transcript: voiceTranscript,
+        typed_statement: typedStatement || null,
       };
 
       await submitClaimUnified({
@@ -672,7 +675,7 @@ export default function StructuralDamageForm({
 
                 <button
                   onClick={() => setStep(5)}
-                  disabled={isBonded === null || (isBonded && !bondBank)}
+                  disabled={isBonded === null || (isBonded === true && !bondBank)}
                   className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
                   Continue
@@ -871,57 +874,80 @@ export default function StructuralDamageForm({
           {step === 6 && (
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Voice Statement
+                Your Statement
               </h2>
               <p className="text-gray-600 mb-6">
-                Record a detailed voice note describing the damage and incident
+                Record a voice note OR type your statement describing the damage and incident (optional).
               </p>
 
-              <div className="text-center">
-                {!audioBlob ? (
-                  <div>
-                    <button
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                        isRecording
-                          ? 'bg-red-500 animate-pulse'
-                          : 'bg-blue-700 hover:bg-blue-800'
-                      }`}
-                    >
-                      <Mic className="w-16 h-16 text-white" />
-                    </button>
-                    <p className="text-sm text-gray-600">
-                      {isRecording ? 'Tap to stop recording' : 'Tap to start recording'}
-                    </p>
+              <div className="space-y-6">
+                {/* Voice Statement */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Voice Statement (Optional)
+                  </label>
+                  <div className="text-center">
+                    {!audioBlob ? (
+                      <div>
+                        <button
+                          onClick={isRecording ? stopRecording : startRecording}
+                          className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                            isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'
+                          }`}
+                        >
+                          <Mic className="w-12 h-12 text-white" />
+                        </button>
+                        <p className="text-sm text-gray-600">
+                          {isRecording ? 'Tap to stop recording' : 'Tap to record voice note'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-2" />
+                        <p className="text-sm text-gray-600 mb-2">Voice note recorded</p>
+                        <audio controls className="w-full mb-2">
+                          <source src={URL.createObjectURL(audioBlob)} type="audio/webm" />
+                        </audio>
+                        <button
+                          onClick={() => setAudioBlob(null)}
+                          className="text-blue-700 text-sm hover:underline"
+                        >
+                          Record again
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div>
-                    <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                    <p className="text-sm text-gray-600 mb-4">Recording saved</p>
-                    <button
-                      onClick={() => setAudioBlob(null)}
-                      className="text-blue-700 text-sm hover:underline"
-                    >
-                      Record again
-                    </button>
-                  </div>
-                )}
-              </div>
+                </div>
 
-              <button
-                onClick={submitClaim}
-                disabled={!audioBlob || loading}
-                className="w-full mt-6 bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Claim'
-                )}
-              </button>
+                {/* Written Statement */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Written Statement (Optional)
+                  </label>
+                  <textarea
+                    value={typedStatement}
+                    onChange={(e) => setTypedStatement(e.target.value)}
+                    rows={5}
+                    placeholder="Describe what happened in detail..."
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={submitClaim}
+                  disabled={loading}
+                  className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50 flex items-center justify-center"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Claim'
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>
