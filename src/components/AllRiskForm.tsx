@@ -67,33 +67,30 @@ export default function AllRiskForm({
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
 
+  // Step 1
   const [incidentType, setIncidentType] = useState<IncidentType>(null);
   const [incidentDateTime, setIncidentDateTime] = useState('');
   const [incidentLocation, setIncidentLocation] = useState('');
   const [isInternational, setIsInternational] = useState(false);
   const [departureDate, setDepartureDate] = useState('');
-
   const [sapsCase, setSapsCase] = useState('');
-  const [damageDescriptionAudio, setDamageDescriptionAudio] = useState<Blob | null>(null);
-  const [isDamageRecording, setIsDamageRecording] = useState(false);
-  const damageMediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const damageAudioChunksRef = useRef<Blob[]>([]);
   const [lastKnownLocation, setLastKnownLocation] = useState('');
 
+  // Step 2
   const [items, setItems] = useState<ClaimItem[]>([]);
   const [newItem, setNewItem] = useState<Partial<ClaimItem>>({});
 
+  // Step 3
   const [proofOfOwnershipFiles, setProofOfOwnershipFiles] = useState<File[]>([]);
   const [policeReportFile, setPoliceReportFile] = useState<File | null>(null);
   const [valuationCertFile, setValuationCertFile] = useState<File | null>(null);
 
+  // Step 4 — voice + written statement
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [typedStatement, setTypedStatement] = useState('');
-
-  const mediaDeviceId = useRef(Math.random().toString());
 
   const startRecording = async () => {
     try {
@@ -109,8 +106,8 @@ export default function AllRiskForm({
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        setAudioBlob(audioBlob);
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -126,40 +123,6 @@ export default function AllRiskForm({
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-    }
-  };
-
-  const startDamageRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      damageMediaRecorderRef.current = mediaRecorder;
-      damageAudioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          damageAudioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(damageAudioChunksRef.current, { type: 'audio/webm' });
-        setDamageDescriptionAudio(audioBlob);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsDamageRecording(true);
-    } catch (error) {
-      console.error('Recording error:', error);
-      alert('Could not access microphone');
-    }
-  };
-
-  const stopDamageRecording = () => {
-    if (damageMediaRecorderRef.current && isDamageRecording) {
-      damageMediaRecorderRef.current.stop();
-      setIsDamageRecording(false);
     }
   };
 
@@ -239,13 +202,9 @@ export default function AllRiskForm({
 
       let voiceNoteUrl = null;
       let voiceTranscript = null;
-      let damageDescriptionUrl = null;
-      let damageDescriptionTranscript = null;
 
       if (audioBlob) {
-        const audioFile = new File([audioBlob], 'voice_note.webm', {
-          type: 'audio/webm',
-        });
+        const audioFile = new File([audioBlob], 'voice_note.webm', { type: 'audio/webm' });
         voiceNoteUrl = await uploadFile(
           audioFile,
           'claims',
@@ -267,41 +226,7 @@ export default function AllRiskForm({
 
           if (transcriptionResponse.ok) {
             const transcriptionResult = await transcriptionResponse.json();
-            const transcript = transcriptionResult.transcript || transcriptionResult.text || null;
-            voiceTranscript = transcript;
-          }
-        } catch (err) {
-          console.error('Transcription error:', err);
-        }
-      }
-
-      if (damageDescriptionAudio) {
-        const damageAudioFile = new File([damageDescriptionAudio], 'damage_description.webm', {
-          type: 'audio/webm',
-        });
-        damageDescriptionUrl = await uploadFile(
-          damageAudioFile,
-          'claims',
-          `${tempId}/${timestamp}/damage_description.webm`
-        );
-
-        try {
-          const transcriptionResponse = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-claim-voice`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              },
-              body: JSON.stringify({ audioUrl: damageDescriptionUrl }),
-            }
-          );
-
-          if (transcriptionResponse.ok) {
-            const transcriptionResult = await transcriptionResponse.json();
-            const transcript = transcriptionResult.transcript || transcriptionResult.text || null;
-            damageDescriptionTranscript = transcript;
+            voiceTranscript = transcriptionResult.transcript || transcriptionResult.text || null;
           }
         } catch (err) {
           console.error('Transcription error:', err);
@@ -343,10 +268,6 @@ export default function AllRiskForm({
         attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/voice_note.webm`, url: voiceNoteUrl, kind: 'voice_note', label: 'Voice Statement' });
       }
 
-      if (damageDescriptionUrl) {
-        attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/damage_description.webm`, url: damageDescriptionUrl, kind: 'damage_description_audio', label: 'Damage Description Audio' });
-      }
-
       proofOfOwnershipUrls.forEach((url, i) => {
         attachments.push({ bucket: 'claims', path: `${tempId}/${timestamp}/proof_${i + 1}.jpg`, url, kind: 'proof_of_ownership', label: `Proof of Ownership ${i + 1}` });
       });
@@ -359,13 +280,7 @@ export default function AllRiskForm({
             : `Replacement Quote — ${item.description}`;
           const quotePath = `${tempId}/${timestamp}/quote_${item.id}.pdf`;
           const quoteUrl = await uploadFile(item.quoteFile, 'claims', quotePath);
-          attachments.push({
-            bucket: 'claims',
-            path: quotePath,
-            url: quoteUrl,
-            kind: quoteKind,
-            label: quoteLabel,
-          });
+          attachments.push({ bucket: 'claims', path: quotePath, url: quoteUrl, kind: quoteKind, label: quoteLabel });
         }
       }
 
@@ -384,7 +299,6 @@ export default function AllRiskForm({
         is_international: isInternational,
         departure_date: departureDate || null,
         saps_case_number: sapsCase || null,
-        damage_description_transcript: damageDescriptionTranscript,
         last_known_location: lastKnownLocation || null,
         items: items,
         voice_transcript: voiceTranscript,
@@ -429,34 +343,22 @@ export default function AllRiskForm({
       <div className="max-w-3xl mx-auto p-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-2xl font-bold text-gray-900">All-Risk Portable Possessions</h1>
-          <button
-            onClick={onBack}
-            className="flex items-center text-gray-600 hover:text-gray-900"
-          >
+          <button onClick={onBack} className="flex items-center text-gray-600 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back
           </button>
         </div>
 
+        {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
             {[1, 2, 3, 4].map((s) => (
               <div key={s} className="flex-1 flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                    step >= s
-                      ? 'bg-blue-700 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${step >= s ? 'bg-blue-700 text-white' : 'bg-gray-200 text-gray-500'}`}>
                   {s}
                 </div>
                 {s < 4 && (
-                  <div
-                    className={`flex-1 h-1 mx-1 ${
-                      step > s ? 'bg-blue-700' : 'bg-gray-200'
-                    }`}
-                  />
+                  <div className={`flex-1 h-1 mx-1 ${step > s ? 'bg-blue-700' : 'bg-gray-200'}`} />
                 )}
               </div>
             ))}
@@ -464,20 +366,20 @@ export default function AllRiskForm({
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6">
+
+          {/* ═══════════════════════════════════════════════
+              STEP 1 — Incident Details
+          ═══════════════════════════════════════════════ */}
           {step === 1 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Incident Details
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Tell us what happened to your item
-              </p>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Incident Details</h2>
+              <p className="text-gray-600 mb-6">Tell us what happened to your item</p>
 
               <div className="space-y-6">
+
+                {/* What happened */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    What happened? *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">What happened? *</label>
                   <div className="space-y-2">
                     {[
                       { id: 'stolen', label: 'Stolen', desc: 'Item was stolen or taken' },
@@ -487,11 +389,7 @@ export default function AllRiskForm({
                       <button
                         key={id}
                         onClick={() => setIncidentType(id as IncidentType)}
-                        className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                          incidentType === id
-                            ? 'border-blue-700 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
+                        className={`w-full p-3 border-2 rounded-lg text-left transition-all ${incidentType === id ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}
                       >
                         <p className="font-semibold text-gray-900">{label}</p>
                         <p className="text-xs text-gray-600">{desc}</p>
@@ -500,10 +398,9 @@ export default function AllRiskForm({
                   </div>
                 </div>
 
+                {/* Date & Time */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date & Time of Incident *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date & Time of Incident *</label>
                   <input
                     type="datetime-local"
                     value={incidentDateTime}
@@ -512,10 +409,9 @@ export default function AllRiskForm({
                   />
                 </div>
 
+                {/* Location */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Where did this happen? *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Where did this happen? *</label>
                   <input
                     type="text"
                     value={incidentLocation}
@@ -525,28 +421,19 @@ export default function AllRiskForm({
                   />
                 </div>
 
+                {/* International */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Did this happen outside South Africa? *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Did this happen outside South Africa? *</label>
                   <div className="space-y-2">
                     <button
                       onClick={() => setIsInternational(false)}
-                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                        isInternational === false
-                          ? 'border-blue-700 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
+                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${isInternational === false ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}
                     >
                       <p className="font-semibold text-gray-900">No, in South Africa</p>
                     </button>
                     <button
                       onClick={() => setIsInternational(true)}
-                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${
-                        isInternational === true
-                          ? 'border-blue-700 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300'
-                      }`}
+                      className={`w-full p-3 border-2 rounded-lg text-left transition-all ${isInternational === true ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}
                     >
                       <p className="font-semibold text-gray-900">Yes, outside South Africa</p>
                     </button>
@@ -555,26 +442,21 @@ export default function AllRiskForm({
 
                 {isInternational && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Date of Departure from SA *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date of Departure from SA *</label>
                     <input
                       type="date"
                       value={departureDate}
                       onChange={(e) => setDepartureDate(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     />
-                    <p className="text-xs text-gray-600 mt-1">
-                      Insurers typically cover up to 60-90 consecutive days abroad
-                    </p>
+                    <p className="text-xs text-gray-600 mt-1">Insurers typically cover up to 60–90 consecutive days abroad</p>
                   </div>
                 )}
 
+                {/* Stolen — SAPS case number */}
                 {incidentType === 'stolen' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      SAPS Case Number *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">SAPS Case Number *</label>
                     <input
                       type="text"
                       value={sapsCase}
@@ -585,49 +467,10 @@ export default function AllRiskForm({
                   </div>
                 )}
 
-                {incidentType === 'accidentally_damaged' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Describe the Damage (Voice Note) *
-                    </label>
-                    <div className="text-center">
-                      {!damageDescriptionAudio ? (
-                        <div>
-                          <button
-                            onClick={isDamageRecording ? stopDamageRecording : startDamageRecording}
-                            className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                              isDamageRecording
-                                ? 'bg-red-500 animate-pulse'
-                                : 'bg-blue-700 hover:bg-blue-800'
-                            }`}
-                          >
-                            <Mic className="w-16 h-16 text-white" />
-                          </button>
-                          <p className="text-sm text-gray-600">
-                            {isDamageRecording ? 'Tap to stop recording' : 'Tap to describe damage'}
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                          <p className="text-sm text-gray-600 mb-4">Damage description recorded</p>
-                          <button
-                            onClick={() => setDamageDescriptionAudio(null)}
-                            className="text-blue-700 text-sm hover:underline"
-                          >
-                            Record again
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
+                {/* Lost/Missing — last known location */}
                 {incidentType === 'lost_missing' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Known Location
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Last Known Location</label>
                     <input
                       type="text"
                       value={lastKnownLocation}
@@ -638,9 +481,18 @@ export default function AllRiskForm({
                   </div>
                 )}
 
+                {/* NOTE: Accidentally Damaged no longer shows a voice note here.
+                    The damage description can be provided on the statement screen (Step 4). */}
+
                 <button
                   onClick={() => setStep(2)}
-                  disabled={!incidentType || !incidentDateTime || !incidentLocation || (isInternational && !departureDate) || (incidentType === 'stolen' && !sapsCase) || (incidentType === 'accidentally_damaged' && !damageDescriptionAudio)}
+                  disabled={
+                    !incidentType ||
+                    !incidentDateTime ||
+                    !incidentLocation ||
+                    (isInternational && !departureDate) ||
+                    (incidentType === 'stolen' && !sapsCase)
+                  }
                   className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50"
                 >
                   Continue
@@ -649,15 +501,15 @@ export default function AllRiskForm({
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════
+              STEP 2 — Item Register
+          ═══════════════════════════════════════════════ */}
           {step === 2 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Item Register
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Add items affected by this incident
-              </p>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Item Register</h2>
+              <p className="text-gray-600 mb-6">Add items affected by this incident</p>
 
+              {/* Added items list */}
               {items.length > 0 && (
                 <div className="mb-6 space-y-3">
                   {items.map((item) => (
@@ -667,9 +519,7 @@ export default function AllRiskForm({
                           <p className="font-semibold text-gray-900">{item.description}</p>
                           <p className="text-sm text-gray-600">{item.category}</p>
                           {item.makeModel && <p className="text-xs text-gray-500">{item.makeModel}</p>}
-                          <p className="text-sm text-blue-700 font-semibold mt-1">
-                            R{item.replacementValue.toLocaleString()}
-                          </p>
+                          <p className="text-sm text-blue-700 font-semibold mt-1">R{item.replacementValue.toLocaleString()}</p>
                           <p className="text-xs text-gray-600 mt-1">
                             {item.onPolicy === 'yes' && 'On policy'}
                             {item.onPolicy === 'no' && 'Not on policy'}
@@ -679,10 +529,7 @@ export default function AllRiskForm({
                             {item.isRepairable ? 'Repairable — repair quote attached' : 'Replacement needed — quote attached'}
                           </p>
                         </div>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
+                        <button onClick={() => removeItem(item.id)} className="text-red-600 hover:text-red-800">
                           <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
@@ -691,27 +538,25 @@ export default function AllRiskForm({
                 </div>
               )}
 
+              {/* Add new item form */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 mb-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Add New Item</h3>
                 <div className="space-y-4">
+
+                  {/* Category */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
                     <select
                       value={newItem.category || ''}
                       onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select category</option>
-                      {ITEM_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
+                      {ITEM_CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
                   </div>
 
+                  {/* Blacklisting helper for stolen phones */}
                   {incidentType === 'stolen' && ['Mobile Phone', 'Tablet'].includes(newItem.category as string) && (
                     <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
                       <div className="flex items-start mb-3">
@@ -724,30 +569,19 @@ export default function AllRiskForm({
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="bg-white rounded p-2">
-                          <p className="font-semibold text-gray-900">Vodacom</p>
-                          <p className="text-gray-700">Dial 082 111</p>
-                        </div>
-                        <div className="bg-white rounded p-2">
-                          <p className="font-semibold text-gray-900">MTN</p>
-                          <p className="text-gray-700">Dial 135 or 083 135</p>
-                        </div>
-                        <div className="bg-white rounded p-2">
-                          <p className="font-semibold text-gray-900">Cell C</p>
-                          <p className="text-gray-700">Dial 140 or 084 140</p>
-                        </div>
-                        <div className="bg-white rounded p-2">
-                          <p className="font-semibold text-gray-900">Telkom</p>
-                          <p className="text-gray-700">Dial 081 180</p>
-                        </div>
+                        {[['Vodacom', 'Dial 082 111'], ['MTN', 'Dial 135 or 083 135'], ['Cell C', 'Dial 140 or 084 140'], ['Telkom', 'Dial 081 180']].map(([carrier, number]) => (
+                          <div key={carrier} className="bg-white rounded p-2">
+                            <p className="font-semibold text-gray-900">{carrier}</p>
+                            <p className="text-gray-700">{number}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
 
+                  {/* Description */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item Description *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Item Description *</label>
                     <input
                       type="text"
                       value={newItem.description || ''}
@@ -757,10 +591,9 @@ export default function AllRiskForm({
                     />
                   </div>
 
+                  {/* Make & Model */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Make & Model
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Make & Model</label>
                     <input
                       type="text"
                       value={newItem.makeModel || ''}
@@ -770,11 +603,10 @@ export default function AllRiskForm({
                     />
                   </div>
 
+                  {/* Serial / IMEI */}
                   {['Mobile Phone', 'Tablet', 'Laptop', 'Camera', 'Smartwatch'].includes(newItem.category as string) && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Serial / IMEI Number
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Serial / IMEI Number</label>
                       <input
                         type="text"
                         value={newItem.serialImei || ''}
@@ -785,10 +617,9 @@ export default function AllRiskForm({
                     </div>
                   )}
 
+                  {/* Replacement Value */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Replacement Value (R) *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Replacement Value (R) *</label>
                     <input
                       type="number"
                       value={newItem.replacementValue || ''}
@@ -798,20 +629,15 @@ export default function AllRiskForm({
                     />
                   </div>
 
+                  {/* On Policy */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Is this item specifically listed on your policy schedule? *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Is this item specifically listed on your policy schedule? *</label>
                     <div className="space-y-2">
                       {['yes', 'no', 'unsure'].map((opt) => (
                         <button
                           key={opt}
                           onClick={() => setNewItem({ ...newItem, onPolicy: opt as 'yes' | 'no' | 'unsure' })}
-                          className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${
-                            newItem.onPolicy === opt
-                              ? 'border-blue-700 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-300'
-                          }`}
+                          className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${newItem.onPolicy === opt ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}
                         >
                           {opt === 'yes' && 'Yes, it is listed'}
                           {opt === 'no' && 'No, not listed'}
@@ -819,7 +645,6 @@ export default function AllRiskForm({
                         </button>
                       ))}
                     </div>
-
                     {newItem.onPolicy === 'no' && newItem.replacementValue && newItem.replacementValue > 5000 && (
                       <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start">
                         <AlertCircle className="w-4 h-4 text-amber-600 mr-2 mt-0.5 flex-shrink-0" />
@@ -830,51 +655,33 @@ export default function AllRiskForm({
                     )}
                   </div>
 
+                  {/* Device security for phones/tablets */}
                   {['Mobile Phone', 'Tablet'].includes(newItem.category as string) && (
                     <div className="space-y-3 pt-2 border-t border-gray-200">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Device Security
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700">Device Security</label>
                       <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={newItem.deviceBlacklisted || false}
+                        <input type="checkbox" checked={newItem.deviceBlacklisted || false}
                           onChange={(e) => setNewItem({ ...newItem, deviceBlacklisted: e.target.checked })}
-                          className="w-4 h-4"
-                          id="blacklisted"
-                        />
-                        <label htmlFor="blacklisted" className="ml-2 text-sm text-gray-700">
-                          Device blacklisted with network provider
-                        </label>
+                          className="w-4 h-4" id="blacklisted" />
+                        <label htmlFor="blacklisted" className="ml-2 text-sm text-gray-700">Device blacklisted with network provider</label>
                       </div>
                       <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={newItem.findMyDeviceLocked || false}
+                        <input type="checkbox" checked={newItem.findMyDeviceLocked || false}
                           onChange={(e) => setNewItem({ ...newItem, findMyDeviceLocked: e.target.checked })}
-                          className="w-4 h-4"
-                          id="findmy"
-                        />
-                        <label htmlFor="findmy" className="ml-2 text-sm text-gray-700">
-                          Find My Device / iCloud locked
-                        </label>
+                          className="w-4 h-4" id="findmy" />
+                        <label htmlFor="findmy" className="ml-2 text-sm text-gray-700">Find My Device / iCloud locked</label>
                       </div>
                     </div>
                   )}
 
+                  {/* Valuation cert for jewellery/watches */}
                   {['Jewelry', 'Watch'].includes(newItem.category as string) && (
                     <div className="pt-2 border-t border-gray-200">
                       <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={newItem.hasValuationCert || false}
+                        <input type="checkbox" checked={newItem.hasValuationCert || false}
                           onChange={(e) => setNewItem({ ...newItem, hasValuationCert: e.target.checked })}
-                          className="w-4 h-4"
-                          id="valuation"
-                        />
-                        <label htmlFor="valuation" className="ml-2 text-sm text-gray-700">
-                          I have a valuation certificate
-                        </label>
+                          className="w-4 h-4" id="valuation" />
+                        <label htmlFor="valuation" className="ml-2 text-sm text-gray-700">I have a valuation certificate</label>
                       </div>
                       {newItem.replacementValue && newItem.replacementValue > 15000 && !newItem.hasValuationCert && (
                         <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start">
@@ -887,45 +694,22 @@ export default function AllRiskForm({
                     </div>
                   )}
 
-                  {['Earrings', 'Cufflinks', 'Shoes'].some(word => (newItem.description || '').includes(word)) && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
-                      <AlertCircle className="w-4 h-4 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                      <p className="text-xs text-blue-700">
-                        If claiming for a pair/set where only one item is lost, the insurer may require the remaining item to be surrendered as salvage.
-                      </p>
-                    </div>
-                  )}
-
+                  {/* Repairable */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Is this item repairable? *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Is this item repairable? *</label>
                     <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => setNewItem({ ...newItem, isRepairable: true })}
-                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${
-                          newItem.isRepairable === true
-                            ? 'border-blue-700 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
+                      <button type="button" onClick={() => setNewItem({ ...newItem, isRepairable: true })}
+                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${newItem.isRepairable === true ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                         Yes, it can be repaired
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => setNewItem({ ...newItem, isRepairable: false })}
-                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${
-                          newItem.isRepairable === false
-                            ? 'border-blue-700 bg-blue-50'
-                            : 'border-gray-200 hover:border-blue-300'
-                        }`}
-                      >
+                      <button type="button" onClick={() => setNewItem({ ...newItem, isRepairable: false })}
+                        className={`w-full p-2 text-left rounded border-2 transition-all text-sm ${newItem.isRepairable === false ? 'border-blue-700 bg-blue-50' : 'border-gray-200 hover:border-blue-300'}`}>
                         No, replacement needed
                       </button>
                     </div>
                   </div>
 
+                  {/* Quote upload */}
                   {newItem.isRepairable !== null && newItem.isRepairable !== undefined && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -935,11 +719,7 @@ export default function AllRiskForm({
                         <input
                           type="file"
                           accept=".pdf"
-                          onChange={(e) => setNewItem({
-                            ...newItem,
-                            quoteFile: e.target.files?.[0] || null,
-                            quoteFileName: e.target.files?.[0]?.name || ''
-                          })}
+                          onChange={(e) => setNewItem({ ...newItem, quoteFile: e.target.files?.[0] || null, quoteFileName: e.target.files?.[0]?.name || '' })}
                           className="hidden"
                           id={`quote-${newItem.category}`}
                         />
@@ -974,84 +754,60 @@ export default function AllRiskForm({
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════
+              STEP 3 — Supporting Documents
+          ═══════════════════════════════════════════════ */}
           {step === 3 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Supporting Documents
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Provide evidence to support your claim
-              </p>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Supporting Documents</h2>
+              <p className="text-gray-600 mb-6">Provide evidence to support your claim</p>
 
               <div className="space-y-6">
+
+                {/* Proof of Ownership */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Proof of Ownership *
-                  </label>
-                  <p className="text-xs text-gray-600 mb-3">
-                    Invoice, box photo, or manual
-                  </p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Proof of Ownership *</label>
+                  <p className="text-xs text-gray-600 mb-3">Invoice, box photo, or manual</p>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <input
-                      type="file"
-                      accept="image/*,.pdf"
-                      multiple
+                    <input type="file" accept="image/*,.pdf" multiple
                       onChange={(e) => setProofOfOwnershipFiles(Array.from(e.target.files || []))}
-                      className="hidden"
-                      id="proof-ownership"
-                    />
+                      className="hidden" id="proof-ownership" />
                     <label htmlFor="proof-ownership" className="cursor-pointer">
                       <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600">
-                        {proofOfOwnershipFiles.length > 0
-                          ? `${proofOfOwnershipFiles.length} file(s) selected`
-                          : 'Tap to upload proof of ownership'}
+                        {proofOfOwnershipFiles.length > 0 ? `${proofOfOwnershipFiles.length} file(s) selected` : 'Tap to upload proof of ownership'}
                       </p>
                     </label>
                   </div>
                 </div>
 
+                {/* Police Report (stolen only) */}
                 {incidentType === 'stolen' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Police Report / Affidavit (PDF) *
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Police Report / Affidavit (PDF) *</label>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept=".pdf"
+                      <input type="file" accept=".pdf"
                         onChange={(e) => setPoliceReportFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="police-report"
-                      />
+                        className="hidden" id="police-report" />
                       <label htmlFor="police-report" className="cursor-pointer">
                         <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          {policeReportFile ? policeReportFile.name : 'Tap to upload police report'}
-                        </p>
+                        <p className="text-sm text-gray-600">{policeReportFile ? policeReportFile.name : 'Tap to upload police report'}</p>
                       </label>
                     </div>
                   </div>
                 )}
 
+                {/* Valuation Cert (jewellery/watch items) */}
                 {items.some((item) => ['Jewelry', 'Watch'].includes(item.category)) && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Valuation Certificate (PDF)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Valuation Certificate (PDF)</label>
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept=".pdf"
+                      <input type="file" accept=".pdf"
                         onChange={(e) => setValuationCertFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="valuation-cert"
-                      />
+                        className="hidden" id="valuation-cert" />
                       <label htmlFor="valuation-cert" className="cursor-pointer">
                         <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          {valuationCertFile ? valuationCertFile.name : 'Tap to upload valuation certificate'}
-                        </p>
+                        <p className="text-sm text-gray-600">{valuationCertFile ? valuationCertFile.name : 'Tap to upload valuation certificate'}</p>
                       </label>
                     </div>
                   </div>
@@ -1068,31 +824,27 @@ export default function AllRiskForm({
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════
+              STEP 4 — Statement
+          ═══════════════════════════════════════════════ */}
           {step === 4 && (
             <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Your Statement
-              </h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Your Statement</h2>
               <p className="text-gray-600 mb-6">
                 Record a voice note OR type your statement about the incident (optional).
               </p>
 
               <div className="space-y-6">
+
                 {/* Voice Statement */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Voice Statement (Optional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Voice Statement (Optional)</label>
                   <div className="text-center">
                     {!audioBlob ? (
                       <div>
                         <button
                           onClick={isRecording ? stopRecording : startRecording}
-                          className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${
-                            isRecording
-                              ? 'bg-red-500 animate-pulse'
-                              : 'bg-blue-700 hover:bg-blue-800'
-                          }`}
+                          className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-3 ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-blue-700 hover:bg-blue-800'}`}
                         >
                           <Mic className="w-12 h-12 text-white" />
                         </button>
@@ -1107,10 +859,7 @@ export default function AllRiskForm({
                         <audio controls className="w-full mb-2">
                           <source src={URL.createObjectURL(audioBlob)} type="audio/webm" />
                         </audio>
-                        <button
-                          onClick={() => setAudioBlob(null)}
-                          className="text-blue-700 text-sm hover:underline"
-                        >
+                        <button onClick={() => setAudioBlob(null)} className="text-blue-700 text-sm hover:underline">
                           Record again
                         </button>
                       </div>
@@ -1120,9 +869,7 @@ export default function AllRiskForm({
 
                 {/* Written Statement */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Written Statement (Optional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Written Statement (Optional)</label>
                   <textarea
                     value={typedStatement}
                     onChange={(e) => setTypedStatement(e.target.value)}
@@ -1149,6 +896,7 @@ export default function AllRiskForm({
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
