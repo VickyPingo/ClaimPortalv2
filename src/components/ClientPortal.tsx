@@ -801,14 +801,14 @@ export default function ClientPortal() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100">
         <div className="max-w-6xl mx-auto p-4 py-8">
 
-          {/* ─── HEADER WITH BROKERAGE LOGO ─── */}
+          {/* ─── HEADER ─── */}
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {brokerage?.logo_url && (
                 <img
                   src={brokerage.logo_url}
                   alt={brokerage.name}
-                  className="h-12 object-contain"
+                  className="h-20 object-contain"
                 />
               )}
               <div>
@@ -817,11 +817,6 @@ export default function ClientPortal() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setViewMode('past-claims')}
-                className="flex items-center px-4 py-2 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition font-medium">
-                <History className="w-5 h-5 mr-2" />
-                Past Claims
-              </button>
               <button onClick={signOut} className="flex items-center px-4 py-2 text-gray-700 hover:bg-white rounded-lg transition">
                 <LogOut className="w-5 h-5 mr-2" />
                 Sign Out
