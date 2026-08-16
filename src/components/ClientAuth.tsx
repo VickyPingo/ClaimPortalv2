@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBrokerage } from '../contexts/BrokerageContext';
 import { Mail, Lock, Phone, User, AlertCircle, Loader, ArrowLeft, FileText, CreditCard } from 'lucide-react';
+import ForgotPassword from './ForgotPassword';
 
 export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void }) {
   const { clientSignIn, clientSignUp } = useAuth();
   const { brokerage } = useBrokerage();
   const [isSignup, setIsSignup] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -66,6 +68,10 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
       setLoading(false);
     }
   };
+
+  if (showForgotPassword) {
+    return <ForgotPassword onBack={() => setShowForgotPassword(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
@@ -237,17 +243,29 @@ export default function ClientAuth({ onBackToRole }: { onBackToRole: () => void 
             </div>
           )}
 
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="remember-me-client"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 text-green-700 border-gray-300 rounded focus:ring-green-500"
-            />
-            <label htmlFor="remember-me-client" className="ml-2 text-sm text-gray-700">
-              Remember Me
-            </label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="remember-me-client"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-green-700 border-gray-300 rounded focus:ring-green-500"
+              />
+              <label htmlFor="remember-me-client" className="ml-2 text-sm text-gray-700">
+                Remember Me
+              </label>
+            </div>
+
+            {!isSignup && (
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-green-700 hover:text-green-800"
+              >
+                Forgot password?
+              </button>
+            )}
           </div>
 
           <button
