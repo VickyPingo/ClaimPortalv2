@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
 import {
   ArrowLeft,
   Loader2,
@@ -92,6 +94,55 @@ export default function MotorVehicleTheftForm({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<any>(null);
   const [typedStatement, setTypedStatement] = useState('');
+
+  const draft = useClaimDraft(
+    'motor_vehicle_theft',
+    clientId,
+    {
+      step, incidentType, traumaCounselingRequested, hasAllKeys, missingKeysExplanation,
+      incidentLocationAddress, sapsCaseNumber, policeStationName, dateReported, incidentDateTime,
+      vehicleMake, vehicleModel, vehicleYear, vehicleRegistration, vehicleVin, vehicleColor,
+      isFinanced, financeBank, financeAccountNumber,
+      hasTrackingDevice, reportedToTracker, trackerCompanyName,
+      driverLicenseFront, driverLicenseBack, sapsCaseSlip, proofOfPurchase,
+      voiceBlob, typedStatement,
+    },
+    step === 'success'
+  );
+
+  const resumeDraft = () => {
+    const d = draft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.incidentType) setIncidentType(d.incidentType);
+    if (d.traumaCounselingRequested) setTraumaCounselingRequested(d.traumaCounselingRequested);
+    if (d.hasAllKeys !== undefined) setHasAllKeys(d.hasAllKeys);
+    if (d.missingKeysExplanation) setMissingKeysExplanation(d.missingKeysExplanation);
+    if (d.incidentLocationAddress) setIncidentLocationAddress(d.incidentLocationAddress);
+    if (d.sapsCaseNumber) setSapsCaseNumber(d.sapsCaseNumber);
+    if (d.policeStationName) setPoliceStationName(d.policeStationName);
+    if (d.dateReported) setDateReported(d.dateReported);
+    if (d.incidentDateTime) setIncidentDateTime(d.incidentDateTime);
+    if (d.vehicleMake) setVehicleMake(d.vehicleMake);
+    if (d.vehicleModel) setVehicleModel(d.vehicleModel);
+    if (d.vehicleYear) setVehicleYear(d.vehicleYear);
+    if (d.vehicleRegistration) setVehicleRegistration(d.vehicleRegistration);
+    if (d.vehicleVin) setVehicleVin(d.vehicleVin);
+    if (d.vehicleColor) setVehicleColor(d.vehicleColor);
+    if (d.isFinanced !== undefined) setIsFinanced(d.isFinanced);
+    if (d.financeBank) setFinanceBank(d.financeBank);
+    if (d.financeAccountNumber) setFinanceAccountNumber(d.financeAccountNumber);
+    if (d.hasTrackingDevice !== undefined) setHasTrackingDevice(d.hasTrackingDevice);
+    if (d.reportedToTracker !== undefined) setReportedToTracker(d.reportedToTracker);
+    if (d.trackerCompanyName) setTrackerCompanyName(d.trackerCompanyName);
+    if (d.driverLicenseFront) setDriverLicenseFront(d.driverLicenseFront);
+    if (d.driverLicenseBack) setDriverLicenseBack(d.driverLicenseBack);
+    if (d.sapsCaseSlip) setSapsCaseSlip(d.sapsCaseSlip);
+    if (d.proofOfPurchase) setProofOfPurchase(d.proofOfPurchase);
+    if (d.voiceBlob) setVoiceBlob(d.voiceBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    draft.dismiss();
+  };
 
   // ── Effects ─────────────────────────────────────────────
   useEffect(() => {
@@ -258,6 +309,7 @@ export default function MotorVehicleTheftForm({
         attachments,
       });
 
+      draft.clear();
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
@@ -265,6 +317,16 @@ export default function MotorVehicleTheftForm({
       setLoading(false);
     }
   };
+
+  if (draft.hasDraft && draft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={draft.draft.savedAt}
+        onResume={resumeDraft}
+        onDiscard={draft.clear}
+      />
+    );
+  }
 
   // ── Success ──────────────────────────────────────────────
   if (step === 'success') {
