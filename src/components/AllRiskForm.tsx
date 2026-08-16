@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
 import { useAuth } from '../contexts/AuthContext';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
 import {
   ArrowLeft,
   Loader2,
@@ -91,6 +93,38 @@ export default function AllRiskForm({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [typedStatement, setTypedStatement] = useState('');
+
+  const draft = useClaimDraft(
+    'all_risk',
+    clientId,
+    {
+      step, incidentType, incidentDateTime, incidentLocation, isInternational,
+      departureDate, sapsCase, lastKnownLocation, items,
+      proofOfOwnershipFiles, policeReportFile, valuationCertFile,
+      audioBlob, typedStatement,
+    },
+    step === 'success'
+  );
+
+  const resumeDraft = () => {
+    const d = draft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.incidentType) setIncidentType(d.incidentType);
+    if (d.incidentDateTime) setIncidentDateTime(d.incidentDateTime);
+    if (d.incidentLocation) setIncidentLocation(d.incidentLocation);
+    if (d.isInternational) setIsInternational(d.isInternational);
+    if (d.departureDate) setDepartureDate(d.departureDate);
+    if (d.sapsCase) setSapsCase(d.sapsCase);
+    if (d.lastKnownLocation) setLastKnownLocation(d.lastKnownLocation);
+    if (d.items) setItems(d.items);
+    if (d.proofOfOwnershipFiles) setProofOfOwnershipFiles(d.proofOfOwnershipFiles);
+    if (d.policeReportFile) setPoliceReportFile(d.policeReportFile);
+    if (d.valuationCertFile) setValuationCertFile(d.valuationCertFile);
+    if (d.audioBlob) setAudioBlob(d.audioBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    draft.dismiss();
+  };
 
   const startRecording = async () => {
     try {
@@ -310,6 +344,7 @@ export default function AllRiskForm({
         claimData: claimData,
         attachments: attachments,
       });
+      draft.clear();
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
@@ -317,6 +352,16 @@ export default function AllRiskForm({
       setLoading(false);
     }
   };
+
+  if (draft.hasDraft && draft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={draft.draft.savedAt}
+        onResume={resumeDraft}
+        onDiscard={draft.clear}
+      />
+    );
+  }
 
   if (step === 'success') {
     return (
