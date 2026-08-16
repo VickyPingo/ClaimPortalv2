@@ -13,6 +13,8 @@ import ClientClaimDetail from './ClientClaimDetail';
 import ClientDocuments from './client-admin/ClientDocuments';
 import ClientDetails from './client-admin/ClientDetails';
 import ContactBroker from './client-admin/ContactBroker';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
 import {
   Car,
   Droplet,
@@ -134,6 +136,61 @@ export default function ClientPortal() {
   const [policeCaseNumber, setPoliceCaseNumber] = useState('');
   const [policeStationName, setPoliceStationName] = useState('');
   const [policeReportFile, setPoliceReportFile] = useState<File | null>(null);
+
+  // Save/resume for the inline Motor Accident + Burst Geyser wizard.
+  // Keyed by incidentType so the two flows never collide with each other.
+  const inlineDraft = useClaimDraft(
+    incidentType || 'inline_claim',
+    clientData?.id || user?.id,
+    {
+      step, incidentType,
+      accidentDateTime, carCondition, selectedProvince, selectedCity, panelBeaterLocation,
+      thirdPartyName, thirdPartyPhone, thirdPartyVehicle,
+      driverLicensePhoto, licenseDiskPhoto, thirdPartyLicensePhoto, thirdPartyDiskPhoto,
+      damagePhoto1, damagePhoto2, damagePhoto3, damagePhoto4, additionalDamagePhotos,
+      leakVideo, serialPhoto,
+      audioBlob, typedStatement, policeCaseNumber, policeStationName, policeReportFile,
+      locationAddress,
+    },
+    !incidentType || step === 'success'
+  );
+
+  const resumeInlineDraft = () => {
+    const d = inlineDraft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.incidentType) setIncidentType(d.incidentType);
+    if (d.accidentDateTime) setAccidentDateTime(d.accidentDateTime);
+    if (d.carCondition) setCarCondition(d.carCondition);
+    if (d.selectedProvince) setSelectedProvince(d.selectedProvince);
+    if (d.selectedCity) setSelectedCity(d.selectedCity);
+    if (d.panelBeaterLocation) setPanelBeaterLocation(d.panelBeaterLocation);
+    if (d.thirdPartyName) setThirdPartyName(d.thirdPartyName);
+    if (d.thirdPartyPhone) setThirdPartyPhone(d.thirdPartyPhone);
+    if (d.thirdPartyVehicle) setThirdPartyVehicle(d.thirdPartyVehicle);
+    if (d.driverLicensePhoto) setDriverLicensePhoto(d.driverLicensePhoto);
+    if (d.licenseDiskPhoto) setLicenseDiskPhoto(d.licenseDiskPhoto);
+    if (d.thirdPartyLicensePhoto) setThirdPartyLicensePhoto(d.thirdPartyLicensePhoto);
+    if (d.thirdPartyDiskPhoto) setThirdPartyDiskPhoto(d.thirdPartyDiskPhoto);
+    if (d.damagePhoto1) setDamagePhoto1(d.damagePhoto1);
+    if (d.damagePhoto2) setDamagePhoto2(d.damagePhoto2);
+    if (d.damagePhoto3) setDamagePhoto3(d.damagePhoto3);
+    if (d.damagePhoto4) setDamagePhoto4(d.damagePhoto4);
+    if (d.additionalDamagePhotos) setAdditionalDamagePhotos(d.additionalDamagePhotos);
+    if (d.leakVideo) setLeakVideo(d.leakVideo);
+    if (d.serialPhoto) setSerialPhoto(d.serialPhoto);
+    if (d.audioBlob) setAudioBlob(d.audioBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    if (d.policeCaseNumber) setPoliceCaseNumber(d.policeCaseNumber);
+    if (d.policeStationName) setPoliceStationName(d.policeStationName);
+    if (d.policeReportFile) setPoliceReportFile(d.policeReportFile);
+    if (d.locationAddress) setLocationAddress(d.locationAddress);
+    // The two dashboard tiles set claimType alongside incidentType, so
+    // restore that too or the wizard content won't render.
+    if (d.incidentType === 'motor_accident') setClaimType('motor');
+    if (d.incidentType === 'burst_geyser') setClaimType('geyser');
+    inlineDraft.dismiss();
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -382,6 +439,7 @@ export default function ClientPortal() {
         await submitClaimUnified({ claimType: 'burst_geyser', claimData: completeClaimData, attachments });
       }
 
+      inlineDraft.clear();
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
@@ -788,6 +846,16 @@ export default function ClientPortal() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (inlineDraft.hasDraft && inlineDraft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={inlineDraft.draft.savedAt}
+        onResume={resumeInlineDraft}
+        onDiscard={inlineDraft.clear}
+      />
     );
   }
 
