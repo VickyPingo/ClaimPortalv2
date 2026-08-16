@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
 import {
   ArrowLeft,
   Loader2,
@@ -86,6 +88,42 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [recordingInterval, setRecordingInterval] = useState<any>(null);
   const [typedStatement, setTypedStatement] = useState('');
+
+  const draft = useClaimDraft(
+    'theft',
+    clientId,
+    {
+      step, locationAddress, sapsCase, policeStation, dateReported, investigatingOfficer,
+      incidentDateTime, propertyOccupied, forcedEntry, forcedEntryPhoto,
+      items, cellphoneStolen, itcRefNumber,
+      sapsCaseSlip, proofOfOwnership, replacementQuote, voiceBlob, typedStatement,
+    },
+    step === 'success'
+  );
+
+  const resumeDraft = () => {
+    const d = draft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.locationAddress) setLocationAddress(d.locationAddress);
+    if (d.sapsCase) setSapsCase(d.sapsCase);
+    if (d.policeStation) setPoliceStation(d.policeStation);
+    if (d.dateReported) setDateReported(d.dateReported);
+    if (d.investigatingOfficer) setInvestigatingOfficer(d.investigatingOfficer);
+    if (d.incidentDateTime) setIncidentDateTime(d.incidentDateTime);
+    if (d.propertyOccupied !== undefined) setPropertyOccupied(d.propertyOccupied);
+    if (d.forcedEntry !== undefined) setForcedEntry(d.forcedEntry);
+    if (d.forcedEntryPhoto) setForcedEntryPhoto(d.forcedEntryPhoto);
+    if (d.items) setItems(d.items);
+    if (d.cellphoneStolen) setCellphoneStolen(d.cellphoneStolen);
+    if (d.itcRefNumber) setItcRefNumber(d.itcRefNumber);
+    if (d.sapsCaseSlip) setSapsCaseSlip(d.sapsCaseSlip);
+    if (d.proofOfOwnership) setProofOfOwnership(d.proofOfOwnership);
+    if (d.replacementQuote) setReplacementQuote(d.replacementQuote);
+    if (d.voiceBlob) setVoiceBlob(d.voiceBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    draft.dismiss();
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -309,6 +347,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         attachments: attachments,
       });
 
+      draft.clear();
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
@@ -316,6 +355,16 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
       setLoading(false);
     }
   };
+
+  if (draft.hasDraft && draft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={draft.draft.savedAt}
+        onResume={resumeDraft}
+        onDiscard={draft.clear}
+      />
+    );
+  }
 
   if (step === 'success') {
     return (
