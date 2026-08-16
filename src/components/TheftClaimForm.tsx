@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
 import { useClaimDraft } from '../hooks/useClaimDraft';
 import ResumeDraftBanner from './ResumeDraftBanner';
+import ImageUploadField from './ImageUploadField';
 import {
   ArrowLeft,
   Loader2,
@@ -59,7 +60,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
   const [incidentDateTime, setIncidentDateTime] = useState('');
   const [propertyOccupied, setPropertyOccupied] = useState<boolean | null>(null);
   const [forcedEntry, setForcedEntry] = useState<boolean | null>(null);
-  const [forcedEntryPhoto, setForcedEntryPhoto] = useState<File | null>(null);
+  const [forcedEntryPhotos, setForcedEntryPhotos] = useState<File[]>([]);
 
   // Step 3: Stolen Items
   const [items, setItems] = useState<StolenItem[]>([]);
@@ -94,7 +95,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
     clientId,
     {
       step, locationAddress, sapsCase, policeStation, dateReported, investigatingOfficer,
-      incidentDateTime, propertyOccupied, forcedEntry, forcedEntryPhoto,
+      incidentDateTime, propertyOccupied, forcedEntry, forcedEntryPhotos,
       items, cellphoneStolen, itcRefNumber,
       sapsCaseSlip, proofOfOwnership, replacementQuote, voiceBlob, typedStatement,
     },
@@ -113,7 +114,7 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
     if (d.incidentDateTime) setIncidentDateTime(d.incidentDateTime);
     if (d.propertyOccupied !== undefined) setPropertyOccupied(d.propertyOccupied);
     if (d.forcedEntry !== undefined) setForcedEntry(d.forcedEntry);
-    if (d.forcedEntryPhoto) setForcedEntryPhoto(d.forcedEntryPhoto);
+    if (d.forcedEntryPhotos) setForcedEntryPhotos(d.forcedEntryPhotos);
     if (d.items) setItems(d.items);
     if (d.cellphoneStolen) setCellphoneStolen(d.cellphoneStolen);
     if (d.itcRefNumber) setItcRefNumber(d.itcRefNumber);
@@ -248,8 +249,8 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
       alert('Please fill in all required fields');
       return false;
     }
-    if (forcedEntry && !forcedEntryPhoto) {
-      alert('Please upload a photo of forced entry');
+    if (forcedEntry && forcedEntryPhotos.length === 0) {
+      alert('Please upload at least one photo of forced entry');
       return false;
     }
     return true;
@@ -290,11 +291,11 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         replacementQuoteUrl = await uploadFile(replacementQuote, 'claims', `${uploadDir}/replacement_quote${replacementQuoteExt}`);
       }
 
-      let forcedEntryPhotoUrl = null;
-      let forcedEntryPhotoExt = '';
-      if (forcedEntryPhoto) {
-        forcedEntryPhotoExt = getFileExt(forcedEntryPhoto);
-        forcedEntryPhotoUrl = await uploadFile(forcedEntryPhoto, 'claims', `${uploadDir}/forced_entry_photo${forcedEntryPhotoExt}`);
+      const forcedEntryPhotoUrls: string[] = [];
+      for (let i = 0; i < forcedEntryPhotos.length; i++) {
+        const ext = getFileExt(forcedEntryPhotos[i]);
+        const url = await uploadFile(forcedEntryPhotos[i], 'claims', `${uploadDir}/forced_entry_photo_${i + 1}${ext}`);
+        forcedEntryPhotoUrls.push(url);
       }
 
       const attachments: Array<{ bucket: string; path: string; url: string; kind?: string; label?: string }> = [];
@@ -306,9 +307,9 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
         attachments.push({ bucket: 'claims', path: `${uploadDir}/replacement_quote${replacementQuoteExt}`, url: replacementQuoteUrl, kind: 'replacement_quote', label: 'Replacement Quote' });
       }
 
-      if (forcedEntryPhotoUrl) {
-        attachments.push({ bucket: 'claims', path: `${uploadDir}/forced_entry_photo${forcedEntryPhotoExt}`, url: forcedEntryPhotoUrl, kind: 'forced_entry_photo', label: 'Forced Entry Photo' });
-      }
+      forcedEntryPhotoUrls.forEach((url, i) => {
+        attachments.push({ bucket: 'claims', path: `${uploadDir}/forced_entry_photo_${i + 1}`, url, kind: 'forced_entry_photo', label: `Forced Entry Photo ${i + 1}` });
+      });
 
       let voiceNoteUrl = null;
       if (voiceBlob) {
@@ -610,26 +611,15 @@ export default function TheftClaimForm({ clientId, brokerageId, onBack }: TheftC
                 </div>
 
                 {forcedEntry === true && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Upload Photo of Forced Entry *
-                    </label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setForcedEntryPhoto(e.target.files?.[0] || null)}
-                        className="hidden"
-                        id="forced-entry-photo"
-                      />
-                      <label htmlFor="forced-entry-photo" className="cursor-pointer">
-                        <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">
-                          {forcedEntryPhoto ? forcedEntryPhoto.name : 'Upload photo of damaged door/window'}
-                        </p>
-                      </label>
-                    </div>
-                  </div>
+                  <ImageUploadField
+                    id="forced-entry-photos"
+                    label="Photo(s) of Forced Entry *"
+                    files={forcedEntryPhotos}
+                    onChange={setForcedEntryPhotos}
+                    minRequired={1}
+                    accent="blue"
+                    helperText="Show the damaged door, window, or lock."
+                  />
                 )}
 
                 {forcedEntry === false && (
