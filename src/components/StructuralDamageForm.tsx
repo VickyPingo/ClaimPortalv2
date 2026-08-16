@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
+import ImageUploadField from './ImageUploadField';
 import {
   ArrowLeft,
   Loader2,
@@ -78,6 +81,46 @@ export default function StructuralDamageForm({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const [typedStatement, setTypedStatement] = useState('');
+
+  const draft = useClaimDraft(
+    'structural_damage',
+    clientId,
+    {
+      step, locationAddress, incidentType, lightningSubType,
+      isHabitable, isPropertySecure, securityGuardRequested,
+      waterEntryPoint, isGradualLeak, roofConstruction, isGlassOnly,
+      isBonded, bondBank, estimatedRepairCost,
+      damagePhotos, repairQuote1, repairQuote2, contractorReport,
+      audioBlob, typedStatement,
+    },
+    step === 'success'
+  );
+
+  const resumeDraft = () => {
+    const d = draft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.locationAddress) setLocationAddress(d.locationAddress);
+    if (d.incidentType) setIncidentType(d.incidentType);
+    if (d.lightningSubType) setLightningSubType(d.lightningSubType);
+    if (d.isHabitable !== undefined) setIsHabitable(d.isHabitable);
+    if (d.isPropertySecure !== undefined) setIsPropertySecure(d.isPropertySecure);
+    if (d.securityGuardRequested) setSecurityGuardRequested(d.securityGuardRequested);
+    if (d.waterEntryPoint) setWaterEntryPoint(d.waterEntryPoint);
+    if (d.isGradualLeak !== undefined) setIsGradualLeak(d.isGradualLeak);
+    if (d.roofConstruction) setRoofConstruction(d.roofConstruction);
+    if (d.isGlassOnly !== undefined) setIsGlassOnly(d.isGlassOnly);
+    if (d.isBonded !== undefined) setIsBonded(d.isBonded);
+    if (d.bondBank) setBondBank(d.bondBank);
+    if (d.estimatedRepairCost) setEstimatedRepairCost(d.estimatedRepairCost);
+    if (d.damagePhotos) setDamagePhotos(d.damagePhotos);
+    if (d.repairQuote1) setRepairQuote1(d.repairQuote1);
+    if (d.repairQuote2) setRepairQuote2(d.repairQuote2);
+    if (d.contractorReport) setContractorReport(d.contractorReport);
+    if (d.audioBlob) setAudioBlob(d.audioBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    draft.dismiss();
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -256,6 +299,7 @@ export default function StructuralDamageForm({
         claimData: claimData,
         attachments: attachments,
       });
+      draft.clear();
       setStep('success');
     } catch (error: any) {
       alert('Failed to submit claim: ' + error.message);
@@ -263,6 +307,16 @@ export default function StructuralDamageForm({
       setLoading(false);
     }
   };
+
+  if (draft.hasDraft && draft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={draft.draft.savedAt}
+        onResume={resumeDraft}
+        onDiscard={draft.clear}
+      />
+    );
+  }
 
   if (step === 'success') {
     return (
@@ -766,29 +820,15 @@ export default function StructuralDamageForm({
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Damage Photos (Wide & Close-up) *
-                  </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={(e) => setDamagePhotos(Array.from(e.target.files || []))}
-                      className="hidden"
-                      id="damage-photos"
-                    />
-                    <label htmlFor="damage-photos" className="cursor-pointer">
-                      <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        {damagePhotos.length > 0
-                          ? `${damagePhotos.length} photo(s) selected`
-                          : 'Tap to upload damage photos'}
-                      </p>
-                    </label>
-                  </div>
-                </div>
+                <ImageUploadField
+                  id="damage-photos"
+                  label="Damage Photos (Wide & Close-up)"
+                  files={damagePhotos}
+                  onChange={setDamagePhotos}
+                  minRequired={1}
+                  accent="blue"
+                  helperText="Include at least one wide shot and one close-up of the damage."
+                />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
