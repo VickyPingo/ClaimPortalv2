@@ -15,6 +15,7 @@ import ClientDetails from './client-admin/ClientDetails';
 import ContactBroker from './client-admin/ContactBroker';
 import { useClaimDraft } from '../hooks/useClaimDraft';
 import ResumeDraftBanner from './ResumeDraftBanner';
+import ImageUploadField from './ImageUploadField';
 import {
   Car,
   Droplet,
@@ -118,11 +119,7 @@ export default function ClientPortal() {
   const [thirdPartyLicensePhoto, setThirdPartyLicensePhoto] = useState<File | null>(null);
   const [thirdPartyDiskPhoto, setThirdPartyDiskPhoto] = useState<File | null>(null);
 
-  const [damagePhoto1, setDamagePhoto1] = useState<File | null>(null);
-  const [damagePhoto2, setDamagePhoto2] = useState<File | null>(null);
-  const [damagePhoto3, setDamagePhoto3] = useState<File | null>(null);
-  const [damagePhoto4, setDamagePhoto4] = useState<File | null>(null);
-  const [additionalDamagePhotos, setAdditionalDamagePhotos] = useState<File[]>([]);
+  const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
 
   const [leakVideo, setLeakVideo] = useState<File | null>(null);
   const [serialPhoto, setSerialPhoto] = useState<File | null>(null);
@@ -147,7 +144,7 @@ export default function ClientPortal() {
       accidentDateTime, carCondition, selectedProvince, selectedCity, panelBeaterLocation,
       thirdPartyName, thirdPartyPhone, thirdPartyVehicle,
       driverLicensePhoto, licenseDiskPhoto, thirdPartyLicensePhoto, thirdPartyDiskPhoto,
-      damagePhoto1, damagePhoto2, damagePhoto3, damagePhoto4, additionalDamagePhotos,
+      damagePhotos,
       leakVideo, serialPhoto,
       audioBlob, typedStatement, policeCaseNumber, policeStationName, policeReportFile,
       locationAddress,
@@ -172,11 +169,7 @@ export default function ClientPortal() {
     if (d.licenseDiskPhoto) setLicenseDiskPhoto(d.licenseDiskPhoto);
     if (d.thirdPartyLicensePhoto) setThirdPartyLicensePhoto(d.thirdPartyLicensePhoto);
     if (d.thirdPartyDiskPhoto) setThirdPartyDiskPhoto(d.thirdPartyDiskPhoto);
-    if (d.damagePhoto1) setDamagePhoto1(d.damagePhoto1);
-    if (d.damagePhoto2) setDamagePhoto2(d.damagePhoto2);
-    if (d.damagePhoto3) setDamagePhoto3(d.damagePhoto3);
-    if (d.damagePhoto4) setDamagePhoto4(d.damagePhoto4);
-    if (d.additionalDamagePhotos) setAdditionalDamagePhotos(d.additionalDamagePhotos);
+    if (d.damagePhotos) setDamagePhotos(d.damagePhotos);
     if (d.leakVideo) setLeakVideo(d.leakVideo);
     if (d.serialPhoto) setSerialPhoto(d.serialPhoto);
     if (d.audioBlob) setAudioBlob(d.audioBlob);
@@ -343,15 +336,10 @@ export default function ClientPortal() {
       }
 
       if (incidentType === 'motor_accident') {
-        const damagePhotoUrls = [];
+        const damagePhotoUrls: string[] = [];
 
-        if (damagePhoto1) damagePhotoUrls.push(await uploadFile(damagePhoto1, 'claims', `${user.id}/${timestamp}/damage_1.jpg`));
-        if (damagePhoto2) damagePhotoUrls.push(await uploadFile(damagePhoto2, 'claims', `${user.id}/${timestamp}/damage_2.jpg`));
-        if (damagePhoto3) damagePhotoUrls.push(await uploadFile(damagePhoto3, 'claims', `${user.id}/${timestamp}/damage_3.jpg`));
-        if (damagePhoto4) damagePhotoUrls.push(await uploadFile(damagePhoto4, 'claims', `${user.id}/${timestamp}/damage_4.jpg`));
-
-        for (let i = 0; i < additionalDamagePhotos.length; i++) {
-          const url = await uploadFile(additionalDamagePhotos[i], 'claims', `${user.id}/${timestamp}/damage_extra_${i + 1}.jpg`);
+        for (let i = 0; i < damagePhotos.length; i++) {
+          const url = await uploadFile(damagePhotos[i], 'claims', `${user.id}/${timestamp}/damage_${i + 1}.jpg`);
           damagePhotoUrls.push(url);
         }
 
@@ -615,43 +603,20 @@ export default function ClientPortal() {
       return (
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Vehicle Damage Photos</h2>
-          <p className="text-gray-600 mb-6">Upload at least 2 photos showing the damage to your vehicle</p>
+          <p className="text-gray-600 mb-6">Upload photos showing the damage to your vehicle — add as many as you need</p>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { label: 'Damage Photo 1 *', state: damagePhoto1, setter: setDamagePhoto1, id: 'damage-1' },
-                { label: 'Damage Photo 2 *', state: damagePhoto2, setter: setDamagePhoto2, id: 'damage-2' },
-                { label: 'Damage Photo 3 (Optional)', state: damagePhoto3, setter: setDamagePhoto3, id: 'damage-3' },
-                { label: 'Damage Photo 4 (Optional)', state: damagePhoto4, setter: setDamagePhoto4, id: 'damage-4' },
-              ].map(({ label, state, setter, id }) => (
-                <div key={id}>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                    <input type="file" accept="image/*" onChange={(e) => setter(e.target.files?.[0] || null)} className="hidden" id={id} />
-                    <label htmlFor={id} className="cursor-pointer">
-                      <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                      <p className="text-xs text-gray-600">{state ? state.name : 'Upload photo'}</p>
-                    </label>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ImageUploadField
+              id="damage-photos"
+              label="Damage Photos"
+              files={damagePhotos}
+              onChange={setDamagePhotos}
+              minRequired={2}
+              accent="blue"
+              helperText="Take photos from a few different angles so the broker can see the full extent of the damage."
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Additional Photos (Optional)</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                <input type="file" accept="image/*" multiple onChange={(e) => setAdditionalDamagePhotos(Array.from(e.target.files || []))} className="hidden" id="damage-extra" />
-                <label htmlFor="damage-extra" className="cursor-pointer">
-                  <Camera className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                  <p className="text-xs text-gray-600">
-                    {additionalDamagePhotos.length > 0 ? `${additionalDamagePhotos.length} additional photo(s) selected` : 'Tap to upload more photos'}
-                  </p>
-                </label>
-              </div>
-            </div>
-
-            <button onClick={() => setStep(6)} disabled={!damagePhoto1 || !damagePhoto2}
+            <button onClick={() => setStep(6)} disabled={damagePhotos.length < 2}
               className="w-full bg-blue-700 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 disabled:opacity-50">
               Continue
             </button>
@@ -775,7 +740,7 @@ export default function ClientPortal() {
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600">Documentation</p>
               <p className="text-sm text-gray-700">
-                Driver license, License disk, {[damagePhoto1, damagePhoto2, damagePhoto3, damagePhoto4].filter(Boolean).length + additionalDamagePhotos.length} damage photo(s)
+                Driver license, License disk, {damagePhotos.length} damage photo(s)
               </p>
             </div>
           </div>
