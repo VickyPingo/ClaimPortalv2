@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { submitClaimUnified } from '../lib/claimSubmission';
+import { useClaimDraft } from '../hooks/useClaimDraft';
+import ResumeDraftBanner from './ResumeDraftBanner';
+import ImageUploadField from './ImageUploadField';
 import {
   ArrowLeft,
   Loader2,
@@ -55,6 +58,37 @@ export default function BurstGeyserForm({
   const statementMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const statementAudioChunksRef = useRef<Blob[]>([]);
   const [typedStatement, setTypedStatement] = useState('');
+
+  const draft = useClaimDraft(
+    'burst_geyser',
+    clientId,
+    {
+      step, burstDate, burstTime, geyserType, hasResultingDamage,
+      damagePhotos, repairQuote, estimatedRepairCost,
+      audioBlob, extraAudioBlob, statementAudioBlob, typedStatement,
+      locationAddress,
+    },
+    step === 'success'
+  );
+
+  const resumeDraft = () => {
+    const d = draft.draft?.data as any;
+    if (!d) return;
+    if (d.step) setStep(d.step);
+    if (d.burstDate) setBurstDate(d.burstDate);
+    if (d.burstTime) setBurstTime(d.burstTime);
+    if (d.geyserType) setGeyserType(d.geyserType);
+    if (d.hasResultingDamage !== undefined) setHasResultingDamage(d.hasResultingDamage);
+    if (d.damagePhotos) setDamagePhotos(d.damagePhotos);
+    if (d.repairQuote) setRepairQuote(d.repairQuote);
+    if (d.estimatedRepairCost) setEstimatedRepairCost(d.estimatedRepairCost);
+    if (d.audioBlob) setAudioBlob(d.audioBlob);
+    if (d.extraAudioBlob) setExtraAudioBlob(d.extraAudioBlob);
+    if (d.statementAudioBlob) setStatementAudioBlob(d.statementAudioBlob);
+    if (d.typedStatement) setTypedStatement(d.typedStatement);
+    if (d.locationAddress) setLocationAddress(d.locationAddress);
+    draft.dismiss();
+  };
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -149,17 +183,6 @@ export default function BurstGeyserForm({
       statementMediaRecorderRef.current.stop();
       setIsStatementRecording(false);
     }
-  };
-
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setDamagePhotos([...damagePhotos, ...newFiles]);
-    }
-  };
-
-  const removePhoto = (index: number) => {
-    setDamagePhotos(damagePhotos.filter((_, i) => i !== index));
   };
 
   const handleRepairQuoteSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,6 +305,7 @@ export default function BurstGeyserForm({
       });
 
       console.log('[GeyserClaim] Submission successful');
+      draft.clear();
       setStep('success');
     } catch (err: any) {
       console.error('[GeyserClaim] Submission error:', err);
@@ -290,6 +314,16 @@ export default function BurstGeyserForm({
       setLoading(false);
     }
   };
+
+  if (draft.hasDraft && draft.draft) {
+    return (
+      <ResumeDraftBanner
+        savedAt={draft.draft.savedAt}
+        onResume={resumeDraft}
+        onDiscard={draft.clear}
+      />
+    );
+  }
 
   if (step === 'success') {
     return (
@@ -493,38 +527,13 @@ export default function BurstGeyserForm({
 
           {step === 3 && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Damage Photos (Optional)
-                </label>
-                <label className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50">
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-600">Click to upload photos</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handlePhotoSelect}
-                    className="hidden"
-                  />
-                </label>
-
-                {damagePhotos.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {damagePhotos.map((photo, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                        <span className="text-sm text-gray-700 truncate">{photo.name}</span>
-                        <button
-                          onClick={() => removePhoto(i)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ImageUploadField
+                id="geyser-damage-photos"
+                label="Damage Photos (Optional)"
+                files={damagePhotos}
+                onChange={setDamagePhotos}
+                accent="blue"
+              />
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
